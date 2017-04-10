@@ -1,198 +1,96 @@
-Supported data types
-
-	Built-in data types
-		- [ bool,
-		    int8, int16, int32, int64,
-		    uint8, uint16, uint32, uint64,
-		    float, double,
-		    string,
-		    array,
-		    stream
-		  ]
-
-		- obviously C inspired
-		- other types may and probably will be added, this is just
-		  something to start with
-
-	(Deliberately) strange types
-		- [struct, union]
-
-		- attempt to mimic compound C types for ease of expression and
-		  flexibility (structs) and to keep the amount of transferred
-		  data reasonable (unions, discussed later)
-
-
-Basic serialization rules
+Supported data types:
 
 	- bool
-		- serialize as uint8
-
-	- uint8, uint16, uint32, uint64
-		- network byte order
-		- for now, simply transfer 1 to 4 bytes
-
-	- int8, int16, int32, int64
-		- network byte order
-		- two's complement
-		- for now, simple transfer 1 to 4 bytes
-
-	- float, double
-		- not sure yet
-
+	- int
+	- uint
+	- float
 	- string
-		- serialized as UTF-8-encoded sequence of characters
-		- null-terminated
-
-	- array
-		- serialized as (n + 1)-tuple
-		- starts with uint64 array size
-		- n serialized items follow
-
+	- array (heterogenous)
 	- stream
-		- serialized as array of uint8
-
-	- union
-		- serialized as (n + 1)-tuple
-		- starts with the sequential number of the property actually
-		  contained within the union
-		- then the representation of that property follows
+	- dict
 
 
-Naming conventions for properties
+Concept of Names:
 
-	- URL is used for unique identifiaction of a property
-		- bird.org/route/metric
-		- project.org/version/some_struct/some_property
-
-	- decentralized naming scheme
-
-
-The Big Picture
-
-	- data is serialized in the form of "records"
-		- from the user's point of view, a record is the information
-		  to be serialized in a single "piece"
-
-	- a record must have a predeclared "type"
-		- type must be declared to be one of the built-in supported types, or
-
-		- it must be declared to be a struct or union of other types,
-		  including structs and unions
-
-		- the type expression takes the form of a serialized string
-		  (the URL of the property) followed by the serialized type specifiaction
-		  	- "project.org/v1.0/struct_s0" struct
-			- "project.org/v1.0/struct_s0/u8" uint8
-			- "project.org/v1.0/struct_s0/s1" "project.org/v1.0/struct_s1/"
-
-		- forward declarations to (not-yet declared types) are acceptable
-		  (and sometimes it will be useful to have such a type)
-
-	- to serialize data, we first apply some rules to express what type
-	  of data follows
-	  	- some rules are applied to avoid transferring single definition
-		  of a type multiple times
-		  	- after the type was expressed, any following record
-			  is expected to be of that type
-
-			- this can be reset by either expressing a different
-			  type or by "switching" the type
-			  	- we can switch to any previously expressed
-				  type
-
-				- the types are referred to by the order number
-				  in which they were declared or by the URL
-
-				- a URL constitutes a type if it appeared in
-				  a type expression as a left hand side
-
-	- with some type "active", we may then serialize the individual records
-		- records may follow one another in the form of an (endless)
-		  stream of a priori unknown length
-
-	- type declarations can be thought of as records of an implicit type,
-	  such as "netbufs.org/v0.0.1/typeexpr" and fully described using
-	  netbufs built-in types
+	- "name" is used to convey meaning of a piece of data
+	- URL-like
+	- names will be written in relative URL form to conserve resources
+	- hierarchy of names reflects authority over namespaces
+	- decentralized, independent and collision-free scheme
+	- Names are spelled and given an integer ID to avoid transferring the
+	  same string more than once
 
 
-Optional fields
+Concept of Dicts:
 
-	- some fields may be declared optional (the rest will be referred to
-	  as "fixed")
-
-	- the point is that fixed fields are transferred every time, optional
-	  fields may or may not be present in a record
-
-	- the record will be prefixed by a bitmap of "present"/"not present"
-	  bits for all optional properties
-	  	- we need some kind of a record header anyway to distinguish
-		  a record from a type expression/type switch
-
-		- this is the most compact representation I can think of, with
-		  2^n optional props, [n/8] bits are needed for every record,
-		  which is probably better than anything else
-
-		- for arrays of type with optional items declared, this is
-		  wasteful; no header is needed to distinguish here as the
-		  record header is useless - the number of items in the array
-		  is known beforehand
-		  	- we could optimize this by restricting individual
-			  array items to all define the same set of optional
-			  items
-
-	- the type and meaning of a property is determined from it's relative
-	  position within a serialized record (taking the present/not present
-	  bits into account of course)
-
-	- the bitmasking is obviously different from the union serialization
-		- but for small unions, the difference is negligible
-		- therefore we may want to drop unions
+	- let's be very flexible, let the types be loose
+	- provide nice API to setup dict <-> struct mapping easily
 
 
-Consequences of previous ideas
+The Big Picture:
 
-	- appendability
-		- a file or stream may have data appended any time
-		- no fixed set of data types, a type may be added anywhere
-
-	- hard to scan for records of a single type of a record
-		- useful for files 
-		- have to scan through the whole file
-		- if this is something that we want, we'll need to add some
-		  kind of "pointer table" (relative addresses to file/stream)
-		  	- reminds me of xref table in a PDF file
-
-	- we're quite close to native hardware represenation most of the time
-		- easy to debug most of the time
-		- not too much bit fiddling
+	- data is prefixed by a Name to give it a meaning
+	- then type of data follows (name does not imply type)
+	- then the data itself follows
+	- structs may be represented as dicts
 
 
-Assorted bargain ideas
+Notes on serialization of individual types:
 
-	- is it {reasonable,useful} to attempt to submit an informational
-	  RFC describing the data format once it's (almost) done? (I'd love to.)
+	- string:
 
-	- integer packing in the UTF-8 fashion
-		- if a value v is less then 127, then serialize it directly as
-		  a single byte (therefore with the MSB set to zero)
+		- UTF-8 encoded
+		- null terminated
+		- (likely) prefixed by string length in bytes to simplify reader's
+		  memory management
 
-		- otherwise, set MSB to one and serialize the 7 most significant
-		  bits of v, then serialize the rest recursively
 
-		- will harm performance, will be a problem for in-place decoding
-		  scheme
+Events:
 
-		- either do it everywhere or only in very rare cases (or not at
-		  all), it'll be a mess otherwise
+	- document contains following "events" (tags):
 
-	- we may want to incorporate record length in the record header to
-	  allow for quick record skipping in a file and to allocate just the
-	  right amount of memory to hold a record (but: in-place decoding will
-	  render this information useless)
+		- name
+		- data
+		- map-begin
+		- map-end
 
-	- the implementation may reorder data members within a struct or a union
-	  to allow for bit-level space optimization
 
-		- it may be useful to transfer some integer property first
-		  if the record header has some bits left, it could squeeze
-		  in there easily
+Open questions:
+
+	- should arrays be homogenous?
+	- can we benefit from fixed fields in terms of speed?
+	- how do we tranfer *actual* hashtables?
+
+
+API:
+	
+	- strict mapping from Names to struct members (or variables etc.):
+		- only interested in some Names, ignore other
+		- give a bitmap denoting which struct members are valid
+
+	- like above, but accumulate "extra" names somewhere
+		- in an "extra stuff" dictionary
+
+	- don't do any mapping, just give generic structures holding all the
+	  values
+	  	- everything's in a "extra stuff" generic dict
+
+
+name		name-id	len		name	...		\0
+data		name-id	type	len	 	value
+map-bgein	name-id	type	len	 	value	...	name-id type value map-end
+map-end
+
+name 27 "bird.org/struct/thing" 1
+name 28 "bird.org/struct/thingy" 2
+
+data 1 int len 11
+data 1 int len 12
+
+
+Alternative Idea:
+	- use CBOR to encode all data, define a protocol over CBOR instead
+	- use native CBOR extensions (tags) to attach semantic information to
+	  data
+	- documents should be properly CBOR-formatted and decodable without
+	  errors
