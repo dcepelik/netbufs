@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 	struct rt rt;
 
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s FILENAME", argv[0]);
+		fprintf(stderr, "Usage: %s FILENAME\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
