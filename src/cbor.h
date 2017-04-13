@@ -84,7 +84,7 @@ cbor_err_t cbor_text_encode(struct cbor_encoder *enc, char *str, size_t len);
 cbor_err_t cbor_text_encode_begin(struct cbor_encoder *enc);
 cbor_err_t cbor_text_encode_end(struct cbor_encoder *enc);
 
-cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, char *bytes, size_t len);
+cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len);
 cbor_err_t cbor_bytes_encode_begin(struct cbor_encoder *enc);
 cbor_err_t cbor_bytes_encode_end(struct cbor_encoder *enc);
 

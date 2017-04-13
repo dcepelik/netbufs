@@ -1,5 +1,6 @@
 #include "internal.h"
 #include "debug.h"
+#include <ctype.h>
 
 
 cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes,
@@ -11,8 +12,14 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes,
 	(void) bytes;
 	(void) count;
 
-	for (i = 0; i < count; i++)
-		DEBUG_PRINTF("Writing byte 0x%02X", bytes[i]);
+	for (i = 0; i < count; i++) {
+		if (isprint(bytes[i])) {
+			DEBUG_PRINTF("Writing byte 0x%02X [%c]", bytes[i], bytes[i]);
+		}
+		else {
+			DEBUG_PRINTF("Writing byte 0x%02X", bytes[i]);
+		}
+	}
 
 	return CBOR_ERR_OK;
 }
