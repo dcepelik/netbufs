@@ -1,8 +1,47 @@
 #ifndef CBOR_H
 #define CBOR_H
 
+#include "error.h"
 #include <stdlib.h>
 #include <inttypes.h>
+
+/*
+ * Major types
+ */
+enum cbor_type
+{
+	CBOR_TYPE_UINT,
+	CBOR_TYPE_NEGATIVE_INT,
+	CBOR_TYPE_BYTES,
+	CBOR_TYPE_TEXT,
+	CBOR_TYPE_ARRAY,
+	CBOR_TYPE_MAP,
+	CBOR_TYPE_TAG,
+	CBOR_TYPE_OTHER,
+};
+
+/*
+ * CBOR data item encapsulation
+ */
+struct cbor_item
+{
+	enum cbor_type type;
+
+	union {
+		size_t len;
+	};
+};
+
+/*
+ * Simple values
+ */
+enum cbor_simple_value
+{
+	CBOR_SIMPLE_VALUE_FALSE = 20,
+	CBOR_SIMPLE_VALUE_TRUE,
+	CBOR_SIMPLE_VALUE_NULL,
+	CBOR_SIMPLE_VALUE_UNDEF,
+};
 
 
 struct cbor_encoder;

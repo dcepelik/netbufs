@@ -1,0 +1,20 @@
+.PHONY: clean metrics
+
+PROG=run-tests
+OBJS=main.o encode.o stream.o util.o memory.o
+
+CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG
+LDFLAGS+=-Wall
+
+
+$(PROG): $(OBJS)
+	$(CC) $(LDFALGS) -o $@ $^
+
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -o $@ $<
+
+clean:
+	rm -f -- $(BINS) *.o
+
+metrics:
+	find . -name "*.c" -or -name "*.h" | xargs cat | wc -l
