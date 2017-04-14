@@ -9,6 +9,8 @@ enum cbor_err
 	CBOR_ERR_ITEM,		/* unexpected item */
 	CBOR_ERR_EOF,		/* unexpected EOF */
 	CBOR_ERR_RANGE,		/* value is out of range */
+	CBOR_ERR_NEGATIVE_INT,	/* negative int where uint was expected */
+	CBOR_ERR_OPER,		/* invalid operation */
 };
 
 typedef enum cbor_err cbor_err_t;

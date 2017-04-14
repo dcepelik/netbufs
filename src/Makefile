@@ -1,7 +1,7 @@
 .PHONY: clean metrics
 
 PROG=run-tests
-OBJS=main.o encode.o stream.o util.o memory.o
+OBJS=main.o cbor.o encode.o decode.o stream.o util.o memory.o stack.o
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG
 LDFLAGS+=-Wall
@@ -17,4 +17,4 @@ clean:
 	rm -f -- $(BINS) *.o
 
 metrics:
-	find . -name "*.c" -or -name "*.h" | xargs cat | wc -l
+	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc

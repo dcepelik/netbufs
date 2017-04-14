@@ -13,8 +13,32 @@ int main(void)
 	//unsigned char bytes[4] = { 42, 44, 46, 43 };
 	//cbor_bytes_encode(enc, bytes, 4);
 
-	char *str = "Hello World!";
-	cbor_text_encode(enc, str, strlen(str));
+	//char *str = "Hello World!";
+	//cbor_text_encode(enc, str, strlen(str));
+
+	//cbor_array_encode_begin(enc, 3);
+	//cbor_int8_encode(enc, 1);
+	//cbor_array_encode_begin(enc, 2);
+	//cbor_int8_encode(enc, 2);
+	//cbor_int8_encode(enc, 3);
+	//cbor_array_encode_end(enc);
+	//cbor_array_encode_begin(enc, 2);
+	//cbor_int8_encode(enc, 4);
+	//cbor_int8_encode(enc, 5);
+	//cbor_array_encode_end(enc);
+	//cbor_array_encode_end(enc);
+
+	cbor_array_encode_begin_indef(enc);
+	cbor_int8_encode(enc, 1);
+	cbor_array_encode_begin(enc, 2);
+	cbor_int8_encode(enc, 2);
+	cbor_int8_encode(enc, 3);
+	cbor_array_encode_end(enc);
+	cbor_array_encode_begin_indef(enc);
+	cbor_int8_encode(enc, 4);
+	cbor_int8_encode(enc, 5);
+	cbor_array_encode_end(enc);
+	cbor_array_encode_end(enc);
 	
 	/* TODO Test encode-decode an int for various ints */
 

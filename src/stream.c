@@ -23,3 +23,15 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes,
 
 	return CBOR_ERR_OK;
 }
+
+
+cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes,
+	size_t offset, size_t count)
+{
+	(void) stream;
+	(void) bytes;
+	(void) offset;
+	(void) count;
+
+	return CBOR_ERR_EOF;
+}

@@ -1,5 +1,6 @@
 #include "internal.h"
 #include "memory.h"
+#include "stack.h"
 #include "stream.h"
 
 #include <assert.h>
@@ -9,17 +10,17 @@
 #include <stdbool.h>
 
 
-#define CBOR_5BIT_1B_EXT	24
-#define CBOR_5BIT_2B_EXT	25
-#define CBOR_5BIT_4B_EXT	26
-#define CBOR_5BIT_8B_EXT	27
-
-
 struct cbor_encoder *cbor_encoder_new()
 {
 	struct cbor_encoder *enc;
 
 	enc = cbor_malloc(sizeof(*enc));
+
+	if (!stack_init(&enc->blocks, 4, sizeof(struct block))) {
+		free(enc);
+		return NULL;
+	}
+
 	return enc;
 }
 
@@ -30,82 +31,101 @@ void cbor_encoder_delete(struct cbor_encoder *enc)
 }
 
 
-static unsigned char cbor_initial(enum cbor_type type)
+static inline bool type_is_indef(enum cbor_major type)
 {
-	return ((unsigned char)type) << 5;
+	return (type & CBOR_EXTRA_MASK) == CBOR_EXTRA_VAR_LEN;
 }
 
 
-static cbor_err_t cbor_uint_encode(struct cbor_encoder *enc, enum cbor_type type, uint64_t val)
+static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type type)
 {
+	unsigned char bytes[9];
+	size_t num_extra_bytes;
 	uint64_t val_be;
 	unsigned char *val_be_bytes = (unsigned char *)&val_be;
-	unsigned char bytes[5];
-	size_t num_bytes;
 	size_t i;
 
-	val_be = htobe64(val);
-	bytes[0] = cbor_initial(type);
+	num_extra_bytes = 0;
+	bytes[0] = type.major << 5;
 
-	if (val <= 23) {
-		num_bytes = 0;
-		bytes[0] += val;
-	}
-	else if (val <= UINT8_MAX) {
-		num_bytes = 1;
-		bytes[0] += CBOR_5BIT_1B_EXT;
-	}
-	else if (val <= UINT16_MAX) {
-		num_bytes = 2;
-		bytes[0] += CBOR_5BIT_2B_EXT;
-	}
-	else if (val <= UINT32_MAX) {
-		num_bytes = 4;
-		bytes[0] += CBOR_5BIT_4B_EXT;
+	if (type.indef) {
+		bytes[0] |= CBOR_EXTRA_VAR_LEN;
 	}
 	else {
-		num_bytes = 8;
-		bytes[0] += CBOR_5BIT_8B_EXT;
+		if (type.val <= 23) {
+			bytes[0] |= type.val;
+		}
+		else if (type.val <= UINT8_MAX) {
+			num_extra_bytes = 1;
+			bytes[0] |= CBOR_EXTRA_1B;
+		}
+		else if (type.val <= UINT16_MAX) {
+			num_extra_bytes = 2;
+			bytes[0] |= CBOR_EXTRA_2B;
+		}
+		else if (type.val <= UINT32_MAX) {
+			num_extra_bytes = 4;
+			bytes[0] |= CBOR_EXTRA_4B;
+		}
+		else {
+			num_extra_bytes = 8;
+			bytes[0] |= CBOR_EXTRA_8B;
+		}
+
+		/* implicit corner case: won't copy anything when val <= 23 */
+		val_be = htobe64(type.val);
+		for (i = 0; i < num_extra_bytes; i++)
+			bytes[1 + i] = val_be_bytes[(8 - num_extra_bytes) + i];
 	}
 
-	/* implicit corner case: won't copy anything when val <= 23 */
-	for (i = 0; i < num_bytes; i++)
-		bytes[1 + i] = val_be_bytes[(8 - num_bytes) + i];
+	return cbor_stream_write(&enc->stream, bytes, 1 + num_extra_bytes);
+}
 
-	return cbor_stream_write(&enc->stream, bytes, 1 + num_bytes);
+
+cbor_err_t cbor_uint_encode(struct cbor_encoder *enc, uint64_t val)
+{
+	return cbor_type_encode(enc, (struct cbor_type) {
+		.major = CBOR_MAJOR_UINT,
+		.indef = false,
+		.val = val
+	});
 }
 
 
 cbor_err_t cbor_uint8_encode(struct cbor_encoder *enc, uint8_t val)
 {
-	return cbor_uint_encode(enc, CBOR_TYPE_UINT, val);
+	return cbor_uint_encode(enc, val);
 }
 
 
 cbor_err_t cbor_uint16_encode(struct cbor_encoder *enc, uint16_t val)
 {
-	return cbor_uint_encode(enc, CBOR_TYPE_UINT, val);
+	return cbor_uint_encode(enc, val);
 }
 
 
 cbor_err_t cbor_uint32_encode(struct cbor_encoder *enc, uint32_t val)
 {
-	return cbor_uint_encode(enc, CBOR_TYPE_UINT, val);
+	return cbor_uint_encode(enc, val);
 }
 
 
 cbor_err_t cbor_uint64_encode(struct cbor_encoder *enc, uint64_t val)
 {
-	return cbor_uint_encode(enc, CBOR_TYPE_UINT, val);
+	return cbor_uint_encode(enc, val);
 }
 
 
 static cbor_err_t cbor_int_encode(struct cbor_encoder *enc, int64_t val)
 {
 	if (val >= 0)
-		return cbor_uint_encode(enc, CBOR_TYPE_UINT, val);
+		return cbor_uint_encode(enc, val);
 	else
-		return cbor_uint_encode(enc, CBOR_TYPE_NEGATIVE_INT, (-1 - val));
+		return cbor_type_encode(enc, (struct cbor_type) {
+			.major = CBOR_MAJOR_NEGATIVE_INT,
+			.indef = false,
+			.val = (-1 - val)
+		});
 }
 
 
@@ -133,21 +153,126 @@ cbor_err_t cbor_int64_encode(struct cbor_encoder *enc, int64_t val)
 }
 
 
-cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
+static cbor_err_t cbor_break_encode(struct cbor_encoder *enc)
 {
-	assert(len > 0);
+	return cbor_stream_write(&enc->stream, (unsigned char[]) { CBOR_BREAK }, 1);
+}
 
-	cbor_err_t err;
 
-	if ((err = cbor_uint_encode(enc, CBOR_TYPE_BYTES, len)) != CBOR_ERR_OK) {
-		return err;
+static cbor_err_t cbor_block_begin(struct cbor_encoder *enc, enum cbor_major major_type, bool indef, uint64_t len)
+{
+	struct block *block;
+
+	block = stack_push(&enc->blocks);
+	if (!block)
+		return CBOR_ERR_NOMEM;
+
+	block->type.major = major_type;
+	block->type.indef = indef;
+	block->type.val = len;
+	block->num_items = 0;
+
+	return cbor_type_encode(enc, block->type);
+}
+
+
+static cbor_err_t cbor_block_end(struct cbor_encoder *enc, enum cbor_major major_type)
+{
+	struct block *block;
+
+	if (stack_is_empty(&enc->blocks))
+		return CBOR_ERR_OPER;
+
+	block = stack_pop(&enc->blocks);
+	if (block->type.indef) {
+		return cbor_break_encode(enc);
 	}
 
+	if (block->num_items != block->type.val)
+		return CBOR_ERR_OPER;
+
+	return CBOR_ERR_OK;
+}
+
+
+cbor_err_t cbor_array_encode_begin(struct cbor_encoder *enc, uint64_t len)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_ARRAY, false, len);
+}
+
+
+cbor_err_t cbor_array_encode_begin_indef(struct cbor_encoder *enc)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_ARRAY, true, 0);
+}
+
+
+cbor_err_t cbor_array_encode_end(struct cbor_encoder *enc)
+{
+	return cbor_block_end(enc, CBOR_MAJOR_ARRAY);
+}
+
+
+cbor_err_t cbor_map_encode_begin(struct cbor_encoder *enc, uint64_t len)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_MAP, false, len);
+}
+
+
+cbor_err_t cbor_map_encode_begin_indef(struct cbor_encoder *enc)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_MAP, true, 0);
+}
+
+
+cbor_err_t cbor_map_encode_end(struct cbor_encoder *enc)
+{
+	return cbor_block_end(enc, CBOR_MAJOR_MAP);
+}
+
+
+cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
+{
+	cbor_err_t err;
+
+	err = cbor_type_encode(enc, (struct cbor_type) {
+		.major = CBOR_MAJOR_BYTES,
+		.indef = false,
+		.val = len
+	});
+
+	if (err)
+		return err;
+
 	return cbor_stream_write(&enc->stream, bytes, len);
+}
+
+
+cbor_err_t cbor_bytes_encode_begin_indef(struct cbor_encoder *enc)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_BYTES, true, 0);
+}
+
+
+cbor_err_t cbor_bytes_encode_end(struct cbor_encoder *enc)
+{
+	return cbor_block_end(enc, CBOR_MAJOR_BYTES);
 }
 
 
 cbor_err_t cbor_text_encode(struct cbor_encoder *enc, char *str, size_t len)
 {
 	return cbor_bytes_encode(enc, (unsigned char *)str, len);
+}
+
+
+cbor_err_t cbor_text_encode_begin_indef(struct cbor_encoder *enc)
+{
+	return cbor_block_begin(enc, CBOR_MAJOR_TEXT, true, 0);
+}
+
+
+cbor_err_t cbor_text_encode_end(struct cbor_encoder *enc)
+{
+	return cbor_block_end(enc, CBOR_MAJOR_TEXT);
 }
