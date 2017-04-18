@@ -26,16 +26,12 @@ struct block
 	size_t num_items;
 };
 
-struct block_stack
-{
-	struct block *array;	/* array of blocks */
-	size_t size;		/* size of the array */
-	size_t count;		/* number of blocks stacked */
-};
+cbor_err_t stack_block_begin(struct stack *stack, enum cbor_major type, bool indef, uint64_t len);
+cbor_err_t stack_block_end(struct stack *stack, enum cbor_major type, bool indef, uint64_t len);
 
 struct cbor_encoder
 {
-	struct cbor_stream stream;
+	struct cbor_stream *stream;
 	struct errlist errors;
 	struct stack blocks;
 	/* state encapsulation */
@@ -44,8 +40,10 @@ struct cbor_encoder
 
 struct cbor_decoder
 {
-	struct cbor_stream stream;
+	struct cbor_stream *stream;
 	struct errlist errors;
+	struct stack blocks;
+	/* state encapsulation */
 	/* various options */
 	/* state encapsulation */
 };

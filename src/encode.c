@@ -10,11 +10,12 @@
 #include <stdbool.h>
 
 
-struct cbor_encoder *cbor_encoder_new()
+struct cbor_encoder *cbor_encoder_new(struct cbor_stream *stream)
 {
 	struct cbor_encoder *enc;
 
 	enc = cbor_malloc(sizeof(*enc));
+	enc->stream = stream;
 
 	if (!stack_init(&enc->blocks, 4, sizeof(struct block))) {
 		free(enc);
@@ -28,12 +29,6 @@ struct cbor_encoder *cbor_encoder_new()
 void cbor_encoder_delete(struct cbor_encoder *enc)
 {
 	cbor_free(enc);
-}
-
-
-static inline bool type_is_indef(enum cbor_major type)
-{
-	return (type & CBOR_EXTRA_MASK) == CBOR_EXTRA_VAR_LEN;
 }
 
 
@@ -78,7 +73,7 @@ static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type ty
 			bytes[1 + i] = val_be_bytes[(8 - num_extra_bytes) + i];
 	}
 
-	return cbor_stream_write(&enc->stream, bytes, 1 + num_extra_bytes);
+	return cbor_stream_write(enc->stream, bytes, 1 + num_extra_bytes);
 }
 
 
@@ -155,7 +150,7 @@ cbor_err_t cbor_int64_encode(struct cbor_encoder *enc, int64_t val)
 
 static cbor_err_t cbor_break_encode(struct cbor_encoder *enc)
 {
-	return cbor_stream_write(&enc->stream, (unsigned char[]) { CBOR_BREAK }, 1);
+	return cbor_stream_write(enc->stream, (unsigned char[]) { CBOR_BREAK }, 1);
 }
 
 
@@ -184,6 +179,10 @@ static cbor_err_t cbor_block_end(struct cbor_encoder *enc, enum cbor_major major
 		return CBOR_ERR_OPER;
 
 	block = stack_pop(&enc->blocks);
+
+	if (block->type.major != major_type)
+		return CBOR_ERR_OPER;
+
 	if (block->type.indef) {
 		return cbor_break_encode(enc);
 	}
@@ -231,12 +230,12 @@ cbor_err_t cbor_map_encode_end(struct cbor_encoder *enc)
 }
 
 
-cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
+static cbor_err_t cbor_string_encode(struct cbor_encoder *enc, enum cbor_major major, unsigned char *bytes, size_t len)
 {
 	cbor_err_t err;
 
 	err = cbor_type_encode(enc, (struct cbor_type) {
-		.major = CBOR_MAJOR_BYTES,
+		.major = major,
 		.indef = false,
 		.val = len
 	});
@@ -244,7 +243,13 @@ cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, siz
 	if (err)
 		return err;
 
-	return cbor_stream_write(&enc->stream, bytes, len);
+	return cbor_stream_write(enc->stream, bytes, len);
+}
+
+
+cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
+{
+	return cbor_string_encode(enc, CBOR_MAJOR_BYTES, bytes, len);
 }
 
 
@@ -260,9 +265,9 @@ cbor_err_t cbor_bytes_encode_end(struct cbor_encoder *enc)
 }
 
 
-cbor_err_t cbor_text_encode(struct cbor_encoder *enc, char *str, size_t len)
+cbor_err_t cbor_text_encode(struct cbor_encoder *enc, unsigned char *str, size_t len)
 {
-	return cbor_bytes_encode(enc, (unsigned char *)str, len);
+	return cbor_string_encode(enc, CBOR_MAJOR_TEXT, (unsigned char *)str, len);
 }
 
 

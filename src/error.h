@@ -11,6 +11,8 @@ enum cbor_err
 	CBOR_ERR_RANGE,		/* value is out of range */
 	CBOR_ERR_NEGATIVE_INT,	/* negative int where uint was expected */
 	CBOR_ERR_OPER,		/* invalid operation */
+	CBOR_ERR_NOFILE,	/* file not found */
+	CBOR_ERR_INDEF,		/* (in)definite-length item was unexpected */
 };
 
 typedef enum cbor_err cbor_err_t;
