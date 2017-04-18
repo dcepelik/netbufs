@@ -375,3 +375,19 @@ cbor_err_t cbor_text_decode(struct cbor_decoder *dec, unsigned char **str, size_
 
 	return err;
 }
+
+
+cbor_err_t cbor_tag_decode(struct cbor_decoder *dec, uint64_t *tagno)
+{
+	cbor_err_t err;
+	struct cbor_type type;
+
+	if ((err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
+		return err;
+
+	if (type.major != CBOR_MAJOR_TAG)
+		return CBOR_ERR_ITEM;
+
+	*tagno = type.val;
+	return CBOR_ERR_OK;
+}

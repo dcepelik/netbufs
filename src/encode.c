@@ -281,3 +281,13 @@ cbor_err_t cbor_text_encode_end(struct cbor_encoder *enc)
 {
 	return cbor_block_end(enc, CBOR_MAJOR_TEXT);
 }
+
+
+cbor_err_t cbor_tag_encode(struct cbor_encoder *enc, uint64_t tagno)
+{
+	return cbor_type_encode(enc, (struct cbor_type) {
+		.major = CBOR_MAJOR_TAG,
+		.indef = false,
+		.val = tagno
+	});
+}
