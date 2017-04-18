@@ -21,6 +21,13 @@ struct cbor_decoder;
 struct cbor_document;
 struct cbor_stream;
 
+struct cbor_stream *cbor_stream_new(void);
+void cbor_stream_delete(struct cbor_stream *stream);
+
+cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int mode);
+cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream);
+void cbor_stream_close(struct cbor_stream *stream);
+
 /*
  * CBOR Major Types
  * @see RFC 7049, section 2.1.
@@ -165,7 +172,7 @@ cbor_err_t cbor_map_decode_end(struct cbor_decoder *dec);
 cbor_err_t cbor_bytes_decode(struct cbor_decoder *dec, unsigned char **bytes, size_t *len);
 cbor_err_t cbor_text_decode(struct cbor_decoder *dec, unsigned char **str, size_t *len);
 
-cbor_err_t cbor_tag_decode(struct cbor_encoder *enc, uint64_t *tagno);
+cbor_err_t cbor_tag_decode(struct cbor_decoder *dec, uint64_t *tagno);
 
 /*
  * DOM-oriented decoder API.

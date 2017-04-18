@@ -9,11 +9,11 @@
 
 int main(void)
 {
-	struct cbor_stream dummy;
-	cbor_stream_init(&dummy);
+	struct cbor_stream *dummy = cbor_stream_new();
+	cbor_stream_open_memory(dummy);
 
-	struct cbor_encoder *enc = cbor_encoder_new(&dummy);
-	struct cbor_decoder *dec = cbor_decoder_new(&dummy);
+	struct cbor_encoder *enc = cbor_encoder_new(dummy);
+	struct cbor_decoder *dec = cbor_decoder_new(dummy);
 
 	//cbor_int16_encode(enc, 1442);
 	//cbor_int16_encode(enc, -55);
