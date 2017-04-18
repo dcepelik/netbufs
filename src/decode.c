@@ -55,12 +55,16 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 	type->major = (bytes[0] & CBOR_MAJOR_MASK) >> 5;
 	extra_bits = bytes[0] & CBOR_EXTRA_MASK;
 
+	/* TODO */
+	type->minor = extra_bits;
+
 	type->indef = (extra_bits == CBOR_EXTRA_VAR_LEN);
 	if (type->indef)
 		return CBOR_ERR_OK;
 
 	if (extra_bits <= 23) {
 		type->val = extra_bits;
+		type->minor = CBOR_MINOR_SVAL;	/* TODO */
 		return CBOR_ERR_OK;
 	}
 
@@ -390,4 +394,21 @@ cbor_err_t cbor_tag_decode(struct cbor_decoder *dec, uint64_t *tagno)
 
 	*tagno = type.val;
 	return CBOR_ERR_OK;
+}
+
+
+cbor_err_t cbor_sval_decode(struct cbor_decoder *dec, enum cbor_sval *sval)
+{
+	cbor_err_t err;
+	struct cbor_type type;
+
+	if ((err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
+		return err;
+
+	if (type.major != CBOR_MAJOR_OTHER || type.minor != CBOR_MINOR_SVAL)
+		return CBOR_ERR_ITEM;
+
+	*sval = type.val;
+	return CBOR_ERR_OK;
+
 }

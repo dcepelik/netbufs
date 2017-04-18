@@ -291,3 +291,17 @@ cbor_err_t cbor_tag_encode(struct cbor_encoder *enc, uint64_t tagno)
 		.val = tagno
 	});
 }
+
+
+cbor_err_t cbor_sval_encode(struct cbor_encoder *enc, enum cbor_sval sval)
+{
+	if (sval > 255)
+		return CBOR_ERR_RANGE;
+
+	return cbor_type_encode(enc, (struct cbor_type) {
+		.major = CBOR_MAJOR_OTHER,
+		.minor = CBOR_MINOR_SVAL,
+		.indef = false,
+		.val = sval
+	});
+}

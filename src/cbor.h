@@ -37,9 +37,26 @@ enum cbor_major
 	CBOR_MAJOR_OTHER,
 };
 
+/*
+ * Additional Information for Major Type 7
+ * @see RFC 7049, section 2.3., Table 1.
+ */
+enum cbor_minor
+{
+	/* 0, ..., 23: simple value (direct) */
+	CBOR_MINOR_SVAL = 24,
+	CBOR_MINOR_FLOAT16,
+	CBOR_MINOR_FLOAT32,
+	CBOR_MINOR_FLOAT64,
+	/* 28, 29, 30: unassigned */
+	CBOR_MINOR_BREAK = 31,
+};
+
+
 struct cbor_type
 {
 	enum cbor_major major;	/* major type */
+	enum cbor_minor minor;	/* minor type */
 	bool indef;		/* indefinite-length type? */
 	uint64_t val;		/* value of integers or length of others */
 };
@@ -115,6 +132,8 @@ cbor_err_t cbor_text_encode(struct cbor_encoder *enc, unsigned char *str, size_t
 cbor_err_t cbor_text_encode_begin_indef(struct cbor_encoder *enc);
 cbor_err_t cbor_text_encode_end(struct cbor_encoder *enc);
 
+cbor_err_t cbor_tag_encode(struct cbor_encoder *enc, uint64_t tagno);
+
 /*
  * Item-oriented decoder API.
  */
@@ -145,6 +164,8 @@ cbor_err_t cbor_map_decode_end(struct cbor_decoder *dec);
 
 cbor_err_t cbor_bytes_decode(struct cbor_decoder *dec, unsigned char **bytes, size_t *len);
 cbor_err_t cbor_text_decode(struct cbor_decoder *dec, unsigned char **str, size_t *len);
+
+cbor_err_t cbor_tag_decode(struct cbor_encoder *enc, uint64_t *tagno);
 
 /*
  * DOM-oriented decoder API.

@@ -15,6 +15,15 @@ typedef unsigned char		cbor_extra_t;
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
+enum cbor_ebits
+{
+	CBOR_EBITS_1B = 24,
+	CBOR_EBITS_2B,
+	CBOR_EBITS_4B,
+	CBOR_EBITS_8B,
+	CBOR_EBITS_INDEF = 31,
+};
+
 struct errlist
 {
 	int i;
