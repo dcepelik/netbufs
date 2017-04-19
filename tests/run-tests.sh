@@ -1,6 +1,6 @@
 #/usr/bin/env sh
 
-make -B --no-print-directory --directory=../src libcbor.a
+make -Bs --no-print-directory --directory=../src libcbor.a
 
 bins=""
 for file in *.c; do
@@ -20,11 +20,25 @@ echo "stream-echo:"
 for file in examples/random-*; do
 	outfile=$(basename $file)
 	./streams-echo $file $outfile
+
 	if ! diff $file $outfile; then
 		echo -e "\tFAILED $file"
 	else
 		echo -e "\tOK"
-		rm $outfile
+		rm -f $outfile
+	fi
+done
+
+echo "decode-encode:"
+for file in examples/cbor-*; do
+	outfile=$(basename $file)
+	./decode-encode $file $outfile
+
+	if ! diff $file $outfile; then
+		echo -e "\tFAILED $file"
+	else
+		echo -e "\tOK"
+		rm -f $outfile
 	fi
 done
 

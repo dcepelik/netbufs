@@ -1,4 +1,7 @@
+#include "cbor.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 
 int main(int argc, char *argv[])
@@ -19,7 +22,12 @@ int main(int argc, char *argv[])
 	inputfn = argv[1];
 	outputfn = argv[2];
 
-	if ((err = cbor_stream_open_file(in, inputfn, O_RDONLY)) != CBOR_ERR_OK) {
+	in = cbor_stream_new();
+	if (!in) {
+		return EXIT_FAILURE;
+	}
+
+	if ((err = cbor_stream_open_file(in, inputfn, O_RDONLY, 0)) != CBOR_ERR_OK) {
 		return EXIT_FAILURE;
 	}
 
@@ -28,7 +36,12 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if ((err = cbor_stream_open_file(out, outputfn, O_WRONLY)) != CBOR_ERR_OK) {
+	out = cbor_stream_new();
+	if (!out) {
+		return EXIT_FAILURE;
+	}
+
+	if ((err = cbor_stream_open_file(out, outputfn, O_RDWR | O_CREAT, 0444)) != CBOR_ERR_OK) {
 		return EXIT_FAILURE;
 	}
 

@@ -2,9 +2,9 @@
 
 PROG=run-tests
 LIB=libcbor.a
-OBJS=main.o cbor.o encode.o decode.o stream.o util.o memory.o stack.o
+OBJS=cbor.o encode.o decode.o stream.o util.o memory.o stack.o
 
-CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG
+CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function
 LDFLAGS+=-Wall
 
 
