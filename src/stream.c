@@ -102,6 +102,7 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 		stream->reading = true;
 	}
 
+	total = 0;
 	while (nbytes > 0) {
 		avail = stream->len - stream->pos;
 		assert(avail >= 0);
@@ -111,7 +112,7 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 			avail = stream->len;
 
 			if (avail == 0)
-				return 0;
+				break;
 		}
 
 		ncpy = MIN(avail, nbytes);
@@ -131,7 +132,7 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, s
 	size_t avail;
 	size_t ncpy;
 
-	cbor_stream_debug_write(stream, bytes, nbytes);
+	//cbor_stream_debug_write(stream, bytes, nbytes);
 
 	if (stream->reading) {
 		stream->pos = 0;
@@ -241,14 +242,15 @@ void cbor_stream_delete(struct cbor_stream *stream)
 }
 
 
-cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int mode)
-{
-	stream->fd = open(filename, mode);
-	if (!stream->fd)
-		return CBOR_ERR_NOFILE; /* TODO */
+#include <errno.h>
 
-	if (access(filename, mode) != 0)
+
+cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int flags, int mode)
+{
+	if ((stream->fd = open(filename, flags, mode)) == -1) {
+		fprintf(stderr, strerror(errno));
 		return CBOR_ERR_NOFILE; /* TODO */
+	}
 
 	stream->filename = filename;
 	stream->mode = mode;
@@ -278,6 +280,9 @@ cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream)
 
 void cbor_stream_close(struct cbor_stream *stream)
 {
+	if (!stream->reading && stream->len)
+		stream->flush(stream);
+
 	if (stream->close)
 		stream->close(stream);
 }
