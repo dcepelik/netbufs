@@ -51,10 +51,8 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 	cbor_extra_t extra_bits;
 	size_t i;
 
-	/* TODO check return value, how to work with EOF? */
-	assert(cbor_stream_read(dec->stream, bytes, 0, 1) > 0);
-
-	DEBUG_EXPR("%02X", bytes[0]);
+	if ((err = cbor_stream_read(dec->stream, bytes, 0, 1)) != CBOR_ERR_OK)
+		return err;
 
 	type->major = (bytes[0] & CBOR_MAJOR_MASK) >> 5;
 	extra_bits = bytes[0] & CBOR_EXTRA_MASK;
@@ -95,7 +93,8 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 		return CBOR_ERR_PARSE;
 	}
 
-	assert(cbor_stream_read(dec->stream, bytes, 1, num_extra_bytes) > 0); /* TODO */
+	if ((err = cbor_stream_read(dec->stream, bytes, 1, num_extra_bytes)) != CBOR_ERR_OK)
+		return err;
 
 	for (i = 0; i < num_extra_bytes; i++)
 		val_be_bytes[(8 - num_extra_bytes) + i] = bytes[1 + i];
@@ -335,8 +334,7 @@ static cbor_err_t cbor_string_decode_payload(struct cbor_decoder *dec, struct cb
 	if (!type->indef) {
 		*len = type->val;
 		*bytes = cbor_malloc(*len + 1);
-		assert(cbor_stream_read(dec->stream, *bytes, 0, type->val) > 0); /* TODO */
-		return CBOR_ERR_OK;
+		return cbor_stream_read(dec->stream, *bytes, 0, type->val);
 	}
 
 	*bytes = NULL;
@@ -353,7 +351,9 @@ static cbor_err_t cbor_string_decode_payload(struct cbor_decoder *dec, struct cb
 
 		/* TODO Do I mind the extra byte allocated for cases when major != CBOR_MAJOR_TEXT? */
 		*bytes = cbor_realloc(*bytes, total + chunk_type.val + 1);
-		cbor_stream_read(dec->stream, *bytes, total, chunk_type.val);
+		if ((err = cbor_stream_read(dec->stream, *bytes, total, chunk_type.val)) != CBOR_ERR_OK)
+			return err;
+
 		total += chunk_type.val;
 	}
 

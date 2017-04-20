@@ -13,8 +13,11 @@ enum cbor_err
 	CBOR_ERR_OPER,		/* invalid operation */
 	CBOR_ERR_NOFILE,	/* file not found */
 	CBOR_ERR_INDEF,		/* (in)definite-length item was unexpected */
+	CBOR_ERR_READ,		/* read()-related error */
 };
 
 typedef enum cbor_err cbor_err_t;
+
+const char *cbor_err_to_string(cbor_err_t err);
 
 #endif

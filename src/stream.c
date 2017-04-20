@@ -87,18 +87,17 @@ static void cbor_stream_fill(struct cbor_stream *stream)
 }
 
 
-size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t nbytes)
+/* TODO Chech that: once EOF is returned for the first time, all successive calls return EOF as well */
+cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
-	size_t total;
 
 	bytes += offset; /* TODO Get rid of offset arg */
 
 	if (stream->dirty)
 		cbor_stream_flush(stream);
 
-	total = 0;
 	while (nbytes > 0) {
 		avail = stream->len - stream->pos;
 		assert(avail >= 0);
@@ -108,7 +107,7 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 			avail = stream->len;
 
 			if (avail == 0) {
-				break;
+				return CBOR_ERR_EOF;
 			}
 		}
 
@@ -117,10 +116,12 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 		bytes += ncpy;
 		stream->pos += ncpy;
 		nbytes -= ncpy;
-		total += ncpy;
 	}
 
-	return total;
+	if (nbytes > 0)
+		return CBOR_ERR_READ; /* TODO save strerror(errno) somewhere */
+
+	return CBOR_ERR_OK;
 }
 
 
@@ -164,7 +165,6 @@ static void cbor_stream_file_close(struct cbor_stream *stream)
 static void cbor_stream_file_fill(struct cbor_stream *stream)
 {
 	stream->len = read(stream->fd, stream->buf, stream->bufsize);
-	TEMP_ASSERT(stream->len > 0);
 }
 
 
