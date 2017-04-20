@@ -45,7 +45,7 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 {
 	unsigned char bytes[9];
 	size_t num_extra_bytes;
-	int64_t val_be;
+	int64_t val_be = 0;
 	unsigned char *val_be_bytes = (unsigned char *)&val_be;
 	cbor_err_t err;
 	cbor_extra_t extra_bits;
@@ -91,14 +91,14 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 
 	default:
 		error(dec, "invalid value of extra bits: %u", extra_bits);
+		DEBUG_TRACE;
 		return CBOR_ERR_PARSE;
 	}
 
-	if ((err = cbor_stream_read(dec->stream, bytes, 1, num_extra_bytes)) != CBOR_ERR_OK)
-		return err;
+	assert(cbor_stream_read(dec->stream, bytes, 1, num_extra_bytes) > 0); /* TODO */
 
 	for (i = 0; i < num_extra_bytes; i++)
-		val_be_bytes[i] = bytes[1 + i];
+		val_be_bytes[(8 - num_extra_bytes) + i] = bytes[1 + i];
 
 	type->val = be64toh(val_be);
 	return CBOR_ERR_OK;
@@ -334,8 +334,9 @@ static cbor_err_t cbor_string_decode_payload(struct cbor_decoder *dec, struct cb
 
 	if (!type->indef) {
 		*len = type->val;
-		*bytes = cbor_malloc(type->val + 1);
-		return cbor_stream_read(dec->stream, *bytes, 0, type->val);
+		*bytes = cbor_malloc(*len + 1);
+		assert(cbor_stream_read(dec->stream, *bytes, 0, type->val) > 0); /* TODO */
+		return CBOR_ERR_OK;
 	}
 
 	*bytes = NULL;
@@ -500,11 +501,14 @@ out_free:
 
 cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item *item)
 {
+	cbor_err_t err;
+
 	switch (item->type.major) {
 	case CBOR_MAJOR_BYTES:
 	case CBOR_MAJOR_TEXT:
-		return cbor_string_decode_payload(dec, &item->type, &item->bytes, &item->len);
-		break;
+		err = cbor_string_decode_payload(dec, &item->type, &item->bytes, &item->len);
+		item->str[item->len] = '\0'; /* TODO */
+		return err;
 
 	case CBOR_MAJOR_ARRAY:
 	case CBOR_MAJOR_MAP:
@@ -512,7 +516,6 @@ cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item 
 			return cbor_array_decode_payload_indef(dec, &item->type, &item->items, &item->len);
 		else
 			return cbor_array_decode_payload(dec, &item->type, &item->items, &item->len);
-		break;
 
 	case CBOR_MAJOR_OTHER:
 		TEMP_ASSERT(false);

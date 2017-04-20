@@ -266,7 +266,7 @@ cbor_err_t cbor_bytes_encode_end(struct cbor_encoder *enc)
 
 cbor_err_t cbor_text_encode(struct cbor_encoder *enc, unsigned char *str, size_t len)
 {
-	return cbor_string_encode(enc, CBOR_MAJOR_TEXT, (unsigned char *)str, len);
+	return cbor_string_encode(enc, CBOR_MAJOR_TEXT, str, len);
 }
 
 

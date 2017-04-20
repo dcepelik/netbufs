@@ -130,6 +130,8 @@ void cbor_decoder_delete(struct cbor_decoder *dec);
  * Item-oriented encoder API.
  */
 
+cbor_err_t cbor_item_encode(struct cbor_encoder *enc, struct cbor_item *item);
+
 cbor_err_t cbor_uint8_encode(struct cbor_encoder *enc, uint8_t val);
 cbor_err_t cbor_uint16_encode(struct cbor_encoder *enc, uint16_t val);
 cbor_err_t cbor_uint32_encode(struct cbor_encoder *enc, uint32_t val);
