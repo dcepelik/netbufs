@@ -14,8 +14,44 @@ typedef unsigned char		cbor_extra_t;
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
+
+struct cbor_stream
+{
+	unsigned char *buf;	/* data buffer */
+	size_t bufsize;	/* size of the buffer */
+	size_t pos;	/* current read/write position within the stream */
+	size_t len;	/* number of valid bytes in the buffer (for reading) */
+	size_t last_read_len;
+	bool dirty;	/* do we have data to be written? */
+	bool eof;	/* did we hit EOF during last filling? */
+
+	/* for file streams */
+	char *filename;	/* filename of currently open file */
+	int fd;		/* file descriptor */
+	int mode;	/* file flags (@see man 3p open) */
+
+	/* for in-memory streams */
+	unsigned char *memory;	/* the memory */
+	size_t memory_size;	/* memory size */
+	size_t memory_len;	/* number of valid bytes in memory */
+	size_t memory_pos;	/* position in memory (for reading/writing) */
+
+	void (*flush)(struct cbor_stream *stream);
+	void (*fill)(struct cbor_stream *stream);
+	void (*close)(struct cbor_stream *stream);
+};
+
 cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, size_t count);
 cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t count);
+
+/* XXX This is a temporary tests helper */
+size_t cbor_stream_read_len(struct cbor_stream *stream, unsigned char *bytes, size_t nbytes);
+
+static inline cbor_err_t cbor_stream_get_last_read_len(struct cbor_stream *stream)
+{
+	return stream->last_read_len;
+}
+
 
 enum cbor_ebits
 {

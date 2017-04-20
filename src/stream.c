@@ -11,32 +11,6 @@
 #include <unistd.h>
 
 
-struct cbor_stream
-{
-	unsigned char *buf;	/* data buffer */
-	size_t bufsize;	/* size of the buffer */
-	size_t pos;	/* current read/write position within the stream */
-	size_t len;	/* number of valid bytes in the buffer (for reading) */
-	bool dirty;	/* do we have data to be written? */
-	bool eof;	/* did we hit EOF during last filling? */
-
-	/* for file streams */
-	char *filename;	/* filename of currently open file */
-	int fd;		/* file descriptor */
-	int mode;	/* file flags (@see man 3p open) */
-
-	/* for in-memory streams */
-	unsigned char *memory;	/* the memory */
-	size_t memory_size;	/* memory size */
-	size_t memory_len;	/* number of valid bytes in memory */
-	size_t memory_pos;	/* position in memory (for reading/writing) */
-
-	void (*flush)(struct cbor_stream *stream);
-	void (*fill)(struct cbor_stream *stream);
-	void (*close)(struct cbor_stream *stream);
-};
-
-
 void cbor_stream_init(struct cbor_stream *stream)
 { size_t size = 1024;
 
@@ -87,7 +61,7 @@ static void cbor_stream_fill(struct cbor_stream *stream)
 }
 
 
-/* TODO Chech that: once EOF is returned for the first time, all successive calls return EOF as well */
+/* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
 cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t nbytes)
 {
 	size_t avail;
@@ -98,6 +72,8 @@ cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, si
 	if (stream->dirty)
 		cbor_stream_flush(stream);
 
+	stream->last_read_len = 0;
+
 	while (nbytes > 0) {
 		avail = stream->len - stream->pos;
 		assert(avail >= 0);
@@ -106,9 +82,8 @@ cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, si
 			cbor_stream_fill(stream);
 			avail = stream->len;
 
-			if (avail == 0) {
+			if (avail == 0)
 				return CBOR_ERR_EOF;
-			}
 		}
 
 		ncpy = MIN(avail, nbytes);
@@ -116,12 +91,20 @@ cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, si
 		bytes += ncpy;
 		stream->pos += ncpy;
 		nbytes -= ncpy;
+		stream->last_read_len += ncpy;
 	}
 
 	if (nbytes > 0)
 		return CBOR_ERR_READ; /* TODO save strerror(errno) somewhere */
 
 	return CBOR_ERR_OK;
+}
+
+
+size_t cbor_stream_read_len(struct cbor_stream *stream, unsigned char *bytes, size_t nbytes)
+{
+	cbor_stream_read(stream, bytes, 0, nbytes);
+	return cbor_stream_get_last_read_len(stream);
 }
 
 
@@ -133,8 +116,6 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, s
 	if (!stream->dirty) {
 		stream->pos = 0;
 	}
-
-	stream->dirty = true;
 
 	while (nbytes > 0) {
 		avail = stream->bufsize - stream->len;
@@ -149,9 +130,12 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, s
 		memcpy(stream->buf + stream->pos, bytes, ncpy);
 		bytes += ncpy;
 		stream->pos += ncpy;
-		stream->len += ncpy;
+		stream->len = stream->pos;
 		nbytes -= ncpy;
+		stream->dirty = true;
 	}
+
+	assert(nbytes == 0);
 
 	return CBOR_ERR_OK;
 }
@@ -165,17 +149,16 @@ static void cbor_stream_file_close(struct cbor_stream *stream)
 static void cbor_stream_file_fill(struct cbor_stream *stream)
 {
 	stream->len = read(stream->fd, stream->buf, stream->bufsize);
+	TEMP_ASSERT(stream->len >= 0);
 }
 
 
 static void cbor_stream_file_flush(struct cbor_stream *stream)
 {
-	size_t to_write;
 	ssize_t written;
 
-	for (to_write = stream->len; to_write > 0; to_write -= written) {
-		written = write(stream->fd, stream->buf, to_write);
-	}
+	written = write(stream->fd, stream->buf, stream->len);
+	TEMP_ASSERT(written == stream->len);
 }
 
 

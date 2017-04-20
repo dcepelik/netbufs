@@ -1,17 +1,18 @@
-#include "internal.h"
-#include "stream.h"
 #include "cbor.h"
 #include "debug.h"
+#include "internal.h"
 
+#include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
-#define BUFSIZE	1024
+
+#define BUFSIZE	117	/* make sure buffer isn't boundary-aligned with stream's internal buffer */
 
 
 int main(int argc, char *argv[])
@@ -21,46 +22,29 @@ int main(int argc, char *argv[])
 	struct cbor_stream *in;
 	struct cbor_stream *out;
 	unsigned char *buf;
-	size_t nbytes;
-	cbor_err_t err;
+	size_t len;
+	int mode;
 
-	if (argc != 3) {
-		fprintf(stderr, "Usage: %s <input-file> <output-file>\n", argv[0]);
-		return EXIT_FAILURE;
-	}
+	assert(argc == 3);
 
 	infn = argv[1];
 	outfn = argv[2];
 
-	in = cbor_stream_new();
-	if (!in) {
-		fprintf(stderr, "%s: cbor_stream_new() failed\n", argv[0]);
-		return EXIT_FAILURE;
-	}
+	buf = malloc(BUFSIZE);
+	assert(buf != NULL);
 
-	if ((err = cbor_stream_open_file(in, infn, O_RDONLY, 0)) != CBOR_ERR_OK) {
-		fprintf(stderr, "%s: cannot open input file '%s'\n", argv[0], infn);
-		return EXIT_FAILURE;
-	}
+	in = cbor_stream_new();
+	assert(in != NULL);
+	assert(cbor_stream_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
 
 	out = cbor_stream_new();
-	if (!out) {
-		fprintf(stderr, "%s: cbor_stream_new() failed\n", argv[0]);
-		return EXIT_FAILURE;
-	}
+	assert(out != NULL);
 
-	if ((err = cbor_stream_open_file(out, outfn, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR)) != CBOR_ERR_OK) {
-		fprintf(stderr, "%s: cannot open output file '%s'\n", argv[0], outfn);
-		return EXIT_FAILURE;
-	}
+	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
+	assert(cbor_stream_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
 
-	buf = malloc(BUFSIZE);
-	if (!buf) {
-		return EXIT_FAILURE;
-	}
-
-	while ((nbytes = cbor_stream_read(in, buf, 0, BUFSIZE)) != 0) {
-		cbor_stream_write(out, buf, nbytes);
+	while ((len = cbor_stream_read_len(in, buf, BUFSIZE)) > 0) {
+		cbor_stream_write(out, buf, len);
 	}
 
 	cbor_stream_close(in);

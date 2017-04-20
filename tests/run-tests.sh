@@ -5,7 +5,7 @@ make -Bs --no-print-directory --directory=../src libcbor.a
 bins=""
 for file in *.c; do
 	bin=$(basename $file .c)
-	gcc -std=c11 -Wall -Werror --pedantic -I ../src -o $bin $file ../src/libcbor.a
+	gcc -std=c11 -Wall -Werror --pedantic -DDEBUG -I ../src -o $bin $file ../src/libcbor.a
 	bins="$bins $bin"
 done
 
@@ -18,28 +18,30 @@ done
 
 echo "stream-echo:"
 for file in examples/random-*; do
-	outfile=$(basename $file)
+	outfile=$(basename $file).out
 	./streams-echo $file $outfile
 
 	if ! diff $file $outfile; then
 		echo -e "\tFAILED $file"
 	else
 		echo -e "\tOK"
-		rm -f $outfile
 	fi
+
+	rm -f $outfile
 done
-
-echo "decode-encode:"
-for file in examples/cbor-*; do
-	outfile=$(basename $file)
-	./decode-encode $file $outfile
-
-	if ! diff $file $outfile; then
-		echo -e "\tFAILED $file"
-	else
-		echo -e "\tOK"
-		rm -f $outfile
-	fi
-done
-
-rm -f -- $bins
+#
+#echo "decode-encode:"
+#for file in examples/*.cbor; do
+#	outfile=$(basename $file .cbor)
+#	./decode-encode $file $outfile
+#
+#	if ! diff $file $outfile; then
+#		echo -e "\tFAILED $file"
+#	else
+#		echo -e "\tOK"
+#	fi
+#
+#	rm -f $outfile
+#done
+#
+##rm -f -- $bins
