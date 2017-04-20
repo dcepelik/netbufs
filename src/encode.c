@@ -1,7 +1,6 @@
 #include "internal.h"
 #include "memory.h"
 #include "stack.h"
-#include "stream.h"
 
 #include <assert.h>
 #include <endian.h>

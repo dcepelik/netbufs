@@ -24,7 +24,7 @@ struct cbor_stream;
 struct cbor_stream *cbor_stream_new(void);
 void cbor_stream_delete(struct cbor_stream *stream);
 
-cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int mode);
+cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int flags, int mode);
 cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream);
 void cbor_stream_close(struct cbor_stream *stream);
 
@@ -59,7 +59,9 @@ enum cbor_minor
 	CBOR_MINOR_BREAK = 31,
 };
 
-
+/*
+ * Type of a CBOR Data Item
+ */
 struct cbor_type
 {
 	enum cbor_major major;	/* major type */
@@ -68,7 +70,7 @@ struct cbor_type
 	uint64_t val;		/* value of integers or length of others */
 };
 
-const char *cbor_type_to_string(struct cbor_type type);
+const char *cbor_type_to_string(struct cbor_type *type);
 
 /*
  * CBOR Simple Values
@@ -82,12 +84,34 @@ enum cbor_sval
 	CBOR_SVAL_UNDEF,
 };
 
+struct cbor_pair;
+
 /*
- * CBOR data item encapsulation
+ * CBOR Data Item
  */
 struct cbor_item
 {
 	struct cbor_type type;
+	size_t len;		/* XXX this is different from type.val! */
+
+	union {
+		unsigned char *bytes;
+		char *str;
+		struct cbor_item *items;
+		struct cbor_pair *pairs;
+	};
+
+};
+
+void cbor_item_dump(struct cbor_item *item);
+
+/*
+ * CBOR Key-Value Pair.
+ */
+struct cbor_pair
+{
+	struct cbor_item key;
+	struct cbor_item value;
 };
 
 enum cbor_event

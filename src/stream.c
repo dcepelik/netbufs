@@ -17,7 +17,7 @@ struct cbor_stream
 	size_t bufsize;	/* size of the buffer */
 	size_t pos;	/* current read/write position within the stream */
 	size_t len;	/* number of valid bytes in the buffer (for reading) */
-	bool reading;	/* was reading the last operation performed? */
+	bool dirty;	/* do we have data to be written? */
 	bool eof;	/* did we hit EOF during last filling? */
 
 	/* for file streams */
@@ -38,8 +38,7 @@ struct cbor_stream
 
 
 void cbor_stream_init(struct cbor_stream *stream)
-{
-	size_t size = 1024;
+{ size_t size = 1024;
 
 	stream->buf = cbor_malloc(size);
 	TEMP_ASSERT(stream->buf);
@@ -47,7 +46,7 @@ void cbor_stream_init(struct cbor_stream *stream)
 	stream->bufsize = size;
 	stream->pos = 0;
 	stream->len = 0;
-	stream->reading = false;
+	stream->dirty = false;
 	stream->eof = false;
 }
 
@@ -77,7 +76,7 @@ static void cbor_stream_flush(struct cbor_stream *stream)
 {
 	stream->flush(stream);
 	stream->pos = 0;
-	stream->len = 0;
+	stream->dirty = false;
 }
 
 
@@ -96,11 +95,8 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 
 	bytes += offset; /* TODO Get rid of offset arg */
 
-	if (!stream->reading) {
-		if (stream->len > 0)
-			cbor_stream_flush(stream);
-		stream->reading = true;
-	}
+	if (stream->dirty)
+		cbor_stream_flush(stream);
 
 	total = 0;
 	while (nbytes > 0) {
@@ -111,8 +107,9 @@ size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t
 			cbor_stream_fill(stream);
 			avail = stream->len;
 
-			if (avail == 0)
+			if (avail == 0) {
 				break;
+			}
 		}
 
 		ncpy = MIN(avail, nbytes);
@@ -132,12 +129,11 @@ cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, s
 	size_t avail;
 	size_t ncpy;
 
-	//cbor_stream_debug_write(stream, bytes, nbytes);
-
-	if (stream->reading) {
+	if (!stream->dirty) {
 		stream->pos = 0;
-		stream->reading = false;
 	}
+
+	stream->dirty = true;
 
 	while (nbytes > 0) {
 		avail = stream->bufsize - stream->len;
@@ -165,11 +161,10 @@ static void cbor_stream_file_close(struct cbor_stream *stream)
 	close(stream->fd);
 }
 
-
 static void cbor_stream_file_fill(struct cbor_stream *stream)
 {
 	stream->len = read(stream->fd, stream->buf, stream->bufsize);
-	TEMP_ASSERT(stream->len >= 0);
+	TEMP_ASSERT(stream->len > 0);
 }
 
 
@@ -180,7 +175,6 @@ static void cbor_stream_file_flush(struct cbor_stream *stream)
 
 	for (to_write = stream->len; to_write > 0; to_write -= written) {
 		written = write(stream->fd, stream->buf, to_write);
-		TEMP_ASSERT(written > 0);
 	}
 }
 
@@ -242,15 +236,10 @@ void cbor_stream_delete(struct cbor_stream *stream)
 }
 
 
-#include <errno.h>
-
-
 cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int flags, int mode)
 {
-	if ((stream->fd = open(filename, flags, mode)) == -1) {
-		fprintf(stderr, strerror(errno));
+	if ((stream->fd = open(filename, flags, mode)) == -1)
 		return CBOR_ERR_NOFILE; /* TODO */
-	}
 
 	stream->filename = filename;
 	stream->mode = mode;
@@ -280,7 +269,7 @@ cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream)
 
 void cbor_stream_close(struct cbor_stream *stream)
 {
-	if (!stream->reading && stream->len)
+	if (stream->dirty)
 		stream->flush(stream);
 
 	if (stream->close)

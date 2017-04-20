@@ -1,13 +1,15 @@
 #include "debug.h"
 #include "internal.h"
 #include "memory.h"
-#include "stream.h"
 
 #include <assert.h>
 #include <endian.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
+
+
+#define CBOR_ARRAY_INIT_SIZE	8
 
 
 struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream)
@@ -49,8 +51,10 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 	cbor_extra_t extra_bits;
 	size_t i;
 
-	if ((err = cbor_stream_read(dec->stream, bytes, 0, 1)) != CBOR_ERR_OK)
-		return err;
+	/* TODO check return value, how to work with EOF? */
+	assert(cbor_stream_read(dec->stream, bytes, 0, 1) > 0);
+
+	DEBUG_EXPR("%02X", bytes[0]);
 
 	type->major = (bytes[0] & CBOR_MAJOR_MASK) >> 5;
 	extra_bits = bytes[0] & CBOR_EXTRA_MASK;
@@ -315,30 +319,44 @@ cbor_err_t cbor_map_decode_end(struct cbor_decoder *dec)
 }
 
 
-static cbor_err_t cbor_string_decode_indef(struct cbor_decoder *dec, enum cbor_major major, unsigned char **bytes, size_t *len)
+static inline bool cbor_type_is_break(struct cbor_type *type)
 {
-	struct cbor_type type;
-	size_t num_read;
+	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
+}
+
+
+static cbor_err_t cbor_string_decode_payload(struct cbor_decoder *dec, struct cbor_type *type,
+	unsigned char **bytes, size_t *len)
+{
+	struct cbor_type chunk_type;
+	size_t total;
 	cbor_err_t err;
 
-	*bytes = NULL;
-	num_read = 0;
+	if (!type->indef) {
+		*len = type->val;
+		*bytes = cbor_malloc(type->val + 1);
+		return cbor_stream_read(dec->stream, *bytes, 0, type->val);
+	}
 
-	while ((err = cbor_type_decode(dec, &type)) == CBOR_ERR_OK) {
-		if (type.major == CBOR_MAJOR_OTHER && type.val == 31)
+	*bytes = NULL;
+	total = 0;
+
+	while ((err = cbor_type_decode(dec, &chunk_type)) == CBOR_ERR_OK) {
+		if (cbor_type_is_break(&chunk_type))
 			break;
 
-		if (type.major != major || type.indef) {
+		if (chunk_type.major != type->major || chunk_type.indef) {
 			free(*bytes);
 			return CBOR_ERR_ITEM;
 		}
 
-		*bytes = cbor_realloc(*bytes, num_read + type.val + 1);
-		cbor_stream_read(dec->stream, *bytes, num_read, type.val);
-		num_read += type.val;
+		/* TODO Do I mind the extra byte allocated for cases when major != CBOR_MAJOR_TEXT? */
+		*bytes = cbor_realloc(*bytes, total + chunk_type.val + 1);
+		cbor_stream_read(dec->stream, *bytes, total, chunk_type.val);
+		total += chunk_type.val;
 	}
 
-	*len = num_read;
+	*len = total;
 	return err;
 }
 
@@ -354,13 +372,7 @@ static cbor_err_t cbor_string_decode(struct cbor_decoder *dec, enum cbor_major m
 	if (type.major != major)
 		return CBOR_ERR_ITEM;
 
-	if (!type.indef) {
-		*bytes = cbor_malloc(type.val + 1);
-		*len = type.val;
-		return cbor_stream_read(dec->stream, *bytes, 0, type.val);
-	}
-
-	return cbor_string_decode_indef(dec, major, bytes, len);
+	return cbor_string_decode_payload(dec, &type, bytes, len);
 }
 
 
@@ -411,4 +423,115 @@ cbor_err_t cbor_sval_decode(struct cbor_decoder *dec, enum cbor_sval *sval)
 	*sval = type.val;
 	return CBOR_ERR_OK;
 
+}
+
+
+cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item *item);
+
+
+static cbor_err_t cbor_array_decode_payload_indef(struct cbor_decoder *dec, struct cbor_type *type,
+	struct cbor_item **items, uint64_t *nitems)
+{
+	struct cbor_item *cur_item;
+	size_t items_size;
+	cbor_err_t err;
+
+	*items = NULL;
+	*nitems = 0;
+	items_size = CBOR_ARRAY_INIT_SIZE;
+
+realloc:
+	*items = cbor_realloc(*items, items_size * sizeof(**items));
+	if (!*items)
+		return CBOR_ERR_NOMEM;
+
+	while (1) {
+		if (*nitems >= items_size) {
+			items_size *= 2;
+			goto realloc;
+		}
+
+		cur_item = *items + *nitems;
+
+		if ((err = cbor_type_decode(dec, &cur_item->type)) != CBOR_ERR_OK)
+			goto out_free;
+
+		if (cbor_type_is_break(&cur_item->type))
+			break;
+
+		if ((err = cbor_item_decode_internal(dec, cur_item)) != CBOR_ERR_OK)
+			goto out_free;
+
+		(*nitems)++;
+	}
+
+	return CBOR_ERR_OK;
+
+out_free:
+	cbor_free(*items);
+	return err;
+}
+
+
+static cbor_err_t cbor_array_decode_payload(struct cbor_decoder *dec, struct cbor_type *type,
+	struct cbor_item **items, uint64_t *len)
+{
+	cbor_err_t err;
+	size_t i;
+
+	*items = cbor_malloc(type->val * sizeof(**items));
+	if (!*items)
+		return CBOR_ERR_NOMEM;
+
+	for (i = 0; i < type->val; i++) {
+		if ((err = cbor_item_decode(dec, &(*items)[i])) != CBOR_ERR_OK)
+			goto out_free;
+	}
+
+	*len = type->val;
+
+	return CBOR_ERR_OK;
+
+out_free:
+	cbor_free(*items);
+	return err;
+}
+
+
+cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item *item)
+{
+	switch (item->type.major) {
+	case CBOR_MAJOR_BYTES:
+	case CBOR_MAJOR_TEXT:
+		return cbor_string_decode_payload(dec, &item->type, &item->bytes, &item->len);
+		break;
+
+	case CBOR_MAJOR_ARRAY:
+	case CBOR_MAJOR_MAP:
+		if (item->type.indef)
+			return cbor_array_decode_payload_indef(dec, &item->type, &item->items, &item->len);
+		else
+			return cbor_array_decode_payload(dec, &item->type, &item->items, &item->len);
+		break;
+
+	case CBOR_MAJOR_OTHER:
+		TEMP_ASSERT(false);
+
+	default:
+		/* no action needed--all data decoded by cbor_type_decode */
+		break;
+	}
+
+	return CBOR_ERR_OK;
+}
+
+
+cbor_err_t cbor_item_decode(struct cbor_decoder *dec, struct cbor_item *item)
+{
+	cbor_err_t err;
+
+	if ((err = cbor_type_decode(dec, &item->type)) != CBOR_ERR_OK)
+		return err;
+
+	return cbor_item_decode_internal(dec, item);
 }

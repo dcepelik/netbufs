@@ -3,7 +3,6 @@
 
 #include "cbor.h"
 #include "stack.h"
-#include "stream.h"
 #include <stdlib.h>
 
 typedef unsigned char		cbor_extra_t;
@@ -14,6 +13,9 @@ typedef unsigned char		cbor_extra_t;
 #define CBOR_BREAK		((CBOR_MAJOR_OTHER << 5) + 31)
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
+
+cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, size_t count);
+size_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t count);
 
 enum cbor_ebits
 {

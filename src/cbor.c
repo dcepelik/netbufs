@@ -1,10 +1,12 @@
 #include "cbor.h"
+#include "debug.h"
 #include "internal.h"
+#include <stdio.h>
 
 
-const char *cbor_type_to_string(struct cbor_type type)
+const char *cbor_type_to_string(struct cbor_type *type)
 {
-	switch (type.major) {
+	switch (type->major) {
 	case CBOR_MAJOR_UINT:
 		return "unsigned int";
 	case CBOR_MAJOR_NEGATIVE_INT:
@@ -23,5 +25,39 @@ const char *cbor_type_to_string(struct cbor_type type)
 		return "other";
 	default:
 		return "<invalid>";
+	}
+}
+
+
+void cbor_item_dump(struct cbor_item *item)
+{
+	size_t i;
+
+	switch (item->type.major) {
+	case CBOR_MAJOR_UINT:
+		fprintf(stderr, "%lu", item->type.val);
+		break;
+
+	case CBOR_MAJOR_BYTES:
+		fprintf(stderr, ">bytes<");
+		break;
+
+	case CBOR_MAJOR_TEXT:
+		fprintf(stderr, "\"%s\"", item->str);
+		break;
+
+	case CBOR_MAJOR_ARRAY:
+		fprintf(stderr, "[");
+		for (i = 0; i < item->len; i++) {
+			if (i > 0)
+				fputs(", ", stderr);
+			cbor_item_dump(&item->items[i]);
+		}
+		fprintf(stderr, "]");
+		break;
+
+	default:
+		fprintf(stderr, "type: %s\n", cbor_type_to_string(&item->type));
+		TEMP_ASSERT(false);
 	}
 }
