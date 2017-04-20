@@ -6,6 +6,10 @@
 #include <stdlib.h>
 
 typedef unsigned char		cbor_extra_t;
+typedef unsigned char		byte;
+
+/* temporary refactoring aid */
+#define cbor_hdr		cbor_type
 
 #define CBOR_MAJOR_MASK		0xE0
 #define CBOR_EXTRA_MASK		0x1F

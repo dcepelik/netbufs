@@ -16,3 +16,13 @@ for testfile in ../tests/stream/*; do
 
 	rm -f $outfile
 done
+
+echo "decenc:"
+for testfile in ../tests/libcbor/*; do
+	echo -e "\t$testfile"
+	outfile=$testfile.out
+	./test-decenc $testfile $outfile
+	echo
+
+	rm -f $outfile
+done

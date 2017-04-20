@@ -38,8 +38,15 @@ void cbor_item_dump(struct cbor_item *item)
 		fprintf(stderr, "%lu", item->type.val);
 		break;
 
+	case CBOR_MAJOR_NEGATIVE_INT:
+		fprintf(stderr, "%li", item->i64);
+		break;
+
 	case CBOR_MAJOR_BYTES:
-		fprintf(stderr, ">bytes<");
+		fputs("b\'", stderr);
+		for (i = 0; i < item->len; i++)
+			fprintf(stderr, "%02X", item->bytes[i]);
+		fputc('\'', stderr);
 		break;
 
 	case CBOR_MAJOR_TEXT:

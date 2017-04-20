@@ -1,11 +1,12 @@
 /*
- * Test I/O streams by reading a file and writing the data to another file.
+ * Test CBOR encoder and decoder by decoding a valid CBOR stream and encoding
+ * all data items it contains into another file.
  *
  * The files are then diffed by run-tests.sh.
  */
 
 #include "cbor.h"
-#include "internal.h"
+#include "debug.h"
 
 #include <assert.h>
 #include <fcntl.h>
@@ -15,26 +16,22 @@
 #include <unistd.h>
 
 
-#define BUFSIZE	117	/* make sure buffer isn't boundary-aligned with stream's internal buffer */
-
-
 int main(int argc, char *argv[])
 {
 	char *infn;
 	char *outfn;
 	struct cbor_stream *in;
 	struct cbor_stream *out;
-	unsigned char *buf;
-	size_t len;
+	struct cbor_decoder *dec;
+	struct cbor_encoder *enc;
+	struct cbor_item item;
 	int mode;
+	cbor_err_t err;
 
 	assert(argc == 3);
 
 	infn = argv[1];
 	outfn = argv[2];
-
-	buf = malloc(BUFSIZE);
-	assert(buf != NULL);
 
 	in = cbor_stream_new();
 	assert(in != NULL);
@@ -47,10 +44,21 @@ int main(int argc, char *argv[])
 	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 	assert(cbor_stream_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
 
-	while ((len = cbor_stream_read_len(in, buf, BUFSIZE)) > 0) {
-		cbor_stream_write(out, buf, len);
+	dec = cbor_decoder_new(in);
+	assert(dec != NULL);
+
+	enc = cbor_encoder_new(out);
+	assert(enc != NULL);
+
+	while ((err = cbor_decode_item(dec, &item)) == CBOR_ERR_OK) {
+		cbor_item_dump(&item);
 	}
 
+	DEBUG_EXPR("%i", err);
+	assert(err == CBOR_ERR_EOF);
+
+	cbor_decoder_delete(dec);
+	cbor_encoder_delete(enc);
 	cbor_stream_close(in);
 	cbor_stream_close(out);
 

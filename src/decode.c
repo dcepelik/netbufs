@@ -10,6 +10,7 @@
 
 
 #define CBOR_ARRAY_INIT_SIZE	8
+#define CBOR_BSTACK_INIT_SIZE	4
 
 
 struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream)
@@ -19,7 +20,7 @@ struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream)
 	dec = cbor_malloc(sizeof(*dec));
 	dec->stream = stream;
 
-	if (!stack_init(&dec->blocks, 4, sizeof(struct block))) {
+	if (!stack_init(&dec->blocks, CBOR_BSTACK_INIT_SIZE, sizeof(struct block))) {
 		free(dec);
 		return NULL;
 	}
@@ -34,28 +35,30 @@ void cbor_decoder_delete(struct cbor_decoder *dec)
 }
 
 
-static void error(struct cbor_decoder *dec, char *str, ...)
+static cbor_err_t error(struct cbor_decoder *dec, cbor_err_t err, char *str, ...)
 {
 	(void) dec;
 	(void) str;
+
+	return err;
 }
 
 
-static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *type)
+static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *type)
 {
-	unsigned char bytes[9];
+	byte bytes[9];
 	size_t num_extra_bytes;
-	int64_t val_be = 0;
-	unsigned char *val_be_bytes = (unsigned char *)&val_be;
-	cbor_err_t err;
+	uint64_t val_be = 0;
+	byte *val_be_bytes = (byte *)&val_be;
 	cbor_extra_t extra_bits;
+	cbor_err_t err;
 	size_t i;
 
 	if ((err = cbor_stream_read(dec->stream, bytes, 0, 1)) != CBOR_ERR_OK)
 		return err;
 
-	type->major = (bytes[0] & CBOR_MAJOR_MASK) >> 5;
-	extra_bits = bytes[0] & CBOR_EXTRA_MASK;
+	type->major = (bytes[0] & 0xE0) >> 5;
+	extra_bits = bytes[0] & 0x1F;
 
 	/* TODO */
 	type->minor = extra_bits;
@@ -88,9 +91,7 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 		break;
 
 	default:
-		error(dec, "invalid value of extra bits: %u", extra_bits);
-		DEBUG_TRACE;
-		return CBOR_ERR_PARSE;
+		return error(dec, CBOR_ERR_PARSE, "invalid value of extra bits: %u", extra_bits);
 	}
 
 	if ((err = cbor_stream_read(dec->stream, bytes, 1, num_extra_bytes)) != CBOR_ERR_OK)
@@ -104,24 +105,28 @@ static cbor_err_t cbor_type_decode(struct cbor_decoder *dec, struct cbor_type *t
 }
 
 
-static uint64_t cbor_uint_decode(struct cbor_decoder *dec, cbor_err_t *err, uint64_t max_value)
+static cbor_err_t decode_hdr_check(struct cbor_decoder *dec, struct cbor_hdr *type, enum cbor_major major)
 {
-	struct cbor_type type;
+	cbor_err_t err;
 
-	if ((*err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
+	if ((err = decode_hdr(dec, type)) != CBOR_ERR_OK)
+		return err;
+
+	if (type->major != major)
+		return CBOR_ERR_ITEM;
+	
+	return CBOR_ERR_OK;
+}
+
+
+static uint64_t decode_uint(struct cbor_decoder *dec, cbor_err_t *err, uint64_t max)
+{
+	struct cbor_hdr type;
+
+	if ((*err = decode_hdr_check(dec, &type, CBOR_MAJOR_UINT)) != CBOR_ERR_OK)
 		return 0;
 
-	if (type.major == CBOR_MAJOR_NEGATIVE_INT) {
-		*err = CBOR_ERR_NEGATIVE_INT;
-		return 0;
-	}
-
-	if (type.major != CBOR_MAJOR_UINT) {
-		*err = CBOR_ERR_ITEM;
-		return 0;
-	}
-
-	if (type.val > max_value) {
+	if (type.val > max) {
 		*err = CBOR_ERR_RANGE;
 		return 0;
 	}
@@ -131,117 +136,165 @@ static uint64_t cbor_uint_decode(struct cbor_decoder *dec, cbor_err_t *err, uint
 }
 
 
-cbor_err_t cbor_uint8_decode(struct cbor_decoder *dec, uint8_t *val)
+/* TODO have a look at the range checks and make sure nothing overflows */
+static inline cbor_err_t uint64_to_negint(uint64_t u64, int64_t *i64)
 {
-	cbor_err_t err;
-	*val = (uint8_t)cbor_uint_decode(dec, &err, UINT8_MAX);
-	return err;
+	if (u64 > -(INT64_MIN + 1))
+		return CBOR_ERR_RANGE;
+
+	return (-1 - u64);
 }
 
 
-cbor_err_t cbor_uint16_decode(struct cbor_decoder *dec, uint16_t *val)
+/* TODO have a look at the range checks and make sure nothing overflows */
+static int64_t decode_int(struct cbor_decoder *dec, cbor_err_t *err, int64_t min, int64_t max)
 {
-	cbor_err_t err;
-	*val = (uint16_t)cbor_uint_decode(dec, &err, UINT16_MAX);
-	return err;
-}
+	struct cbor_hdr type;
+	int64_t i64;
 
-
-cbor_err_t cbor_uint32_decode(struct cbor_decoder *dec, uint32_t *val)
-{
-	cbor_err_t err;
-	*val = (uint32_t)cbor_uint_decode(dec, &err, UINT32_MAX);
-	return err;
-}
-
-
-cbor_err_t cbor_uint64_decode(struct cbor_decoder *dec, uint64_t *val)
-{
-	cbor_err_t err;
-	*val = (uint64_t)cbor_uint_decode(dec, &err, UINT64_MAX);
-	return err;
-}
-
-
-/*
- * TODO have a look at the range checks and make sure nothing overflows
- */
-static uint64_t cbor_int_decode(struct cbor_decoder *dec, cbor_err_t *err,
-	int64_t min_value, uint64_t max_value)
-{
-	struct cbor_type type;
-
-	if ((*err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
+	if ((*err = decode_hdr(dec, &type)) != CBOR_ERR_OK)
 		return 0;
 
+	if (type.major != CBOR_MAJOR_NEGATIVE_INT && type.major != CBOR_MAJOR_UINT) {
+		*err = CBOR_ERR_ITEM;
+		return 0;
+	}
+
 	if (type.major == CBOR_MAJOR_NEGATIVE_INT) {
-		if (type.val > -(INT64_MIN + 1) || type.val < min_value) {
+		*err = uint64_to_negint(type.val, &i64);
+	}
+	else {
+		if (type.val > INT64_MAX) {
 			*err = CBOR_ERR_RANGE;
 			return 0;
 		}
 
-		return (-1 - type.val);
-	}
-	
-	if (type.major == CBOR_MAJOR_UINT) {
-		if (type.val > max_value) {
-			*err = CBOR_ERR_RANGE;
-			return 0;
-		}
-
-		return type.val;
+		i64 = type.val;
 	}
 
-	*err = CBOR_ERR_ITEM;
-	return 0;
+	if (i64 < min || i64 > max) {
+		*err = CBOR_ERR_RANGE;
+		return 0;
+	}
+
+	*err = CBOR_ERR_OK;
+	return i64;
 }
 
 
-cbor_err_t cbor_int8_decode(struct cbor_decoder *dec, int8_t *val)
+cbor_err_t cbor_decode_uint8(struct cbor_decoder *dec, uint8_t *val)
 {
 	cbor_err_t err;
-	*val = (int8_t)cbor_int_decode(dec, &err, INT8_MIN, INT8_MAX);
+	*val = (uint8_t)decode_uint(dec, &err, UINT8_MAX);
 	return err;
 }
 
 
-cbor_err_t cbor_int16_decode(struct cbor_decoder *dec, int16_t *val)
+cbor_err_t cbor_decode_uint16(struct cbor_decoder *dec, uint16_t *val)
 {
 	cbor_err_t err;
-	*val = (int16_t)cbor_int_decode(dec, &err, INT16_MIN, INT16_MAX);
+	*val = (uint16_t)decode_uint(dec, &err, UINT16_MAX);
 	return err;
 }
 
 
-cbor_err_t cbor_int32_decode(struct cbor_decoder *dec, int32_t *val)
+cbor_err_t cbor_decode_uint32(struct cbor_decoder *dec, uint32_t *val)
 {
 	cbor_err_t err;
-	*val = (int32_t)cbor_int_decode(dec, &err, INT32_MIN, INT32_MAX);
+	*val = (uint32_t)decode_uint(dec, &err, UINT32_MAX);
 	return err;
 }
 
 
-cbor_err_t cbor_int64_decode(struct cbor_decoder *dec, int64_t *val)
+cbor_err_t cbor_decode_uint64(struct cbor_decoder *dec, uint64_t *val)
 {
 	cbor_err_t err;
-	*val = (int64_t)cbor_int_decode(dec, &err, INT64_MIN, INT64_MAX);
+	*val = (uint64_t)decode_uint(dec, &err, UINT64_MAX);
 	return err;
 }
 
 
-static cbor_err_t cbor_decode_break(struct cbor_decoder *dec)
+cbor_err_t cbor_decode_int8(struct cbor_decoder *dec, int8_t *val)
 {
-	struct cbor_type type;
+	cbor_err_t err;
+	*val = (int8_t)decode_int(dec, &err, INT8_MIN, INT8_MAX);
+	return err;
+}
 
-	cbor_type_decode(dec, &type);
-	if (type.major != CBOR_MAJOR_OTHER || type.val != 31) // TODO
+
+cbor_err_t cbor_decode_int16(struct cbor_decoder *dec, int16_t *val)
+{
+	cbor_err_t err;
+	*val = (int16_t)decode_int(dec, &err, INT16_MIN, INT16_MAX);
+	return err;
+}
+
+
+cbor_err_t cbor_decode_int32(struct cbor_decoder *dec, int32_t *val)
+{
+	cbor_err_t err;
+	*val = (int32_t)decode_int(dec, &err, INT32_MIN, INT32_MAX);
+	return err;
+}
+
+
+cbor_err_t cbor_decode_int64(struct cbor_decoder *dec, int64_t *val)
+{
+	cbor_err_t err;
+	*val = (int64_t)decode_int(dec, &err, INT64_MIN, INT64_MAX);
+	return err;
+}
+
+
+cbor_err_t cbor_decode_tag(struct cbor_decoder *dec, uint64_t *tagno)
+{
+	struct cbor_hdr hdr;
+	cbor_err_t err;
+
+	if ((err = decode_hdr_check(dec, &hdr, CBOR_MAJOR_TAG)) == CBOR_ERR_OK)
+		*tagno = hdr.val;
+
+	return err;
+}
+
+
+cbor_err_t cbor_decode_sval(struct cbor_decoder *dec, enum cbor_sval *sval)
+{
+	struct cbor_hdr hdr;
+	cbor_err_t err;
+
+	if ((err = decode_hdr(dec, &hdr)) != CBOR_ERR_OK)
+		return err;
+
+	if (hdr.major != CBOR_MAJOR_OTHER || hdr.minor != CBOR_MINOR_SVAL)
 		return CBOR_ERR_ITEM;
+
+	*sval = hdr.val;
+	return CBOR_ERR_OK;
+
+}
+
+
+static inline bool is_break(struct cbor_hdr *type)
+{
+	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
+}
+
+
+static cbor_err_t decode_break(struct cbor_decoder *dec)
+{
+	struct cbor_hdr hdr;
+	cbor_err_t err;
+
+	if ((err = decode_hdr(dec, &hdr)) == CBOR_ERR_OK)
+		if (!is_break(&hdr))
+			return CBOR_ERR_ITEM;
 
 	return CBOR_ERR_OK;
 }
 
 
-static cbor_err_t cbor_block_begin(struct cbor_decoder *dec, enum cbor_major major_type, bool indef, uint64_t *len)
+static cbor_err_t block_begin(struct cbor_decoder *dec, enum cbor_major major_type, bool indef, uint64_t *len)
 {
 	struct block *block;
 	cbor_err_t err;
@@ -251,11 +304,8 @@ static cbor_err_t cbor_block_begin(struct cbor_decoder *dec, enum cbor_major maj
 		return CBOR_ERR_NOMEM;
 
 	block->num_items = 0;
-	if ((err = cbor_type_decode(dec, &block->type)) != CBOR_ERR_OK)
+	if ((err = decode_hdr_check(dec, &block->type, major_type)) != CBOR_ERR_OK)
 		return err;
-
-	if (block->type.major != major_type)
-		return CBOR_ERR_ITEM;
 
 	if (block->type.indef != indef)
 		return CBOR_ERR_INDEF;
@@ -265,7 +315,7 @@ static cbor_err_t cbor_block_begin(struct cbor_decoder *dec, enum cbor_major maj
 }
 
 
-static cbor_err_t cbor_block_end(struct cbor_decoder *dec, enum cbor_major major_type)
+static cbor_err_t block_end(struct cbor_decoder *dec, enum cbor_major major_type)
 {
 	struct block *block;
 
@@ -278,7 +328,7 @@ static cbor_err_t cbor_block_end(struct cbor_decoder *dec, enum cbor_major major
 		return CBOR_ERR_OPER;
 
 	if (block->type.indef)
-		return cbor_decode_break(dec);
+		return decode_break(dec);
 
 	if (block->num_items != block->type.val)
 		return CBOR_ERR_OPER;
@@ -287,210 +337,167 @@ static cbor_err_t cbor_block_end(struct cbor_decoder *dec, enum cbor_major major
 }
 
 
-cbor_err_t cbor_array_decode_begin(struct cbor_decoder *dec, uint64_t *len)
+cbor_err_t cbor_decode_array_begin(struct cbor_decoder *dec, uint64_t *len)
 {
-	return cbor_block_begin(dec, CBOR_MAJOR_ARRAY, false, len);
+	return block_begin(dec, CBOR_MAJOR_ARRAY, false, len);
 }
 
 
-cbor_err_t cbor_array_decode_begin_indef(struct cbor_decoder *dec)
+cbor_err_t cbor_decode_array_begin_indef(struct cbor_decoder *dec)
 {
 	uint64_t tmp;
-	return cbor_block_begin(dec, CBOR_MAJOR_ARRAY, true, &tmp);
+	return block_begin(dec, CBOR_MAJOR_ARRAY, true, &tmp);
 }
 
 
-cbor_err_t cbor_array_decode_end(struct cbor_decoder *dec)
+cbor_err_t cbor_decode_array_end(struct cbor_decoder *dec)
 {
-	return cbor_block_end(dec, CBOR_MAJOR_ARRAY);
+	return block_end(dec, CBOR_MAJOR_ARRAY);
 }
 
 
-cbor_err_t cbor_map_decode_begin(struct cbor_decoder *dec, uint64_t *len)
+cbor_err_t cbor_decode_map_begin(struct cbor_decoder *dec, uint64_t *len)
 {
-	return cbor_block_begin(dec, CBOR_MAJOR_MAP, false, len);
+	return block_begin(dec, CBOR_MAJOR_MAP, false, len);
 }
 
 
-cbor_err_t cbor_map_decode_end(struct cbor_decoder *dec)
+cbor_err_t cbor_decode_map_end(struct cbor_decoder *dec)
 {
-	return cbor_block_end(dec, CBOR_MAJOR_MAP);
+	return block_end(dec, CBOR_MAJOR_MAP);
 }
 
 
-static inline bool cbor_type_is_break(struct cbor_type *type)
-{
-	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
-}
-
-
-static cbor_err_t cbor_string_decode_payload(struct cbor_decoder *dec, struct cbor_type *type,
-	unsigned char **bytes, size_t *len)
-{
-	struct cbor_type chunk_type;
-	size_t total;
-	cbor_err_t err;
-
-	if (!type->indef) {
-		*len = type->val;
-		*bytes = cbor_malloc(*len + 1);
-		return cbor_stream_read(dec->stream, *bytes, 0, type->val);
-	}
-
-	*bytes = NULL;
-	total = 0;
-
-	while ((err = cbor_type_decode(dec, &chunk_type)) == CBOR_ERR_OK) {
-		if (cbor_type_is_break(&chunk_type))
-			break;
-
-		if (chunk_type.major != type->major || chunk_type.indef) {
-			free(*bytes);
-			return CBOR_ERR_ITEM;
-		}
-
-		/* TODO Do I mind the extra byte allocated for cases when major != CBOR_MAJOR_TEXT? */
-		*bytes = cbor_realloc(*bytes, total + chunk_type.val + 1);
-		if ((err = cbor_stream_read(dec->stream, *bytes, total, chunk_type.val)) != CBOR_ERR_OK)
-			return err;
-
-		total += chunk_type.val;
-	}
-
-	*len = total;
-	return err;
-}
-
-
-static cbor_err_t cbor_string_decode(struct cbor_decoder *dec, enum cbor_major major, unsigned char **bytes, size_t *len)
-{
-	struct cbor_type type;
-	cbor_err_t err;
-
-	if ((err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
-		return err;
-
-	if (type.major != major)
-		return CBOR_ERR_ITEM;
-
-	return cbor_string_decode_payload(dec, &type, bytes, len);
-}
-
-
-cbor_err_t cbor_bytes_decode(struct cbor_decoder *dec, unsigned char **str, size_t *len)
-{
-	return cbor_string_decode(dec, CBOR_MAJOR_BYTES, str, len);
-}
-
-
-cbor_err_t cbor_text_decode(struct cbor_decoder *dec, unsigned char **str, size_t *len)
+static cbor_err_t decode_chunk(struct cbor_decoder *dec, struct cbor_hdr *stream_hdr,
+	struct cbor_hdr *chunk_hdr, byte **bytes, size_t *len)
 {
 	cbor_err_t err;
 
-	if ((err = cbor_string_decode(dec, CBOR_MAJOR_TEXT, str, len)) == CBOR_ERR_OK)
-		(*str)[*len] = '\0';
-
-	return err;
-}
-
-
-cbor_err_t cbor_tag_decode(struct cbor_decoder *dec, uint64_t *tagno)
-{
-	cbor_err_t err;
-	struct cbor_type type;
-
-	if ((err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
-		return err;
-
-	if (type.major != CBOR_MAJOR_TAG)
-		return CBOR_ERR_ITEM;
-
-	*tagno = type.val;
-	return CBOR_ERR_OK;
-}
-
-
-cbor_err_t cbor_sval_decode(struct cbor_decoder *dec, enum cbor_sval *sval)
-{
-	cbor_err_t err;
-	struct cbor_type type;
-
-	if ((err = cbor_type_decode(dec, &type)) != CBOR_ERR_OK)
-		return err;
-
-	if (type.major != CBOR_MAJOR_OTHER || type.minor != CBOR_MINOR_SVAL)
-		return CBOR_ERR_ITEM;
-
-	*sval = type.val;
-	return CBOR_ERR_OK;
-
-}
-
-
-cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item *item);
-
-
-static cbor_err_t cbor_array_decode_payload_indef(struct cbor_decoder *dec, struct cbor_type *type,
-	struct cbor_item **items, uint64_t *nitems)
-{
-	struct cbor_item *cur_item;
-	size_t items_size;
-	cbor_err_t err;
-
-	*items = NULL;
-	*nitems = 0;
-	items_size = CBOR_ARRAY_INIT_SIZE;
-
-realloc:
-	*items = cbor_realloc(*items, items_size * sizeof(**items));
-	if (!*items)
+	*bytes = cbor_realloc(*bytes, 1 + *len + chunk_hdr->val);
+	if (!*bytes)
 		return CBOR_ERR_NOMEM;
 
-	while (1) {
-		if (*nitems >= items_size) {
-			items_size *= 2;
-			goto realloc;
-		}
-
-		cur_item = *items + *nitems;
-
-		if ((err = cbor_type_decode(dec, &cur_item->type)) != CBOR_ERR_OK)
-			goto out_free;
-
-		if (cbor_type_is_break(&cur_item->type))
-			break;
-
-		if ((err = cbor_item_decode_internal(dec, cur_item)) != CBOR_ERR_OK)
-			goto out_free;
-
-		(*nitems)++;
+	if ((err = cbor_stream_read(dec->stream, *bytes + *len, 0, chunk_hdr->val)) != CBOR_ERR_OK) {
+		free(*bytes);
+		return err;
 	}
 
+	*len += chunk_hdr->val;
 	return CBOR_ERR_OK;
+}
+
+
+static cbor_err_t decode_stream(struct cbor_decoder *dec, struct cbor_hdr *stream_hdr,
+	byte **bytes, size_t *len)
+{
+	struct cbor_hdr chunk_hdr;
+	cbor_err_t err;
+
+	*len = 0;
+	*bytes = NULL;
+
+	if (!stream_hdr->indef)
+		return decode_chunk(dec, stream_hdr, stream_hdr, bytes, len);
+
+	while ((err = decode_hdr(dec, &chunk_hdr)) == CBOR_ERR_OK) {
+		if (is_break(&chunk_hdr))
+			break;
+
+		if (chunk_hdr.major != stream_hdr->major || chunk_hdr.indef) {
+			err = CBOR_ERR_ITEM;
+			goto out_free;
+		}
+
+		if ((err = decode_chunk(dec, stream_hdr, &chunk_hdr, bytes, len) != CBOR_ERR_OK))
+			goto out_free;
+	}
+
+	return err;
 
 out_free:
-	cbor_free(*items);
+	free(*bytes);
 	return err;
 }
 
 
-static cbor_err_t cbor_array_decode_payload(struct cbor_decoder *dec, struct cbor_type *type,
-	struct cbor_item **items, uint64_t *len)
+static cbor_err_t decode_stream_null(struct cbor_decoder *dec, struct cbor_hdr *stream_hdr, byte **bytes, size_t *len)
 {
+	cbor_err_t err;
+	if ((err = decode_stream(dec, stream_hdr, bytes, len)) == CBOR_ERR_OK)
+		(*bytes)[*len] = 0;
+	return err;
+}
+
+
+cbor_err_t cbor_decode_bytes(struct cbor_decoder *dec, byte **str, size_t *len)
+{
+	struct cbor_hdr hdr;
+	cbor_err_t err;
+
+	if ((err = decode_hdr_check(dec, &hdr, CBOR_MAJOR_BYTES)) != CBOR_ERR_OK)
+		return err;
+
+	return decode_stream(dec, &hdr, str, len);
+}
+
+
+cbor_err_t cbor_decode_text(struct cbor_decoder *dec, byte **str, size_t *len)
+{
+	struct cbor_hdr hdr;
+	cbor_err_t err;
+
+	if ((err = decode_hdr_check(dec, &hdr, CBOR_MAJOR_TEXT)) != CBOR_ERR_OK)
+		return err;
+
+	return decode_stream_null(dec, &hdr, str, len);
+}
+
+
+static cbor_err_t decode_item(struct cbor_decoder *dec, struct cbor_item *item);
+
+
+static cbor_err_t decode_array_items(struct cbor_decoder *dec, struct cbor_hdr *array_hdr,
+	struct cbor_item **items, uint64_t *nitems)
+{
+	struct cbor_item *item;
+	size_t size;
+	bool end = false;
 	cbor_err_t err;
 	size_t i;
 
-	*items = cbor_malloc(type->val * sizeof(**items));
+	size = CBOR_ARRAY_INIT_SIZE;
+	if (!array_hdr->indef)
+		size = array_hdr->val;
+	*items = NULL;
+
+	*items = cbor_realloc(*items, size * sizeof(**items));
 	if (!*items)
 		return CBOR_ERR_NOMEM;
 
-	for (i = 0; i < type->val; i++) {
-		if ((err = cbor_item_decode(dec, &(*items)[i])) != CBOR_ERR_OK)
+	i = 0;
+
+more_items:
+	for (; i < size; i++) {
+		item = *items + i;
+
+		if ((err = decode_hdr(dec, &item->type)) != CBOR_ERR_OK)
+			goto out_free;
+
+		if (is_break(&item->type)) {
+			end = true;
+			break;
+		}
+
+		if ((err = decode_item(dec, item)) != CBOR_ERR_OK)
 			goto out_free;
 	}
 
-	*len = type->val;
+	if (!end && array_hdr->indef) {
+		size *= 2;
+		goto more_items;
+	}
 
+	*nitems = i;
 	return CBOR_ERR_OK;
 
 out_free:
@@ -499,42 +506,38 @@ out_free:
 }
 
 
-cbor_err_t cbor_item_decode_internal(struct cbor_decoder *dec, struct cbor_item *item)
+static cbor_err_t decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
 	switch (item->type.major) {
+	case CBOR_MAJOR_NEGATIVE_INT:
+		return uint64_to_negint(item->type.val, &item->i64);
+
 	case CBOR_MAJOR_BYTES:
+		return decode_stream(dec, &item->type, &item->bytes, &item->len);
+
 	case CBOR_MAJOR_TEXT:
-		err = cbor_string_decode_payload(dec, &item->type, &item->bytes, &item->len);
-		item->str[item->len] = '\0'; /* TODO */
-		return err;
+		return decode_stream_null(dec, &item->type, &item->bytes, &item->len);
 
 	case CBOR_MAJOR_ARRAY:
-	case CBOR_MAJOR_MAP:
-		if (item->type.indef)
-			return cbor_array_decode_payload_indef(dec, &item->type, &item->items, &item->len);
-		else
-			return cbor_array_decode_payload(dec, &item->type, &item->items, &item->len);
+		return decode_array_items(dec, &item->type, &item->items, &item->len);
 
-	case CBOR_MAJOR_OTHER:
-		TEMP_ASSERT(false);
+	case CBOR_MAJOR_MAP:
+		return decode_array_items(dec, &item->type, &item->items, &item->len);
 
 	default:
-		/* no action needed--all data decoded by cbor_type_decode */
-		break;
+		return CBOR_ERR_OK;
 	}
-
-	return CBOR_ERR_OK;
 }
 
 
-cbor_err_t cbor_item_decode(struct cbor_decoder *dec, struct cbor_item *item)
+cbor_err_t cbor_decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
-	if ((err = cbor_type_decode(dec, &item->type)) != CBOR_ERR_OK)
+	if ((err = decode_hdr(dec, &item->type)) != CBOR_ERR_OK)
 		return err;
 
-	return cbor_item_decode_internal(dec, item);
+	return decode_item(dec, item);
 }

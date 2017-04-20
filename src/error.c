@@ -17,8 +17,6 @@ const char *cbor_err_to_string(cbor_err_t err)
 		return "End-of-file was reached.";
 	case CBOR_ERR_RANGE:
 		return "Value is out of range.";
-	case CBOR_ERR_NEGATIVE_INT:
-		return "Negative int where unsigned int was expected.";
 	case CBOR_ERR_OPER:
 		return "Operation is invalid (at the moment).";
 	case CBOR_ERR_NOFILE:

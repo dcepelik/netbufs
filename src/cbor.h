@@ -95,6 +95,7 @@ struct cbor_item
 	size_t len;		/* XXX this is different from type.val! */
 
 	union {
+		int64_t i64;
 		unsigned char *bytes;
 		char *str;
 		struct cbor_item *items;
@@ -171,34 +172,34 @@ cbor_err_t cbor_tag_encode(struct cbor_encoder *enc, uint64_t tagno);
  * Item-oriented decoder API.
  */
 
-cbor_err_t cbor_item_decode(struct cbor_decoder *dec, struct cbor_item *item);
+cbor_err_t cbor_decode_uint8(struct cbor_decoder *dec, uint8_t *val);
+cbor_err_t cbor_decode_uint16(struct cbor_decoder *dec, uint16_t *val);
+cbor_err_t cbor_decode_uint32(struct cbor_decoder *dec, uint32_t *val);
+cbor_err_t cbor_decode_uint64(struct cbor_decoder *dec, uint64_t *val);
 
-cbor_err_t cbor_uint8_decode(struct cbor_decoder *dec, uint8_t *val);
-cbor_err_t cbor_uint16_decode(struct cbor_decoder *dec, uint16_t *val);
-cbor_err_t cbor_uint32_decode(struct cbor_decoder *dec, uint32_t *val);
-cbor_err_t cbor_uint64_decode(struct cbor_decoder *dec, uint64_t *val);
+cbor_err_t cbor_decode_int8(struct cbor_decoder *dec, int8_t *val);
+cbor_err_t cbor_decode_int16(struct cbor_decoder *dec, int16_t *val);
+cbor_err_t cbor_decode_int32(struct cbor_decoder *dec, int32_t *val);
+cbor_err_t cbor_decode_int64(struct cbor_decoder *dec, int64_t *val);
 
-cbor_err_t cbor_int8_decode(struct cbor_decoder *dec, int8_t *val);
-cbor_err_t cbor_int16_decode(struct cbor_decoder *dec, int16_t *val);
-cbor_err_t cbor_int32_decode(struct cbor_decoder *dec, int32_t *val);
-cbor_err_t cbor_int64_decode(struct cbor_decoder *dec, int64_t *val);
+cbor_err_t cbor_decode_float16(struct cbor_decoder *dec, float *val);
+cbor_err_t cbor_decode_float32(struct cbor_decoder *dec, float *val);
+cbor_err_t cbor_decode_float64(struct cbor_decoder *dec, double *val);
 
-cbor_err_t cbor_float16_decode(struct cbor_decoder *dec, float *val);
-cbor_err_t cbor_float32_decode(struct cbor_decoder *dec, float *val);
-cbor_err_t cbor_float64_decode(struct cbor_decoder *dec, double *val);
+cbor_err_t cbor_decode_sval(struct cbor_decoder *dec, enum cbor_sval *val);
 
-cbor_err_t cbor_sval_decode(struct cbor_decoder *dec, enum cbor_sval *val);
+cbor_err_t cbor_decode_array_begin(struct cbor_decoder *dec, uint64_t *len);
+cbor_err_t cbor_decode_array_end(struct cbor_decoder *dec);
 
-cbor_err_t cbor_array_decode_begin(struct cbor_decoder *dec, uint64_t *len);
-cbor_err_t cbor_array_decode_end(struct cbor_decoder *dec);
+cbor_err_t cbor_decode_map_begin(struct cbor_decoder *dec, uint64_t *len);
+cbor_err_t cbor_decode_map_end(struct cbor_decoder *dec);
 
-cbor_err_t cbor_map_decode_begin(struct cbor_decoder *dec, uint64_t *len);
-cbor_err_t cbor_map_decode_end(struct cbor_decoder *dec);
+cbor_err_t cbor_decode_bytes(struct cbor_decoder *dec, unsigned char **bytes, size_t *len);
+cbor_err_t cbor_decode_text(struct cbor_decoder *dec, unsigned char **str, size_t *len);
 
-cbor_err_t cbor_bytes_decode(struct cbor_decoder *dec, unsigned char **bytes, size_t *len);
-cbor_err_t cbor_text_decode(struct cbor_decoder *dec, unsigned char **str, size_t *len);
+cbor_err_t cbor_decode_tag(struct cbor_decoder *dec, uint64_t *tagno);
 
-cbor_err_t cbor_tag_decode(struct cbor_decoder *dec, uint64_t *tagno);
+cbor_err_t cbor_decode_item(struct cbor_decoder *dec, struct cbor_item *item);
 
 /*
  * DOM-oriented decoder API.

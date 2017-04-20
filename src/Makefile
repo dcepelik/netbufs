@@ -3,7 +3,7 @@
 PROG=playground
 LIB=libcbor.a
 LIBOBJS=cbor.o encode.o decode.o stream.o util.o memory.o stack.o error.o
-BINS=test-stream
+BINS=test-stream test-decenc test-adhoc
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
 LDFLAGS+=-Wall
@@ -14,6 +14,12 @@ $(LIB): $(LIBOBJS)
 	ar rcs $(LIB) $(LIBOBJS)
 
 test-stream: test-stream.o $(LIBOBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+test-decenc: test-decenc.o $(LIBOBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+test-adhoc: test-adhoc.o $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 %.o: %.c %.h
