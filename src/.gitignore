@@ -1,2 +1,3 @@
 *.a
-playground
+test-*
+!test-*.c

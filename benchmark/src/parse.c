@@ -30,6 +30,7 @@ void parser_init(struct parser *p, char *filename)
 	p->col_no = 1;
 	p->buf = malloc(PARSER_BUF_SIZE);
 	p->unget = '\0';
+
 	parser_fill_buffer(p);
 }
 
@@ -43,7 +44,6 @@ static void parser_error(struct parser *p, char *fmt, ...)
 	vfprintf(stderr, fmt, args);
 
 	va_end(args);
-
 	exit(EXIT_FAILURE);
 }
 
@@ -54,14 +54,14 @@ void parser_free(struct parser *p)
 }
 
 
-static char parser_getc_internal(struct parser *p)
+static char parser_getc(struct parser *p)
 {
 	char c;
 
 	if (p->unget != '\0') {
 		c = p->unget;
 		p->unget = '\0';
-		return c;
+		goto out;
 	}
 
 	if (p->offset >= p->avail) {
@@ -79,17 +79,9 @@ static char parser_getc_internal(struct parser *p)
 	}
 
 	p->col_no++;
+
+out:
 	return p->cur = c;
-}
-
-
-static char parser_getc(struct parser *p)
-{
-	char c;
-
-	c = parser_getc_internal(p);
-
-	return c;
 }
 
 
