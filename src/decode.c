@@ -16,7 +16,7 @@
 
 static cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 {
-	//assert(err == CBOR_ERR_OK);
+	//assert(err == CBOR_ERR_OK); /* uncomment for easier debugging */
 
 	va_list args;
 
@@ -34,7 +34,7 @@ static cbor_err_t decode_hdr(struct cbor_stream *cs, struct cbor_hdr *hdr)
 	size_t num_extra_bytes;
 	uint64_t val_be = 0;
 	byte_t *val_be_bytes = (byte_t *)&val_be;
-	cbor_extra_t extra_bits;
+	enum cbor_minor minor;
 	cbor_err_t err;
 	size_t i;
 
@@ -42,44 +42,44 @@ static cbor_err_t decode_hdr(struct cbor_stream *cs, struct cbor_hdr *hdr)
 		return err;
 
 	hdr->major = (bytes[0] & 0xE0) >> 5;
-	extra_bits = bytes[0] & 0x1F;
+	minor = bytes[0] & 0x1F;
 
 	/* TODO */
-	hdr->minor = extra_bits;
+	hdr->minor = minor;
 
-	hdr->indef = (extra_bits == CBOR_EXTRA_VAR_LEN);
+	hdr->indef = (minor == CBOR_MINOR_INDEFINITE_BREAK);
 	if (hdr->indef) {
-		if (hdr->major == CBOR_MAJOR_OTHER || major_allows_indef(hdr->major))
+		if (hdr->major == CBOR_MAJOR_7 || major_allows_indef(hdr->major))
 			return CBOR_ERR_OK;
 		return error(cs, CBOR_ERR_INDEF, "%s does not allow for "
 			"indefinite-length encoding", cbor_major_to_string(hdr->major));
 	}
 
-	if (extra_bits <= 23) {
-		hdr->u64 = extra_bits;
-		hdr->minor = CBOR_MINOR_SVAL;	/* TODO */
+	if (minor <= 23) {
+		hdr->u64 = minor;
+		hdr->minor = CBOR_MINOR_1B_SVAL;	/* TODO */
 		return CBOR_ERR_OK;
 	}
 
-	switch (extra_bits) {
-	case CBOR_EXTRA_1B:
+	switch (minor) {
+	case CBOR_MINOR_1B_SVAL:
 		num_extra_bytes = 1;
 		break;
 
-	case CBOR_EXTRA_2B:
+	case CBOR_MINOR_2B_FLOAT16:
 		num_extra_bytes = 2;
 		break;
 
-	case CBOR_EXTRA_4B:
+	case CBOR_MINOR_4B_FLOAT32:
 		num_extra_bytes = 4;
 		break;
 
-	case CBOR_EXTRA_8B:
+	case CBOR_MINOR_8B_FLOAT64:
 		num_extra_bytes = 8;
 		break;
 
 	default:
-		return error(cs, CBOR_ERR_PARSE, "invalid value of extra bits: %u", extra_bits);
+		return error(cs, CBOR_ERR_PARSE, "invalid value of extra bits: %u", minor);
 	}
 
 	if ((err = buf_read(cs->buf, bytes, 1, num_extra_bytes)) != CBOR_ERR_OK)
@@ -149,12 +149,12 @@ static int64_t decode_int(struct cbor_stream *cs, cbor_err_t *err, int64_t min, 
 	if ((*err = decode_hdr(cs, &hdr)) != CBOR_ERR_OK)
 		return 0;
 
-	if (hdr.major != CBOR_MAJOR_NEGATIVE_INT && hdr.major != CBOR_MAJOR_UINT) {
+	if (hdr.major != CBOR_MAJOR_NEGINT && hdr.major != CBOR_MAJOR_UINT) {
 		*err = CBOR_ERR_ITEM;
 		return 0;
 	}
 
-	if (hdr.major == CBOR_MAJOR_NEGATIVE_INT) {
+	if (hdr.major == CBOR_MAJOR_NEGINT) {
 		*err = uint64_to_negint(cs, hdr.u64, &i64);
 	}
 	else {
@@ -260,7 +260,7 @@ cbor_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *sval)
 	if ((err = decode_hdr(cs, &hdr)) != CBOR_ERR_OK)
 		return err;
 
-	if (hdr.major != CBOR_MAJOR_OTHER || hdr.minor != CBOR_MINOR_SVAL)
+	if (hdr.major != CBOR_MAJOR_7 || hdr.minor != CBOR_MINOR_1B_SVAL)
 		return error(cs, CBOR_ERR_ITEM, "A Simple Value was expected.");
 
 	*sval = hdr.u64;
@@ -276,7 +276,7 @@ static cbor_err_t decode_break(struct cbor_stream *cs)
 
 	if ((err = decode_hdr(cs, &hdr)) == CBOR_ERR_OK)
 		if (!is_break(&hdr))
-			return error(cs, CBOR_ERR_ITEM, "Break Code was expected.");
+			return error(cs, CBOR_ERR_ITEM, "Break was expected.");
 
 	return CBOR_ERR_OK;
 }
@@ -289,7 +289,7 @@ static cbor_err_t block_begin(struct cbor_stream *cs, enum cbor_major major_type
 
 	block = stack_push(&cs->blocks);
 	if (!block)
-		return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block");
+		return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
 
 	block->num_items = 0;
 	if ((err = decode_hdr_check(cs, &block->hdr, major_type)) != CBOR_ERR_OK)
@@ -531,7 +531,7 @@ static cbor_err_t decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	cbor_err_t err;
 
 	switch (item->hdr.major) {
-	case CBOR_MAJOR_NEGATIVE_INT:
+	case CBOR_MAJOR_NEGINT:
 		return uint64_to_negint(cs, item->hdr.u64, &item->i64);
 
 	case CBOR_MAJOR_BYTES:

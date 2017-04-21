@@ -11,7 +11,7 @@ typedef unsigned char		cbor_extra_t;
 #define CBOR_MAJOR_MASK		0xE0
 #define CBOR_EXTRA_MASK		0x1F
 
-#define CBOR_BREAK		((CBOR_MAJOR_OTHER << 5) + 31)
+#define CBOR_BREAK		((CBOR_MAJOR_7 << 5) + 31)
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
@@ -104,7 +104,8 @@ static inline bool major_allows_indef(enum cbor_major major)
 
 static inline bool is_break(struct cbor_hdr *hdr)
 {
-	return (hdr->major == CBOR_MAJOR_OTHER && hdr->minor == CBOR_MINOR_BREAK);
+	return hdr->major == CBOR_MAJOR_7
+		&& hdr->minor == CBOR_MINOR_INDEFINITE_BREAK;
 }
 
 #endif

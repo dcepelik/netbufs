@@ -38,7 +38,7 @@ static cbor_err_t cbor_encode_type(struct cbor_stream *cs, struct cbor_hdr hdr)
 	bytes[0] = hdr.major << 5;
 
 	if (hdr.indef) {
-		bytes[0] |= CBOR_EXTRA_VAR_LEN;
+		bytes[0] |= CBOR_MINOR_INDEFINITE_BREAK;
 	}
 	else {
 		if (hdr.u64 <= 23) {
@@ -46,19 +46,19 @@ static cbor_err_t cbor_encode_type(struct cbor_stream *cs, struct cbor_hdr hdr)
 		}
 		else if (hdr.u64 <= UINT8_MAX) {
 			num_extra_bytes = 1;
-			bytes[0] |= CBOR_EXTRA_1B;
+			bytes[0] |= CBOR_MINOR_1B_SVAL;
 		}
 		else if (hdr.u64 <= UINT16_MAX) {
 			num_extra_bytes = 2;
-			bytes[0] |= CBOR_EXTRA_2B;
+			bytes[0] |= CBOR_MINOR_2B_FLOAT16;
 		}
 		else if (hdr.u64 <= UINT32_MAX) {
 			num_extra_bytes = 4;
-			bytes[0] |= CBOR_EXTRA_4B;
+			bytes[0] |= CBOR_MINOR_4B_FLOAT32;
 		}
 		else {
 			num_extra_bytes = 8;
-			bytes[0] |= CBOR_EXTRA_8B;
+			bytes[0] |= CBOR_MINOR_8B_FLOAT64;
 		}
 
 		/* implicit corner case: won't copy anything when val <= 23 */
@@ -111,7 +111,7 @@ static cbor_err_t cbor_encode_int(struct cbor_stream *cs, int64_t val)
 		return cbor_encode_uint(cs, val);
 	else
 		return cbor_encode_type(cs, (struct cbor_hdr) {
-			.major = CBOR_MAJOR_NEGATIVE_INT,
+			.major = CBOR_MAJOR_NEGINT,
 			.indef = false,
 			.u64 = (-1 - val)
 		});
@@ -294,8 +294,8 @@ cbor_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 		return error(cs, CBOR_ERR_RANGE, "Simple value %u is greater than 255.", sval);
 
 	return cbor_encode_type(cs, (struct cbor_hdr) {
-		.major = CBOR_MAJOR_OTHER,
-		.minor = CBOR_MINOR_SVAL,
+		.major = CBOR_MAJOR_7,
+		.minor = CBOR_MINOR_1B_SVAL,
 		.indef = false,
 		.u64 = sval
 	});
@@ -313,7 +313,7 @@ cbor_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_MAJOR_UINT:
 		return cbor_encode_uint64(cs, item->hdr.u64);
 
-	case CBOR_MAJOR_NEGATIVE_INT:
+	case CBOR_MAJOR_NEGINT:
 		return cbor_encode_int64(cs, item->i64);
 
 	case CBOR_MAJOR_BYTES:

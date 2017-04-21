@@ -9,7 +9,7 @@ const char *cbor_major_to_string(enum cbor_major major)
 	switch (major) {
 	case CBOR_MAJOR_UINT:
 		return "unsigned int";
-	case CBOR_MAJOR_NEGATIVE_INT:
+	case CBOR_MAJOR_NEGINT:
 		return "negative int";
 	case CBOR_MAJOR_BYTES:
 		return "byte string";
@@ -21,11 +21,11 @@ const char *cbor_major_to_string(enum cbor_major major)
 		return "array";
 	case CBOR_MAJOR_TAG:
 		return "tag";
-	case CBOR_MAJOR_OTHER:
-		return "other";
-	default:
-		return "<invalid>";
+	case CBOR_MAJOR_7:
+		return "major type 7";
 	}
+
+	return NULL;
 }
 
 
@@ -38,7 +38,7 @@ void cbor_item_dump(struct cbor_item *item)
 		fprintf(stderr, "%lu", item->hdr.u64);
 		break;
 
-	case CBOR_MAJOR_NEGATIVE_INT:
+	case CBOR_MAJOR_NEGINT:
 		fprintf(stderr, "%li", item->i64);
 		break;
 
