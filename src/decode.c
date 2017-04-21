@@ -21,6 +21,8 @@ struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream)
 	dec = cbor_malloc(sizeof(*dec));
 	dec->stream = stream;
 
+	strbuf_init(&dec->err_buf, 24);
+
 	if (!stack_init(&dec->blocks, CBOR_BSTACK_INIT_SIZE, sizeof(struct block))) {
 		free(dec);
 		return NULL;
@@ -32,13 +34,14 @@ struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream)
 
 void cbor_decoder_delete(struct cbor_decoder *dec)
 {
+	strbuf_free(&dec->err_buf);
 	cbor_free(dec);
 }
 
 
 static cbor_err_t error(struct cbor_decoder *dec, cbor_err_t err, char *str, ...)
 {
-	assert(err == CBOR_ERR_OK);
+	//assert(err == CBOR_ERR_OK);
 
 	va_list args;
 

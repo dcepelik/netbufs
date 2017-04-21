@@ -18,6 +18,8 @@ struct cbor_encoder *cbor_encoder_new(struct cbor_stream *stream)
 	enc = cbor_malloc(sizeof(*enc));
 	enc->stream = stream;
 
+	strbuf_init(&enc->err_buf, 24);
+
 	if (!stack_init(&enc->blocks, 4, sizeof(struct block))) {
 		free(enc);
 		return NULL;
@@ -29,6 +31,7 @@ struct cbor_encoder *cbor_encoder_new(struct cbor_stream *stream)
 
 void cbor_encoder_delete(struct cbor_encoder *enc)
 {
+	strbuf_free(&enc->err_buf);
 	cbor_free(enc);
 }
 
