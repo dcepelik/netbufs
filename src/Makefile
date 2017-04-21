@@ -2,7 +2,7 @@
 
 PROG=playground
 LIB=libcbor.a
-LIBOBJS=cbor.o encode.o decode.o stream.o util.o memory.o stack.o error.o strbuf.o
+LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o
 BINS=test-stream test-decenc test-adhoc test-corrupt
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable

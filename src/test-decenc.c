@@ -1,5 +1,5 @@
 /*
- * Test CBOR encoder and decoder by decoding a valid CBOR stream and encoding
+ * Test CBOR encoder and decoder by decoding a valid CBOR buf and encoding
  * all data items it contains into another file.
  *
  * The files are then diffed by run-tests.sh.
@@ -20,10 +20,10 @@ int main(int argc, char *argv[])
 {
 	char *infn;
 	char *outfn;
-	struct cbor_stream *in;
-	struct cbor_stream *out;
-	struct cbor_decoder *dec;
-	struct cbor_encoder *enc;
+	struct buf *in;
+	struct buf *out;
+	struct cbor_stream *cs_in;
+	struct cbor_stream *cs_out;
 	struct cbor_item item;
 	int mode;
 	cbor_err_t err;
@@ -33,35 +33,35 @@ int main(int argc, char *argv[])
 	infn = argv[1];
 	outfn = argv[2];
 
-	in = cbor_stream_new();
+	in = buf_new();
 	assert(in != NULL);
 
-	assert(cbor_stream_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
+	assert(buf_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
 
-	out = cbor_stream_new();
+	out = buf_new();
 	assert(out != NULL);
 
 	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-	assert(cbor_stream_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
+	assert(buf_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
 
-	dec = cbor_decoder_new(in);
-	assert(dec != NULL);
+	cs_in = cbor_stream_new(in);
+	assert(cs_in != NULL);
 
-	enc = cbor_encoder_new(out);
-	assert(enc != NULL);
+	cs_out = cbor_stream_new(out);
+	assert(cs_out != NULL);
 
-	while ((err = cbor_decode_item(dec, &item)) == CBOR_ERR_OK) {
-		if ((err = cbor_encode_item(enc, &item)) != CBOR_ERR_OK)
+	while ((err = cbor_decode_item(cs_in, &item)) == CBOR_ERR_OK) {
+		if ((err = cbor_encode_item(cs_out, &item)) != CBOR_ERR_OK)
 			break;
 	}
 
 	DEBUG_EXPR("%s", cbor_err_to_string(err));
 	assert(err == CBOR_ERR_EOF);
 
-	cbor_stream_close(in);
-	cbor_stream_close(out);
-	cbor_decoder_delete(dec);
-	cbor_encoder_delete(enc);
+	buf_close(in);
+	buf_close(out);
+	cbor_stream_delete(cs_in);
+	cbor_stream_delete(cs_out);
 
 	return EXIT_SUCCESS;
 }

@@ -15,15 +15,15 @@
 #include <unistd.h>
 
 
-#define BUFSIZE	117	/* make sure buffer isn't boundary-aligned with stream's internal buffer */
+#define BUFSIZE	117	/* make sure buffer isn't boundary-aligned with buf's internal buffer */
 
 
 int main(int argc, char *argv[])
 {
 	char *infn;
 	char *outfn;
-	struct cbor_stream *in;
-	struct cbor_stream *out;
+	struct buf *in;
+	struct buf *out;
 	unsigned char *buf;
 	size_t len;
 	int mode;
@@ -36,23 +36,23 @@ int main(int argc, char *argv[])
 	buf = malloc(BUFSIZE);
 	assert(buf != NULL);
 
-	in = cbor_stream_new();
+	in = buf_new();
 	assert(in != NULL);
 
-	assert(cbor_stream_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
+	assert(buf_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
 
-	out = cbor_stream_new();
+	out = buf_new();
 	assert(out != NULL);
 
 	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-	assert(cbor_stream_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
+	assert(buf_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
 
-	while ((len = cbor_stream_read_len(in, buf, BUFSIZE)) > 0) {
-		cbor_stream_write(out, buf, len);
+	while ((len = buf_read_len(in, buf, BUFSIZE)) > 0) {
+		buf_write(out, buf, len);
 	}
 
-	cbor_stream_close(in);
-	cbor_stream_close(out);
+	buf_close(in);
+	buf_close(out);
 
 	return EXIT_SUCCESS;
 }

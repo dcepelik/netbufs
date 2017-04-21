@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 typedef unsigned char		cbor_extra_t;
-typedef unsigned char		byte;
 
 #define CBOR_MAJOR_MASK		0xE0
 #define CBOR_EXTRA_MASK		0x1F
@@ -17,11 +16,11 @@ typedef unsigned char		byte;
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
 
-struct cbor_stream
+struct buf
 {
-	unsigned char *buf;	/* data buffer */
+	byte_t *buf;	/* data buffer */
 	size_t bufsize;	/* size of the buffer */
-	size_t pos;	/* current read/write position within the stream */
+	size_t pos;	/* current read/write position within the buf */
 	size_t len;	/* number of valid bytes in the buffer (for reading) */
 	size_t last_read_len;
 	bool dirty;	/* do we have data to be written? */
@@ -33,25 +32,25 @@ struct cbor_stream
 	int mode;	/* file flags (@see man 3p open) */
 
 	/* for in-memory streams */
-	unsigned char *memory;	/* the memory */
+	byte_t *memory;	/* the memory */
 	size_t memory_size;	/* memory size */
 	size_t memory_len;	/* number of valid bytes in memory */
 	size_t memory_pos;	/* position in memory (for reading/writing) */
 
-	void (*flush)(struct cbor_stream *stream);
-	void (*fill)(struct cbor_stream *stream);
-	void (*close)(struct cbor_stream *stream);
+	void (*flush)(struct buf *buf);
+	void (*fill)(struct buf *buf);
+	void (*close)(struct buf *buf);
 };
 
-cbor_err_t cbor_stream_write(struct cbor_stream *stream, unsigned char *bytes, size_t count);
-cbor_err_t cbor_stream_read(struct cbor_stream *stream, unsigned char *bytes, size_t offset, size_t count);
+cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t count);
+cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t offset, size_t count);
 
 /* XXX This is a temporary tests helper */
-size_t cbor_stream_read_len(struct cbor_stream *stream, unsigned char *bytes, size_t nbytes);
+size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes);
 
-static inline cbor_err_t cbor_stream_get_last_read_len(struct cbor_stream *stream)
+static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
 {
-	return stream->last_read_len;
+	return buf->last_read_len;
 }
 
 
@@ -78,19 +77,9 @@ struct block
 cbor_err_t stack_block_begin(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
 cbor_err_t stack_block_end(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
 
-struct cbor_encoder
+struct cbor_stream
 {
-	struct cbor_stream *stream;
-	struct stack blocks;
-	cbor_err_t err;
-	struct strbuf err_buf;
-
-	/* various options */
-};
-
-struct cbor_decoder
-{
-	struct cbor_stream *stream;
+	struct buf *buf;
 	struct stack blocks;
 	cbor_err_t err;
 	struct strbuf err_buf;

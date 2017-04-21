@@ -16,19 +16,21 @@
 #define CBOR_EXTRA_8B		27
 #define CBOR_EXTRA_VAR_LEN	31
 
-struct cbor_encoder;
-struct cbor_decoder;
-struct cbor_document;
+/* temporary */
+typedef unsigned char		byte_t;
+
 struct cbor_stream;
+struct cbor_stream;
+struct buf;
 
-struct cbor_stream *cbor_stream_new(void);
-void cbor_stream_delete(struct cbor_stream *stream);
+struct buf *buf_new(void);
+void buf_delete(struct buf *buf);
 
-bool cbor_stream_is_eof(struct cbor_stream *stream);
+bool buf_is_eof(struct buf *buf);
 
-cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int flags, int mode);
-cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream);
-void cbor_stream_close(struct cbor_stream *stream);
+cbor_err_t buf_open_file(struct buf *buf, char *filename, int flags, int mode);
+cbor_err_t buf_open_memory(struct buf *buf);
+void buf_close(struct buf *buf);
 
 /*
  * CBOR Major Types
@@ -64,7 +66,7 @@ enum cbor_minor
 };
 
 /*
- * Type of a CBOR Data Item
+ * Header of a CBOR Data Item
  */
 struct cbor_hdr
 {
@@ -94,11 +96,12 @@ struct cbor_pair;
 struct cbor_item
 {
 	struct cbor_hdr hdr;
-	size_t len;		/* XXX this is different from hdr.u64! */
+	uint64_t len;
 
 	union {
+		uint64_t u64;
 		int64_t i64;
-		unsigned char *bytes;
+		byte_t *bytes;
 		char *str;
 		struct cbor_item *items;
 		struct cbor_pair *pairs;
@@ -110,8 +113,7 @@ void cbor_item_dump(struct cbor_item *item);
 
 /*
  * CBOR Key-Value Pair.
- *
- * Beware, This struct's topology affects decode_map_items.
+ * NOTE: this struct's topology affects decode_map_items.
  */
 struct cbor_pair
 {
@@ -119,97 +121,84 @@ struct cbor_pair
 	struct cbor_item value;
 };
 
-enum cbor_event
-{
-	CBOR_EVENT_ARRAY_BEGIN,
-	CBOR_EVENT_ARRAY_END,
-};
+struct cbor_stream *cbor_stream_new(struct buf *buf);
+void cbor_stream_delete(struct cbor_stream *cs);
 
-struct cbor_encoder *cbor_encoder_new(struct cbor_stream *stream);
-void cbor_encoder_delete(struct cbor_encoder *enc);
-
-struct cbor_decoder *cbor_decoder_new(struct cbor_stream *stream);
-void cbor_decoder_delete(struct cbor_decoder *dec);
+struct cbor_stream *cbor_decoder_new(struct buf *buf);
+void cbor_stream_delete(struct cbor_stream *cs);
 
 /*
  * Item-oriented encoder API.
  */
 
-cbor_err_t cbor_encode_item(struct cbor_encoder *enc, struct cbor_item *item);
+cbor_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item);
 
-cbor_err_t cbor_encode_uint8(struct cbor_encoder *enc, uint8_t val);
-cbor_err_t cbor_encode_uint16(struct cbor_encoder *enc, uint16_t val);
-cbor_err_t cbor_encode_uint32(struct cbor_encoder *enc, uint32_t val);
-cbor_err_t cbor_encode_uint64(struct cbor_encoder *enc, uint64_t val);
+cbor_err_t cbor_encode_uint8(struct cbor_stream *cs, uint8_t val);
+cbor_err_t cbor_encode_uint16(struct cbor_stream *cs, uint16_t val);
+cbor_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val);
+cbor_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val);
 
-cbor_err_t cbor_encode_int8(struct cbor_encoder *enc, int8_t val);
-cbor_err_t cbor_encode_int16(struct cbor_encoder *enc, int16_t val);
-cbor_err_t cbor_encode_int32(struct cbor_encoder *enc, int32_t val);
-cbor_err_t cbor_encode_int64(struct cbor_encoder *enc, int64_t val);
+cbor_err_t cbor_encode_int8(struct cbor_stream *cs, int8_t val);
+cbor_err_t cbor_encode_int16(struct cbor_stream *cs, int16_t val);
+cbor_err_t cbor_encode_int32(struct cbor_stream *cs, int32_t val);
+cbor_err_t cbor_encode_int64(struct cbor_stream *cs, int64_t val);
 
-cbor_err_t cbor_encode_float16(struct cbor_encoder *enc, float val);
-cbor_err_t cbor_encode_float32(struct cbor_encoder *enc, float val);
-cbor_err_t cbor_encode_float64(struct cbor_encoder *enc, double val);
+cbor_err_t cbor_encode_float16(struct cbor_stream *cs, float val);
+cbor_err_t cbor_encode_float32(struct cbor_stream *cs, float val);
+cbor_err_t cbor_encode_float64(struct cbor_stream *cs, double val);
 
-cbor_err_t cbor_encode_sval(struct cbor_encoder *enc, enum cbor_sval val);
+cbor_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval val);
 
-cbor_err_t cbor_encode_array_begin(struct cbor_encoder *enc, uint64_t len);
-cbor_err_t cbor_encode_array_begin_indef(struct cbor_encoder *enc);
-cbor_err_t cbor_encode_array_end(struct cbor_encoder *enc);
+cbor_err_t cbor_encode_array_begin(struct cbor_stream *cs, uint64_t len);
+cbor_err_t cbor_encode_array_begin_indef(struct cbor_stream *cs);
+cbor_err_t cbor_encode_array_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_encode_map_begin(struct cbor_encoder *enc, size_t len);
-cbor_err_t cbor_encode_map_begin_indef(struct cbor_encoder *enc);
-cbor_err_t cbor_encode_map_end(struct cbor_encoder *enc);
+cbor_err_t cbor_encode_map_begin(struct cbor_stream *cs, size_t len);
+cbor_err_t cbor_encode_map_begin_indef(struct cbor_stream *cs);
+cbor_err_t cbor_encode_map_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_encode_bytes(struct cbor_encoder *enc, unsigned char *bytes, size_t len);
-cbor_err_t cbor_encode_bytes_begin_indef(struct cbor_encoder *enc);
-cbor_err_t cbor_encode_bytes_end(struct cbor_encoder *enc);
+cbor_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len);
+cbor_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
+cbor_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_encode_text(struct cbor_encoder *enc, unsigned char *str, size_t len);
+cbor_err_t cbor_encode_text(struct cbor_stream *cs, byte_t *str, size_t len);
 /* TODO cbor_encode_text_begin: use as indefinite string, but normalize afterwards */
-cbor_err_t cbor_encode_text_begin_indef(struct cbor_encoder *enc);
-cbor_err_t cbor_encode_text_end(struct cbor_encoder *enc);
+cbor_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
+cbor_err_t cbor_encode_text_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_encode_tag(struct cbor_encoder *enc, uint64_t tagno);
+cbor_err_t cbor_encode_tag(struct cbor_stream *cs, uint64_t tagno);
 
 /*
  * Item-oriented decoder API.
  */
 
-cbor_err_t cbor_decode_uint8(struct cbor_decoder *dec, uint8_t *val);
-cbor_err_t cbor_decode_uint16(struct cbor_decoder *dec, uint16_t *val);
-cbor_err_t cbor_decode_uint32(struct cbor_decoder *dec, uint32_t *val);
-cbor_err_t cbor_decode_uint64(struct cbor_decoder *dec, uint64_t *val);
+cbor_err_t cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
+cbor_err_t cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val);
+cbor_err_t cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val);
+cbor_err_t cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val);
 
-cbor_err_t cbor_decode_int8(struct cbor_decoder *dec, int8_t *val);
-cbor_err_t cbor_decode_int16(struct cbor_decoder *dec, int16_t *val);
-cbor_err_t cbor_decode_int32(struct cbor_decoder *dec, int32_t *val);
-cbor_err_t cbor_decode_int64(struct cbor_decoder *dec, int64_t *val);
+cbor_err_t cbor_decode_int8(struct cbor_stream *cs, int8_t *val);
+cbor_err_t cbor_decode_int16(struct cbor_stream *cs, int16_t *val);
+cbor_err_t cbor_decode_int32(struct cbor_stream *cs, int32_t *val);
+cbor_err_t cbor_decode_int64(struct cbor_stream *cs, int64_t *val);
 
-cbor_err_t cbor_decode_float16(struct cbor_decoder *dec, float *val);
-cbor_err_t cbor_decode_float32(struct cbor_decoder *dec, float *val);
-cbor_err_t cbor_decode_float64(struct cbor_decoder *dec, double *val);
+cbor_err_t cbor_decode_float16(struct cbor_stream *cs, float *val);
+cbor_err_t cbor_decode_float32(struct cbor_stream *cs, float *val);
+cbor_err_t cbor_decode_float64(struct cbor_stream *cs, double *val);
 
-cbor_err_t cbor_decode_sval(struct cbor_decoder *dec, enum cbor_sval *val);
+cbor_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *val);
 
-cbor_err_t cbor_decode_array_begin(struct cbor_decoder *dec, uint64_t *len);
-cbor_err_t cbor_decode_array_end(struct cbor_decoder *dec);
+cbor_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len);
+cbor_err_t cbor_decode_array_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_decode_map_begin(struct cbor_decoder *dec, uint64_t *len);
-cbor_err_t cbor_decode_map_end(struct cbor_decoder *dec);
+cbor_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len);
+cbor_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
-cbor_err_t cbor_decode_bytes(struct cbor_decoder *dec, unsigned char **bytes, size_t *len);
-cbor_err_t cbor_decode_text(struct cbor_decoder *dec, unsigned char **str, size_t *len);
+cbor_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **bytes, size_t *len);
+cbor_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len);
 
-cbor_err_t cbor_decode_tag(struct cbor_decoder *dec, uint64_t *tagno);
+cbor_err_t cbor_decode_tag(struct cbor_stream *cs, uint64_t *tagno);
 
-cbor_err_t cbor_decode_item(struct cbor_decoder *dec, struct cbor_item *item);
-
-/*
- * DOM-oriented decoder API.
- */
-
-struct cbor_document *cbor_document_decode(struct cbor_decoder *dec);
-void cbor_document_delete(struct cbor_document *doc);
+cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item);
 
 #endif

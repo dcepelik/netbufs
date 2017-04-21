@@ -19,8 +19,8 @@
 int main(int argc, char *argv[])
 {
 	char *infn;
-	struct cbor_stream *in;
-	struct cbor_decoder *dec;
+	struct buf *in;
+	struct cbor_stream *cs_in;
 	struct cbor_item item;
 	cbor_err_t err;
 
@@ -28,27 +28,27 @@ int main(int argc, char *argv[])
 
 	infn = argv[1];
 
-	in = cbor_stream_new();
+	in = buf_new();
 	assert(in != NULL);
 
-	assert(cbor_stream_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
+	assert(buf_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
 
-	dec = cbor_decoder_new(in);
-	assert(dec != NULL);
+	cs_in = cbor_stream_new(in);
+	assert(cs_in != NULL);
 
 	err = CBOR_ERR_ITEM;
 
 	/* bon appétit! */
-	while (!cbor_stream_is_eof(in)) {
-		if ((err = cbor_decode_item(dec, &item)) != CBOR_ERR_OK)
+	while (!buf_is_eof(in)) {
+		if ((err = cbor_decode_item(cs_in, &item)) != CBOR_ERR_OK)
 			break;
 	}
 
 	printf("The error detected was: %s\n", cbor_err_to_string(err));
 	assert(err != CBOR_ERR_OK);
 
-	cbor_stream_close(in);
-	cbor_decoder_delete(dec);
+	buf_close(in);
+	cbor_stream_delete(cs_in);
 
 	return EXIT_SUCCESS;
 }
