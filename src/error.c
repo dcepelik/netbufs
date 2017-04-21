@@ -28,6 +28,8 @@ const char *cbor_err_to_string(cbor_err_t err)
 		return "An error occured during read().";
 	case CBOR_ERR_UNSUP:
 		return "Operation not supported or feature not implemented.";
+	case CBOR_ERR_NOMORE:
+		return "No more items.";
 	}
 
 	return NULL;

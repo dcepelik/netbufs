@@ -40,6 +40,8 @@ static cbor_err_t error(struct cbor_decoder *dec, cbor_err_t err, char *str, ...
 	(void) dec;
 	(void) str;
 
+	//assert(err == CBOR_ERR_OK);
+
 	return err;
 }
 
@@ -64,8 +66,12 @@ static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *type)
 	type->minor = extra_bits;
 
 	type->indef = (extra_bits == CBOR_EXTRA_VAR_LEN);
-	if (type->indef)
+	if (type->indef) {
+		/* CBOR_MAJOR_OTHER + CBOR_EXTRA_VAR_LEN == Break Code */
+		if (type->major != CBOR_MAJOR_OTHER && !major_allows_indef(type->major))
+			return error(dec, CBOR_ERR_INDEF, "... does not allow for indefinite-length encoding");
 		return CBOR_ERR_OK;
+	}
 
 	if (extra_bits <= 23) {
 		type->val = extra_bits;
@@ -378,6 +384,9 @@ static cbor_err_t decode_chunk(struct cbor_decoder *dec, struct cbor_hdr *stream
 {
 	cbor_err_t err;
 
+	if (chunk_hdr->val > SIZE_MAX)
+		return error(dec, CBOR_ERR_RANGE, "Chunk is too large to be decoded by this implementation.");
+
 	*bytes = cbor_realloc(*bytes, 1 + *len + chunk_hdr->val);
 	if (!*bytes)
 		return error(dec, CBOR_ERR_NOMEM, "No memory to decode another stream chunk.");
@@ -471,18 +480,17 @@ static cbor_err_t decode_array_items(struct cbor_decoder *dec, struct cbor_hdr *
 	size_t i;
 
 	size = CBOR_ARRAY_INIT_SIZE;
-	if (!array_hdr->indef) {
+	if (!array_hdr->indef)
 		size = array_hdr->val;
-	}
-	*items = NULL;
 
+	*items = NULL;
+	i = 0;
+
+more_items:
 	*items = cbor_realloc(*items, size * sizeof(**items));
 	if (!*items)
 		return error(dec, CBOR_ERR_NOMEM, "No memory to decode array items.");
 
-	i = 0;
-
-more_items:
 	for (; i < size; i++) {
 		item = *items + i;
 

@@ -24,6 +24,8 @@ struct cbor_stream;
 struct cbor_stream *cbor_stream_new(void);
 void cbor_stream_delete(struct cbor_stream *stream);
 
+bool cbor_stream_is_eof(struct cbor_stream *stream);
+
 cbor_err_t cbor_stream_open_file(struct cbor_stream *stream, char *filename, int flags, int mode);
 cbor_err_t cbor_stream_open_memory(struct cbor_stream *stream);
 void cbor_stream_close(struct cbor_stream *stream);

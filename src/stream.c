@@ -149,6 +149,7 @@ static void cbor_stream_file_close(struct cbor_stream *stream)
 static void cbor_stream_file_fill(struct cbor_stream *stream)
 {
 	stream->len = read(stream->fd, stream->buf, stream->bufsize);
+	stream->eof = (stream->len == 0);
 	TEMP_ASSERT(stream->len >= 0);
 }
 
@@ -257,4 +258,20 @@ void cbor_stream_close(struct cbor_stream *stream)
 
 	if (stream->close)
 		stream->close(stream);
+}
+
+
+bool cbor_stream_is_eof(struct cbor_stream *stream)
+{
+	assert(!stream->dirty);
+
+	size_t avail;
+
+	avail = stream->len - stream->pos;
+	if (!avail) {
+		stream->fill(stream);
+		return stream->len == 0;
+	}
+
+	return false;
 }

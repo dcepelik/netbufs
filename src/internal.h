@@ -104,4 +104,12 @@ struct cbor_document
 	struct cbor_item root;
 };
 
+static inline bool major_allows_indef(enum cbor_major major)
+{
+	return major == CBOR_MAJOR_TEXT
+		|| major == CBOR_MAJOR_BYTES
+		|| major == CBOR_MAJOR_ARRAY
+		|| major == CBOR_MAJOR_MAP;
+}
+
 #endif

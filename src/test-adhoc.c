@@ -178,6 +178,44 @@ void map_test_encode(struct cbor_encoder *enc)
 }
 
 
+void bigmap_test_encode(struct cbor_encoder *enc)
+{
+	size_t i;
+	size_t a_lot = 1024;
+	size_t a_lot_more = 32 * a_lot;
+
+	cbor_map_encode_begin_indef(enc);
+	for (i = 0; i < a_lot; i++) {
+		cbor_int32_encode(enc, i);
+		cbor_int32_encode(enc, i);
+	}
+	cbor_map_encode_end(enc);
+
+	cbor_map_encode_begin(enc, a_lot_more);
+	for (i = 0; i < a_lot_more; i++) {
+		cbor_int32_encode(enc, i);
+		cbor_int32_encode(enc, i);
+	}
+	cbor_map_encode_end(enc);
+}
+
+
+typedef cbor_err_t (action_t)(struct cbor_encoder *enc);
+
+
+void nesting_test_encode(struct cbor_encoder *enc)
+{
+	size_t num_nests = 4096;
+	size_t i;
+
+	for (i = 0; i < num_nests; i++)
+		cbor_array_encode_begin_indef(enc);
+
+	for (i = 0; i < num_nests; i++)
+		cbor_array_encode_end(enc);
+}
+
+
 int main(int argc, char *argv[])
 {
 	struct cbor_stream *in;
@@ -211,7 +249,7 @@ int main(int argc, char *argv[])
 	out = cbor_stream_new();
 	assert(out);
 
-	assert(cbor_stream_open_file(out, "/home/david/sw/netbufs/tests/libcbor/map.cbor", O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR) == CBOR_ERR_OK);
+	assert(cbor_stream_open_file(out, "/home/david/sw/netbufs/tests/libcbor/nested.cbor", O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR) == CBOR_ERR_OK);
 
 	enc = cbor_encoder_new(out);
 	assert(enc);
@@ -221,7 +259,9 @@ int main(int argc, char *argv[])
 	//bytes_test_encode(enc);
 	//text_test_encode(enc);
 	//tags_test_encode(enc);
-	map_test_encode(enc);
+	//map_test_encode(enc);
+	//bigmap_test_encode(enc);
+	nesting_test_encode(enc);
 
 	cbor_stream_close(in);
 	cbor_stream_close(out);

@@ -5,6 +5,7 @@
 
 BAD_DIFF="DIFF!"
 BAD_VALGRIND="VALGRIND!"
+BAD_RUNTIME="RUNTIME!"
 OK="OK"
 
 num_errs=0
@@ -38,6 +39,31 @@ for testfile in ../tests/libcbor/*.cbor; do
 
 	if ! diff -q $testfile $outfile >/dev/null; then
 		echo -e "\t$BAD_DIFF $testfile"
+		err=1
+	fi
+
+	if [ $err -eq 0 ]; then
+		echo -e "\tOK"
+		rm -f $outfile
+	fi
+
+	num_errs=$(expr $num_errs + $err)
+done
+
+echo "corrupt:"
+for testfile in ../tests/libcbor/corrupt/*.corrupt ../tests/libcbor/random/*.random; do
+	outfile=$testfile.out
+	valgrind_result=$(valgrind ./test-corrupt $testfile 2>&1 >/dev/null | tail -n1 | cut -d ' ' -f4,10)
+
+	err=0
+
+	if ! ./test-corrupt $testfile 2>&1 >/dev/null; then
+		echo -e "\t$BAD_RUNTIME $testfile"
+		err=1
+	fi
+
+	if [ "$valgrind_result" != "0 0" ]; then
+		echo -e "\t$BAD_VALGRIND $testfile"
 		err=1
 	fi
 
