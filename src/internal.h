@@ -3,13 +3,11 @@
 
 #include "cbor.h"
 #include "stack.h"
+#include "strbuf.h"
 #include <stdlib.h>
 
 typedef unsigned char		cbor_extra_t;
 typedef unsigned char		byte;
-
-/* temporary refactoring aid */
-#define cbor_hdr		cbor_type
 
 #define CBOR_MAJOR_MASK		0xE0
 #define CBOR_EXTRA_MASK		0x1F
@@ -73,30 +71,31 @@ struct errlist
 
 struct block
 {
-	struct cbor_type type;
+	struct cbor_hdr hdr;
 	size_t num_items;
 };
 
-cbor_err_t stack_block_begin(struct stack *stack, enum cbor_major type, bool indef, uint64_t len);
-cbor_err_t stack_block_end(struct stack *stack, enum cbor_major type, bool indef, uint64_t len);
+cbor_err_t stack_block_begin(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
+cbor_err_t stack_block_end(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
 
 struct cbor_encoder
 {
 	struct cbor_stream *stream;
-	struct errlist errors;
 	struct stack blocks;
-	/* state encapsulation */
+	cbor_err_t err;
+	struct strbuf err_buf;
+
 	/* various options */
 };
 
 struct cbor_decoder
 {
 	struct cbor_stream *stream;
-	struct errlist errors;
 	struct stack blocks;
-	/* state encapsulation */
+	cbor_err_t err;
+	struct strbuf err_buf;
+
 	/* various options */
-	/* state encapsulation */
 };
 
 struct cbor_document
@@ -104,12 +103,19 @@ struct cbor_document
 	struct cbor_item root;
 };
 
+
 static inline bool major_allows_indef(enum cbor_major major)
 {
 	return major == CBOR_MAJOR_TEXT
 		|| major == CBOR_MAJOR_BYTES
 		|| major == CBOR_MAJOR_ARRAY
 		|| major == CBOR_MAJOR_MAP;
+}
+
+
+static inline bool is_break(struct cbor_hdr *hdr)
+{
+	return (hdr->major == CBOR_MAJOR_OTHER && hdr->minor == CBOR_MINOR_BREAK);
 }
 
 #endif

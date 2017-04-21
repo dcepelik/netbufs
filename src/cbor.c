@@ -4,9 +4,9 @@
 #include <stdio.h>
 
 
-const char *cbor_type_to_string(struct cbor_type *type)
+const char *cbor_major_to_string(enum cbor_major major)
 {
-	switch (type->major) {
+	switch (major) {
 	case CBOR_MAJOR_UINT:
 		return "unsigned int";
 	case CBOR_MAJOR_NEGATIVE_INT:
@@ -33,9 +33,9 @@ void cbor_item_dump(struct cbor_item *item)
 {
 	size_t i;
 
-	switch (item->type.major) {
+	switch (item->hdr.major) {
 	case CBOR_MAJOR_UINT:
-		fprintf(stderr, "%lu", item->type.val);
+		fprintf(stderr, "%lu", item->hdr.u64);
 		break;
 
 	case CBOR_MAJOR_NEGATIVE_INT:
@@ -77,7 +77,7 @@ void cbor_item_dump(struct cbor_item *item)
 		break;
 
 	default:
-		fprintf(stderr, "type: %s\n", cbor_type_to_string(&item->type));
+		fprintf(stderr, "hdr: %s\n", cbor_major_to_string(item->hdr.major));
 		TEMP_ASSERT(false);
 	}
 }

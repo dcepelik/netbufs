@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 	assert(enc != NULL);
 
 	while ((err = cbor_decode_item(dec, &item)) == CBOR_ERR_OK) {
-		if ((err = cbor_item_encode(enc, &item)) != CBOR_ERR_OK)
+		if ((err = cbor_encode_item(enc, &item)) != CBOR_ERR_OK)
 			break;
 	}
 

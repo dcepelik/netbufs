@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 
 
@@ -32,21 +33,21 @@ void cbor_encoder_delete(struct cbor_encoder *enc)
 }
 
 
-/* TODO DRY */
-static inline bool is_break(struct cbor_hdr *type)
-{
-	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
-}
-
-
 static cbor_err_t error(struct cbor_encoder *enc, cbor_err_t err, char *str, ...)
 {
 	assert(err == CBOR_ERR_OK);
+
+	va_list args;
+
+	enc->err = err;
+	va_start(args, str);
+	strbuf_vprintf_at(&enc->err_buf, 0, str, args);
+	va_end(args);
 	return err;
 }
 
 
-static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type type)
+static cbor_err_t cbor_encode_type(struct cbor_encoder *enc, struct cbor_hdr hdr)
 {
 	unsigned char bytes[9];
 	size_t num_extra_bytes;
@@ -56,24 +57,24 @@ static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type ty
 	size_t i;
 
 	num_extra_bytes = 0;
-	bytes[0] = type.major << 5;
+	bytes[0] = hdr.major << 5;
 
-	if (type.indef) {
+	if (hdr.indef) {
 		bytes[0] |= CBOR_EXTRA_VAR_LEN;
 	}
 	else {
-		if (type.val <= 23) {
-			bytes[0] |= type.val;
+		if (hdr.u64 <= 23) {
+			bytes[0] |= hdr.u64;
 		}
-		else if (type.val <= UINT8_MAX) {
+		else if (hdr.u64 <= UINT8_MAX) {
 			num_extra_bytes = 1;
 			bytes[0] |= CBOR_EXTRA_1B;
 		}
-		else if (type.val <= UINT16_MAX) {
+		else if (hdr.u64 <= UINT16_MAX) {
 			num_extra_bytes = 2;
 			bytes[0] |= CBOR_EXTRA_2B;
 		}
-		else if (type.val <= UINT32_MAX) {
+		else if (hdr.u64 <= UINT32_MAX) {
 			num_extra_bytes = 4;
 			bytes[0] |= CBOR_EXTRA_4B;
 		}
@@ -83,7 +84,7 @@ static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type ty
 		}
 
 		/* implicit corner case: won't copy anything when val <= 23 */
-		val_be = htobe64(type.val);
+		val_be = htobe64(hdr.u64);
 		for (i = 0; i < num_extra_bytes; i++)
 			bytes[1 + i] = val_be_bytes[(8 - num_extra_bytes) + i];
 	}
@@ -92,78 +93,78 @@ static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type ty
 }
 
 
-cbor_err_t cbor_uint_encode(struct cbor_encoder *enc, uint64_t val)
+cbor_err_t cbor_encode_uint(struct cbor_encoder *enc, uint64_t val)
 {
-	return cbor_type_encode(enc, (struct cbor_type) {
+	return cbor_encode_type(enc, (struct cbor_hdr) {
 		.major = CBOR_MAJOR_UINT,
 		.indef = false,
-		.val = val
+		.u64 = val
 	});
 }
 
 
-cbor_err_t cbor_uint8_encode(struct cbor_encoder *enc, uint8_t val)
+cbor_err_t cbor_encode_uint8(struct cbor_encoder *enc, uint8_t val)
 {
-	return cbor_uint_encode(enc, val);
+	return cbor_encode_uint(enc, val);
 }
 
 
-cbor_err_t cbor_uint16_encode(struct cbor_encoder *enc, uint16_t val)
+cbor_err_t cbor_encode_uint16(struct cbor_encoder *enc, uint16_t val)
 {
-	return cbor_uint_encode(enc, val);
+	return cbor_encode_uint(enc, val);
 }
 
 
-cbor_err_t cbor_uint32_encode(struct cbor_encoder *enc, uint32_t val)
+cbor_err_t cbor_encode_uint32(struct cbor_encoder *enc, uint32_t val)
 {
-	return cbor_uint_encode(enc, val);
+	return cbor_encode_uint(enc, val);
 }
 
 
-cbor_err_t cbor_uint64_encode(struct cbor_encoder *enc, uint64_t val)
+cbor_err_t cbor_encode_uint64(struct cbor_encoder *enc, uint64_t val)
 {
-	return cbor_uint_encode(enc, val);
+	return cbor_encode_uint(enc, val);
 }
 
 
-static cbor_err_t cbor_int_encode(struct cbor_encoder *enc, int64_t val)
+static cbor_err_t cbor_encode_int(struct cbor_encoder *enc, int64_t val)
 {
 	if (val >= 0)
-		return cbor_uint_encode(enc, val);
+		return cbor_encode_uint(enc, val);
 	else
-		return cbor_type_encode(enc, (struct cbor_type) {
+		return cbor_encode_type(enc, (struct cbor_hdr) {
 			.major = CBOR_MAJOR_NEGATIVE_INT,
 			.indef = false,
-			.val = (-1 - val)
+			.u64 = (-1 - val)
 		});
 }
 
 
-cbor_err_t cbor_int8_encode(struct cbor_encoder *enc, int8_t val)
+cbor_err_t cbor_encode_int8(struct cbor_encoder *enc, int8_t val)
 {
-	return cbor_int_encode(enc, val);
+	return cbor_encode_int(enc, val);
 }
 
 
-cbor_err_t cbor_int16_encode(struct cbor_encoder *enc, int16_t val)
+cbor_err_t cbor_encode_int16(struct cbor_encoder *enc, int16_t val)
 {
-	return cbor_int_encode(enc, val);
+	return cbor_encode_int(enc, val);
 }
 
 
-cbor_err_t cbor_int32_encode(struct cbor_encoder *enc, int32_t val)
+cbor_err_t cbor_encode_int32(struct cbor_encoder *enc, int32_t val)
 {
-	return cbor_int_encode(enc, val);
+	return cbor_encode_int(enc, val);
 }
 
 
-cbor_err_t cbor_int64_encode(struct cbor_encoder *enc, int64_t val)
+cbor_err_t cbor_encode_int64(struct cbor_encoder *enc, int64_t val)
 {
-	return cbor_int_encode(enc, val);
+	return cbor_encode_int(enc, val);
 }
 
 
-static cbor_err_t cbor_break_encode(struct cbor_encoder *enc)
+static cbor_err_t cbor_encode_break(struct cbor_encoder *enc)
 {
 	return cbor_stream_write(enc->stream, (unsigned char[]) { CBOR_BREAK }, 1);
 }
@@ -177,12 +178,12 @@ static cbor_err_t cbor_block_begin(struct cbor_encoder *enc, enum cbor_major maj
 	if (!block)
 		return error(enc, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
 
-	block->type.major = major_type;
-	block->type.indef = indef;
-	block->type.val = len;
+	block->hdr.major = major_type;
+	block->hdr.indef = indef;
+	block->hdr.u64 = len;
 	block->num_items = 0;
 
-	return cbor_type_encode(enc, block->type);
+	return cbor_encode_type(enc, block->hdr);
 }
 
 
@@ -195,14 +196,14 @@ static cbor_err_t cbor_block_end(struct cbor_encoder *enc, enum cbor_major major
 
 	block = stack_pop(&enc->blocks);
 
-	if (block->type.major != major_type)
+	if (block->hdr.major != major_type)
 		/* TODO msg */
 		return error(enc, CBOR_ERR_OPER, "Attempting to close block of ..., but ... is open.");
 
-	if (block->type.indef)
-		return cbor_break_encode(enc);
+	if (block->hdr.indef)
+		return cbor_encode_break(enc);
 
-	//if (block->num_items != block->type.val) {
+	//if (block->num_items != block->hdr.u64) {
 	//	return error(enc, CBOR_ERR_OPER, NULL);
 	//}
 
@@ -210,50 +211,50 @@ static cbor_err_t cbor_block_end(struct cbor_encoder *enc, enum cbor_major major
 }
 
 
-cbor_err_t cbor_array_encode_begin(struct cbor_encoder *enc, uint64_t len)
+cbor_err_t cbor_encode_array_begin(struct cbor_encoder *enc, uint64_t len)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_ARRAY, false, len);
 }
 
 
-cbor_err_t cbor_array_encode_begin_indef(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_array_begin_indef(struct cbor_encoder *enc)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_ARRAY, true, 0);
 }
 
 
-cbor_err_t cbor_array_encode_end(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_array_end(struct cbor_encoder *enc)
 {
 	return cbor_block_end(enc, CBOR_MAJOR_ARRAY);
 }
 
 
-cbor_err_t cbor_map_encode_begin(struct cbor_encoder *enc, uint64_t len)
+cbor_err_t cbor_encode_map_begin(struct cbor_encoder *enc, uint64_t len)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_MAP, false, len);
 }
 
 
-cbor_err_t cbor_map_encode_begin_indef(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_map_begin_indef(struct cbor_encoder *enc)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_MAP, true, 0);
 }
 
 
-cbor_err_t cbor_map_encode_end(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_map_end(struct cbor_encoder *enc)
 {
 	return cbor_block_end(enc, CBOR_MAJOR_MAP);
 }
 
 
-static cbor_err_t cbor_string_encode(struct cbor_encoder *enc, enum cbor_major major, unsigned char *bytes, size_t len)
+static cbor_err_t cbor_encode_string(struct cbor_encoder *enc, enum cbor_major major, unsigned char *bytes, size_t len)
 {
 	cbor_err_t err;
 
-	err = cbor_type_encode(enc, (struct cbor_type) {
+	err = cbor_encode_type(enc, (struct cbor_hdr) {
 		.major = major,
 		.indef = false,
-		.val = len
+		.u64 = len
 	});
 
 	if (err)
@@ -263,94 +264,94 @@ static cbor_err_t cbor_string_encode(struct cbor_encoder *enc, enum cbor_major m
 }
 
 
-cbor_err_t cbor_bytes_encode(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
+cbor_err_t cbor_encode_bytes(struct cbor_encoder *enc, unsigned char *bytes, size_t len)
 {
-	return cbor_string_encode(enc, CBOR_MAJOR_BYTES, bytes, len);
+	return cbor_encode_string(enc, CBOR_MAJOR_BYTES, bytes, len);
 }
 
 
-cbor_err_t cbor_bytes_encode_begin_indef(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_bytes_begin_indef(struct cbor_encoder *enc)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_BYTES, true, 0);
 }
 
 
-cbor_err_t cbor_bytes_encode_end(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_bytes_end(struct cbor_encoder *enc)
 {
 	return cbor_block_end(enc, CBOR_MAJOR_BYTES);
 }
 
 
-cbor_err_t cbor_text_encode(struct cbor_encoder *enc, unsigned char *str, size_t len)
+cbor_err_t cbor_encode_text(struct cbor_encoder *enc, unsigned char *str, size_t len)
 {
-	return cbor_string_encode(enc, CBOR_MAJOR_TEXT, str, len);
+	return cbor_encode_string(enc, CBOR_MAJOR_TEXT, str, len);
 }
 
 
-cbor_err_t cbor_text_encode_begin_indef(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_text_begin_indef(struct cbor_encoder *enc)
 {
 	return cbor_block_begin(enc, CBOR_MAJOR_TEXT, true, 0);
 }
 
 
-cbor_err_t cbor_text_encode_end(struct cbor_encoder *enc)
+cbor_err_t cbor_encode_text_end(struct cbor_encoder *enc)
 {
 	return cbor_block_end(enc, CBOR_MAJOR_TEXT);
 }
 
 
-cbor_err_t cbor_tag_encode(struct cbor_encoder *enc, uint64_t tagno)
+cbor_err_t cbor_encode_tag(struct cbor_encoder *enc, uint64_t tagno)
 {
-	return cbor_type_encode(enc, (struct cbor_type) {
+	return cbor_encode_type(enc, (struct cbor_hdr) {
 		.major = CBOR_MAJOR_TAG,
 		.indef = false,
-		.val = tagno
+		.u64 = tagno
 	});
 }
 
 
-cbor_err_t cbor_sval_encode(struct cbor_encoder *enc, enum cbor_sval sval)
+cbor_err_t cbor_encode_sval(struct cbor_encoder *enc, enum cbor_sval sval)
 {
 	if (sval > 255)
 		return error(enc, CBOR_ERR_RANGE, "Simple value %u is greater than 255.", sval);
 
-	return cbor_type_encode(enc, (struct cbor_type) {
+	return cbor_encode_type(enc, (struct cbor_hdr) {
 		.major = CBOR_MAJOR_OTHER,
 		.minor = CBOR_MINOR_SVAL,
 		.indef = false,
-		.val = sval
+		.u64 = sval
 	});
 }
 
 
-cbor_err_t cbor_array_encode(struct cbor_encoder *enc, struct cbor_item *array);
-cbor_err_t cbor_map_encode(struct cbor_encoder *enc, struct cbor_item *map);
+cbor_err_t cbor_encode_array(struct cbor_encoder *enc, struct cbor_item *array);
+cbor_err_t cbor_encode_map(struct cbor_encoder *enc, struct cbor_item *map);
 
 
-cbor_err_t cbor_item_encode(struct cbor_encoder *enc, struct cbor_item *item)
+cbor_err_t cbor_encode_item(struct cbor_encoder *enc, struct cbor_item *item)
 {
-	switch (item->type.major)
+	switch (item->hdr.major)
 	{
 	case CBOR_MAJOR_UINT:
-		return cbor_uint64_encode(enc, item->type.val);
+		return cbor_encode_uint64(enc, item->hdr.u64);
 
 	case CBOR_MAJOR_NEGATIVE_INT:
-		return cbor_int64_encode(enc, item->i64);
+		return cbor_encode_int64(enc, item->i64);
 
 	case CBOR_MAJOR_BYTES:
-		return cbor_bytes_encode(enc, item->bytes, item->len);
+		return cbor_encode_bytes(enc, item->bytes, item->len);
 
 	case CBOR_MAJOR_TEXT:
-		return cbor_text_encode(enc, (unsigned char *)item->str, item->len);
+		return cbor_encode_text(enc, (unsigned char *)item->str, item->len);
 
 	case CBOR_MAJOR_ARRAY:
-		return cbor_array_encode(enc, item);
+		return cbor_encode_array(enc, item);
 
 	case CBOR_MAJOR_MAP:
-		return cbor_map_encode(enc, item);
+		return cbor_encode_map(enc, item);
 
 	case CBOR_MAJOR_TAG:
-		return cbor_tag_encode(enc, item->type.val);
+		return cbor_encode_tag(enc, item->hdr.u64);
 
 	default:
 		return error(enc, CBOR_ERR_UNSUP, NULL);
@@ -364,22 +365,22 @@ static inline cbor_err_t encode_array_items(struct cbor_encoder *enc, struct cbo
 	cbor_err_t err;
 
 	for (i = 0; i < len; i++)
-		if ((err = cbor_item_encode(enc, &items[i])) != CBOR_ERR_OK)
+		if ((err = cbor_encode_item(enc, &items[i])) != CBOR_ERR_OK)
 			return err;
 
 	return CBOR_ERR_OK;
 }
 
 
-cbor_err_t cbor_array_encode(struct cbor_encoder *enc, struct cbor_item *array)
+cbor_err_t cbor_encode_array(struct cbor_encoder *enc, struct cbor_item *array)
 {
 	size_t i;
 	cbor_err_t err;
 
-	if (array->type.indef)
-		err = cbor_array_encode_begin_indef(enc);
+	if (array->hdr.indef)
+		err = cbor_encode_array_begin_indef(enc);
 	else
-		err = cbor_array_encode_begin(enc, array->len);
+		err = cbor_encode_array_begin(enc, array->len);
 
 	if (err != CBOR_ERR_OK)
 		return err;
@@ -387,22 +388,22 @@ cbor_err_t cbor_array_encode(struct cbor_encoder *enc, struct cbor_item *array)
 	if ((err = encode_array_items(enc, array->items, array->len)) != CBOR_ERR_OK)
 		return err;
 
-	if ((err = cbor_array_encode_end(enc)) != CBOR_ERR_OK)
+	if ((err = cbor_encode_array_end(enc)) != CBOR_ERR_OK)
 		return err;
 
 	return CBOR_ERR_OK;
 }
 
 
-cbor_err_t cbor_map_encode(struct cbor_encoder *enc, struct cbor_item *map)
+cbor_err_t cbor_encode_map(struct cbor_encoder *enc, struct cbor_item *map)
 {
 	size_t i;
 	cbor_err_t err;
 
-	if (map->type.indef)
-		err = cbor_map_encode_begin_indef(enc);
+	if (map->hdr.indef)
+		err = cbor_encode_map_begin_indef(enc);
 	else
-		err = cbor_map_encode_begin(enc, map->len);
+		err = cbor_encode_map_begin(enc, map->len);
 
 	if (err != CBOR_ERR_OK)
 		return err;
@@ -410,7 +411,7 @@ cbor_err_t cbor_map_encode(struct cbor_encoder *enc, struct cbor_item *map)
 	if ((err = encode_array_items(enc, (struct cbor_item *)map->pairs, 2 * map->len)) != CBOR_ERR_OK)
 		return err;
 
-	if ((err = cbor_map_encode_end(enc)) != CBOR_ERR_OK)
+	if ((err = cbor_encode_map_end(enc)) != CBOR_ERR_OK)
 		return err;
 
 	return CBOR_ERR_OK;

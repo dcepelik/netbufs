@@ -6,6 +6,7 @@
 #include <endian.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 
 
@@ -37,16 +38,19 @@ void cbor_decoder_delete(struct cbor_decoder *dec)
 
 static cbor_err_t error(struct cbor_decoder *dec, cbor_err_t err, char *str, ...)
 {
-	(void) dec;
-	(void) str;
+	assert(err == CBOR_ERR_OK);
 
-	//assert(err == CBOR_ERR_OK);
+	va_list args;
 
+	dec->err = err;
+	va_start(args, str);
+	strbuf_vprintf_at(&dec->err_buf, 0, str, args);
+	va_end(args);
 	return err;
 }
 
 
-static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *type)
+static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *hdr)
 {
 	byte bytes[9];
 	size_t num_extra_bytes;
@@ -59,23 +63,23 @@ static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *type)
 	if ((err = cbor_stream_read(dec->stream, bytes, 0, 1)) != CBOR_ERR_OK)
 		return err;
 
-	type->major = (bytes[0] & 0xE0) >> 5;
+	hdr->major = (bytes[0] & 0xE0) >> 5;
 	extra_bits = bytes[0] & 0x1F;
 
 	/* TODO */
-	type->minor = extra_bits;
+	hdr->minor = extra_bits;
 
-	type->indef = (extra_bits == CBOR_EXTRA_VAR_LEN);
-	if (type->indef) {
-		/* CBOR_MAJOR_OTHER + CBOR_EXTRA_VAR_LEN == Break Code */
-		if (type->major != CBOR_MAJOR_OTHER && !major_allows_indef(type->major))
-			return error(dec, CBOR_ERR_INDEF, "... does not allow for indefinite-length encoding");
-		return CBOR_ERR_OK;
+	hdr->indef = (extra_bits == CBOR_EXTRA_VAR_LEN);
+	if (hdr->indef) {
+		if (hdr->major == CBOR_MAJOR_OTHER || major_allows_indef(hdr->major))
+			return CBOR_ERR_OK;
+		return error(dec, CBOR_ERR_INDEF, "%s does not allow for "
+			"indefinite-length encoding", cbor_major_to_string(hdr->major));
 	}
 
 	if (extra_bits <= 23) {
-		type->val = extra_bits;
-		type->minor = CBOR_MINOR_SVAL;	/* TODO */
+		hdr->u64 = extra_bits;
+		hdr->minor = CBOR_MINOR_SVAL;	/* TODO */
 		return CBOR_ERR_OK;
 	}
 
@@ -106,21 +110,22 @@ static cbor_err_t decode_hdr(struct cbor_decoder *dec, struct cbor_hdr *type)
 	for (i = 0; i < num_extra_bytes; i++)
 		val_be_bytes[(8 - num_extra_bytes) + i] = bytes[1 + i];
 
-	type->val = be64toh(val_be);
+	hdr->u64 = be64toh(val_be);
 	return CBOR_ERR_OK;
 }
 
 
-static cbor_err_t decode_hdr_check(struct cbor_decoder *dec, struct cbor_hdr *type, enum cbor_major major)
+static cbor_err_t decode_hdr_check(struct cbor_decoder *dec, struct cbor_hdr *hdr, enum cbor_major major)
 {
 	cbor_err_t err;
 
-	if ((err = decode_hdr(dec, type)) != CBOR_ERR_OK)
+	if ((err = decode_hdr(dec, hdr)) != CBOR_ERR_OK)
 		return err;
 
-	if (type->major != major)
+	if (hdr->major != major)
 		/* TODO msg */
-		return error(dec, CBOR_ERR_ITEM, "... was unexpected, ... was expected.");
+		return error(dec, CBOR_ERR_ITEM, "%s was unexpected, %s was expected.",
+			hdr->major, major);
 	
 	return CBOR_ERR_OK;
 }
@@ -128,18 +133,18 @@ static cbor_err_t decode_hdr_check(struct cbor_decoder *dec, struct cbor_hdr *ty
 
 static uint64_t decode_uint(struct cbor_decoder *dec, cbor_err_t *err, uint64_t max)
 {
-	struct cbor_hdr type;
+	struct cbor_hdr hdr;
 
-	if ((*err = decode_hdr_check(dec, &type, CBOR_MAJOR_UINT)) != CBOR_ERR_OK)
+	if ((*err = decode_hdr_check(dec, &hdr, CBOR_MAJOR_UINT)) != CBOR_ERR_OK)
 		return 0;
 
-	if (type.val > max) {
+	if (hdr.u64 > max) {
 		*err = CBOR_ERR_RANGE;
 		return 0;
 	}
 
 	*err = CBOR_ERR_OK;
-	return type.val;
+	return hdr.u64;
 }
 
 
@@ -160,27 +165,27 @@ static inline cbor_err_t uint64_to_negint(struct cbor_decoder *dec, uint64_t u64
 /* TODO have a look at the range checks and make sure nothing overflows */
 static int64_t decode_int(struct cbor_decoder *dec, cbor_err_t *err, int64_t min, int64_t max)
 {
-	struct cbor_hdr type;
+	struct cbor_hdr hdr;
 	int64_t i64;
 
-	if ((*err = decode_hdr(dec, &type)) != CBOR_ERR_OK)
+	if ((*err = decode_hdr(dec, &hdr)) != CBOR_ERR_OK)
 		return 0;
 
-	if (type.major != CBOR_MAJOR_NEGATIVE_INT && type.major != CBOR_MAJOR_UINT) {
+	if (hdr.major != CBOR_MAJOR_NEGATIVE_INT && hdr.major != CBOR_MAJOR_UINT) {
 		*err = CBOR_ERR_ITEM;
 		return 0;
 	}
 
-	if (type.major == CBOR_MAJOR_NEGATIVE_INT) {
-		*err = uint64_to_negint(dec, type.val, &i64);
+	if (hdr.major == CBOR_MAJOR_NEGATIVE_INT) {
+		*err = uint64_to_negint(dec, hdr.u64, &i64);
 	}
 	else {
-		if (type.val > INT64_MAX) {
+		if (hdr.u64 > INT64_MAX) {
 			*err = CBOR_ERR_RANGE;
 			return 0;
 		}
 
-		i64 = type.val;
+		i64 = hdr.u64;
 	}
 
 	if (i64 < min || i64 > max) {
@@ -263,7 +268,7 @@ cbor_err_t cbor_decode_tag(struct cbor_decoder *dec, uint64_t *tagno)
 	cbor_err_t err;
 
 	if ((err = decode_hdr_check(dec, &hdr, CBOR_MAJOR_TAG)) == CBOR_ERR_OK)
-		*tagno = hdr.val;
+		*tagno = hdr.u64;
 
 	return err;
 }
@@ -280,15 +285,9 @@ cbor_err_t cbor_decode_sval(struct cbor_decoder *dec, enum cbor_sval *sval)
 	if (hdr.major != CBOR_MAJOR_OTHER || hdr.minor != CBOR_MINOR_SVAL)
 		return error(dec, CBOR_ERR_ITEM, "A Simple Value was expected.");
 
-	*sval = hdr.val;
+	*sval = hdr.u64;
 	return CBOR_ERR_OK;
 
-}
-
-
-static inline bool is_break(struct cbor_hdr *type)
-{
-	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
 }
 
 
@@ -315,13 +314,13 @@ static cbor_err_t block_begin(struct cbor_decoder *dec, enum cbor_major major_ty
 		return error(dec, CBOR_ERR_NOMEM, "No memory to allocate new nesting block");
 
 	block->num_items = 0;
-	if ((err = decode_hdr_check(dec, &block->type, major_type)) != CBOR_ERR_OK)
+	if ((err = decode_hdr_check(dec, &block->hdr, major_type)) != CBOR_ERR_OK)
 		return err;
 
-	if (block->type.indef != indef)
+	if (block->hdr.indef != indef)
 		return error(dec, CBOR_ERR_INDEF, NULL);
 
-	*len = block->type.val;
+	*len = block->hdr.u64;
 	return CBOR_ERR_OK;
 }
 
@@ -335,13 +334,13 @@ static cbor_err_t block_end(struct cbor_decoder *dec, enum cbor_major major_type
 
 	block = stack_pop(&dec->blocks);
 
-	if (block->type.major != major_type)
+	if (block->hdr.major != major_type)
 		return error(dec, CBOR_ERR_OPER, NULL);
 
-	if (block->type.indef)
+	if (block->hdr.indef)
 		return decode_break(dec);
 
-	if (block->num_items != block->type.val)
+	if (block->num_items != block->hdr.u64)
 		return error(dec, CBOR_ERR_OPER, NULL);
 	
 	return CBOR_ERR_OK;
@@ -384,19 +383,19 @@ static cbor_err_t decode_chunk(struct cbor_decoder *dec, struct cbor_hdr *stream
 {
 	cbor_err_t err;
 
-	if (chunk_hdr->val > SIZE_MAX)
+	if (chunk_hdr->u64 > SIZE_MAX)
 		return error(dec, CBOR_ERR_RANGE, "Chunk is too large to be decoded by this implementation.");
 
-	*bytes = cbor_realloc(*bytes, 1 + *len + chunk_hdr->val);
+	*bytes = cbor_realloc(*bytes, 1 + *len + chunk_hdr->u64);
 	if (!*bytes)
 		return error(dec, CBOR_ERR_NOMEM, "No memory to decode another stream chunk.");
 
-	if ((err = cbor_stream_read(dec->stream, *bytes + *len, 0, chunk_hdr->val)) != CBOR_ERR_OK) {
+	if ((err = cbor_stream_read(dec->stream, *bytes + *len, 0, chunk_hdr->u64)) != CBOR_ERR_OK) {
 		free(*bytes);
 		return err;
 	}
 
-	*len += chunk_hdr->val;
+	*len += chunk_hdr->u64;
 	return CBOR_ERR_OK;
 }
 
@@ -481,7 +480,7 @@ static cbor_err_t decode_array_items(struct cbor_decoder *dec, struct cbor_hdr *
 
 	size = CBOR_ARRAY_INIT_SIZE;
 	if (!array_hdr->indef)
-		size = array_hdr->val;
+		size = array_hdr->u64;
 
 	*items = NULL;
 	i = 0;
@@ -494,10 +493,10 @@ more_items:
 	for (; i < size; i++) {
 		item = *items + i;
 
-		if ((err = decode_hdr(dec, &item->type)) != CBOR_ERR_OK)
+		if ((err = decode_hdr(dec, &item->hdr)) != CBOR_ERR_OK)
 			goto out_free;
 
-		if (is_break(&item->type)) {
+		if (is_break(&item->hdr)) {
 			end = true;
 			break;
 		}
@@ -531,7 +530,7 @@ static cbor_err_t decode_map_items(struct cbor_decoder *dec, struct cbor_hdr *ma
 	array_hdr = (struct cbor_hdr) {
 		.major = CBOR_MAJOR_ARRAY,
 		.indef = map_hdr->indef,
-		.val = 2 * map_hdr->val,
+		.u64 = 2 * map_hdr->u64,
 	};
 
 	if ((err = decode_array_items(dec, &array_hdr, &items, npairs)) != CBOR_ERR_OK)
@@ -553,21 +552,21 @@ static cbor_err_t decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
-	switch (item->type.major) {
+	switch (item->hdr.major) {
 	case CBOR_MAJOR_NEGATIVE_INT:
-		return uint64_to_negint(dec, item->type.val, &item->i64);
+		return uint64_to_negint(dec, item->hdr.u64, &item->i64);
 
 	case CBOR_MAJOR_BYTES:
-		return decode_stream(dec, &item->type, &item->bytes, &item->len);
+		return decode_stream(dec, &item->hdr, &item->bytes, &item->len);
 
 	case CBOR_MAJOR_TEXT:
-		return decode_stream_null(dec, &item->type, &item->bytes, &item->len);
+		return decode_stream_null(dec, &item->hdr, &item->bytes, &item->len);
 
 	case CBOR_MAJOR_ARRAY:
-		return decode_array_items(dec, &item->type, &item->items, &item->len);
+		return decode_array_items(dec, &item->hdr, &item->items, &item->len);
 
 	case CBOR_MAJOR_MAP:
-		return decode_map_items(dec, &item->type, &item->pairs, &item->len);
+		return decode_map_items(dec, &item->hdr, &item->pairs, &item->len);
 
 	default:
 		return CBOR_ERR_OK;
@@ -579,7 +578,7 @@ cbor_err_t cbor_decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
-	if ((err = decode_hdr(dec, &item->type)) == CBOR_ERR_OK)
+	if ((err = decode_hdr(dec, &item->hdr)) == CBOR_ERR_OK)
 		return decode_item(dec, item);
 	return err;
 }
