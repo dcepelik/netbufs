@@ -51,16 +51,15 @@ int main(int argc, char *argv[])
 	assert(enc != NULL);
 
 	while ((err = cbor_decode_item(dec, &item)) == CBOR_ERR_OK) {
-		cbor_item_dump(&item);
+		cbor_item_encode(enc, &item);
 	}
 
-	DEBUG_EXPR("%i", err);
 	assert(err == CBOR_ERR_EOF);
 
-	cbor_decoder_delete(dec);
-	cbor_encoder_delete(enc);
 	cbor_stream_close(in);
 	cbor_stream_close(out);
+	cbor_decoder_delete(dec);
+	cbor_encoder_delete(enc);
 
 	return EXIT_SUCCESS;
 }

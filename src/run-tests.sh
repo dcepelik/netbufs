@@ -18,11 +18,15 @@ for testfile in ../tests/stream/*; do
 done
 
 echo "decenc:"
-for testfile in ../tests/libcbor/*; do
-	echo -e "\t$testfile"
+for testfile in ../tests/libcbor/*.cbor; do
 	outfile=$testfile.out
 	./test-decenc $testfile $outfile
-	echo
+
+	if ! diff -q $testfile $outfile; then
+		echo -e "\tFAILED $testfile"
+	else
+		echo -e "\tOK"
+	fi
 
 	rm -f $outfile
 done

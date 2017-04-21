@@ -112,10 +112,10 @@ void text_test_encode(struct cbor_encoder *enc)
 	cbor_text_encode(enc, uqueen, 1);
 	cbor_text_encode(enc, uqueen, strlen(queen));
 
-	cbor_text_encode_begin_indef(enc);
+	/*cbor_text_encode_begin_indef(enc);
 	for (i = 0; i < ARRAY_SIZE(poem); i++)
 		cbor_text_encode(enc, (unsigned char *)poem[i], strlen(poem[i]));
-	cbor_text_encode_end(enc);
+	cbor_text_encode_end(enc);*/
 }
 
 

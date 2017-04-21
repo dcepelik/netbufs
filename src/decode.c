@@ -142,7 +142,8 @@ static inline cbor_err_t uint64_to_negint(uint64_t u64, int64_t *i64)
 	if (u64 > -(INT64_MIN + 1))
 		return CBOR_ERR_RANGE;
 
-	return (-1 - u64);
+	*i64 = (-1 - u64);
+	return CBOR_ERR_OK;
 }
 
 
@@ -536,8 +537,7 @@ cbor_err_t cbor_decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
-	if ((err = decode_hdr(dec, &item->type)) != CBOR_ERR_OK)
-		return err;
-
-	return decode_item(dec, item);
+	if ((err = decode_hdr(dec, &item->type)) == CBOR_ERR_OK)
+		return decode_item(dec, item);
+	return err;
 }

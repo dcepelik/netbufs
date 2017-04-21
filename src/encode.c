@@ -304,3 +304,54 @@ cbor_err_t cbor_sval_encode(struct cbor_encoder *enc, enum cbor_sval sval)
 		.val = sval
 	});
 }
+
+
+cbor_err_t cbor_array_encode(struct cbor_encoder *enc, struct cbor_item *array);
+
+
+cbor_err_t cbor_item_encode(struct cbor_encoder *enc, struct cbor_item *item)
+{
+	switch (item->type.major)
+	{
+	case CBOR_MAJOR_UINT:
+		return cbor_uint64_encode(enc, item->type.val);
+
+	case CBOR_MAJOR_NEGATIVE_INT:
+		return cbor_int64_encode(enc, item->i64);
+
+	case CBOR_MAJOR_BYTES:
+		return cbor_bytes_encode(enc, item->bytes, item->len);
+
+	case CBOR_MAJOR_TEXT:
+		return cbor_text_encode(enc, (unsigned char *)item->str, item->len);
+
+	case CBOR_MAJOR_ARRAY:
+		return cbor_array_encode(enc, item);
+
+	default:
+		return CBOR_ERR_OPER;
+	}
+}
+
+
+cbor_err_t cbor_array_encode(struct cbor_encoder *enc, struct cbor_item *array)
+{
+	size_t i;
+	cbor_err_t err;
+
+	if (array->type.indef)
+		err = cbor_array_encode_begin_indef(enc);
+	else
+		err = cbor_array_encode_begin(enc, array->len);
+
+	if (err != CBOR_ERR_OK)
+		return err;
+
+	for (i = 0; i < array->len; i++)
+		cbor_item_encode(enc, &array->items[i]);
+
+	if ((err = cbor_array_encode_end(enc)) != CBOR_ERR_OK)
+		return err;
+
+	return CBOR_ERR_OK;
+}
