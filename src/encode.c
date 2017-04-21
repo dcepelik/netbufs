@@ -1,3 +1,4 @@
+#include "debug.h"
 #include "internal.h"
 #include "memory.h"
 #include "stack.h"
@@ -31,12 +32,20 @@ void cbor_encoder_delete(struct cbor_encoder *enc)
 }
 
 
+/* TODO DRY */
+static inline bool is_break(struct cbor_hdr *type)
+{
+	return (type->major == CBOR_MAJOR_OTHER && type->minor == CBOR_MINOR_BREAK);
+}
+
+
 static cbor_err_t cbor_type_encode(struct cbor_encoder *enc, struct cbor_type type)
 {
 	unsigned char bytes[9];
 	size_t num_extra_bytes;
 	uint64_t val_be;
 	unsigned char *val_be_bytes = (unsigned char *)&val_be;
+	struct block *block;
 	size_t i;
 
 	num_extra_bytes = 0;
@@ -182,12 +191,12 @@ static cbor_err_t cbor_block_end(struct cbor_encoder *enc, enum cbor_major major
 	if (block->type.major != major_type)
 		return CBOR_ERR_OPER;
 
-	if (block->type.indef) {
+	if (block->type.indef)
 		return cbor_break_encode(enc);
-	}
 
-	if (block->num_items != block->type.val)
-		return CBOR_ERR_OPER;
+	//if (block->num_items != block->type.val) {
+	//	return CBOR_ERR_OPER;
+	//}
 
 	return CBOR_ERR_OK;
 }
@@ -327,6 +336,9 @@ cbor_err_t cbor_item_encode(struct cbor_encoder *enc, struct cbor_item *item)
 
 	case CBOR_MAJOR_ARRAY:
 		return cbor_array_encode(enc, item);
+
+	case CBOR_MAJOR_TAG:
+		return cbor_tag_encode(enc, item->type.val);
 
 	default:
 		return CBOR_ERR_OPER;
