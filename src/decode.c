@@ -113,7 +113,8 @@ static cbor_err_t decode_hdr_check(struct cbor_decoder *dec, struct cbor_hdr *ty
 		return err;
 
 	if (type->major != major)
-		return CBOR_ERR_ITEM;
+		/* TODO msg */
+		return error(dec, CBOR_ERR_ITEM, "... was unexpected, ... was expected.");
 	
 	return CBOR_ERR_OK;
 }
@@ -137,10 +138,13 @@ static uint64_t decode_uint(struct cbor_decoder *dec, cbor_err_t *err, uint64_t 
 
 
 /* TODO have a look at the range checks and make sure nothing overflows */
-static inline cbor_err_t uint64_to_negint(uint64_t u64, int64_t *i64)
+static inline cbor_err_t uint64_to_negint(struct cbor_decoder *dec, uint64_t u64, int64_t *i64)
 {
-	if (u64 > -(INT64_MIN + 1))
-		return CBOR_ERR_RANGE;
+	uint64_t minabs = -(INT64_MIN + 1);
+
+	if (u64 > minabs)
+		return error(dec, CBOR_ERR_RANGE, "Negative integer -%lu is less than -%lu and cannot be decoded.",
+			u64, minabs);
 
 	*i64 = (-1 - u64);
 	return CBOR_ERR_OK;
@@ -162,7 +166,7 @@ static int64_t decode_int(struct cbor_decoder *dec, cbor_err_t *err, int64_t min
 	}
 
 	if (type.major == CBOR_MAJOR_NEGATIVE_INT) {
-		*err = uint64_to_negint(type.val, &i64);
+		*err = uint64_to_negint(dec, type.val, &i64);
 	}
 	else {
 		if (type.val > INT64_MAX) {
@@ -268,7 +272,7 @@ cbor_err_t cbor_decode_sval(struct cbor_decoder *dec, enum cbor_sval *sval)
 		return err;
 
 	if (hdr.major != CBOR_MAJOR_OTHER || hdr.minor != CBOR_MINOR_SVAL)
-		return CBOR_ERR_ITEM;
+		return error(dec, CBOR_ERR_ITEM, "A Simple Value was expected.");
 
 	*sval = hdr.val;
 	return CBOR_ERR_OK;
@@ -289,7 +293,7 @@ static cbor_err_t decode_break(struct cbor_decoder *dec)
 
 	if ((err = decode_hdr(dec, &hdr)) == CBOR_ERR_OK)
 		if (!is_break(&hdr))
-			return CBOR_ERR_ITEM;
+			return error(dec, CBOR_ERR_ITEM, "Break Code was expected.");
 
 	return CBOR_ERR_OK;
 }
@@ -302,14 +306,14 @@ static cbor_err_t block_begin(struct cbor_decoder *dec, enum cbor_major major_ty
 
 	block = stack_push(&dec->blocks);
 	if (!block)
-		return CBOR_ERR_NOMEM;
+		return error(dec, CBOR_ERR_NOMEM, "No memory to allocate new nesting block");
 
 	block->num_items = 0;
 	if ((err = decode_hdr_check(dec, &block->type, major_type)) != CBOR_ERR_OK)
 		return err;
 
 	if (block->type.indef != indef)
-		return CBOR_ERR_INDEF;
+		return error(dec, CBOR_ERR_INDEF, NULL);
 
 	*len = block->type.val;
 	return CBOR_ERR_OK;
@@ -321,18 +325,18 @@ static cbor_err_t block_end(struct cbor_decoder *dec, enum cbor_major major_type
 	struct block *block;
 
 	if (stack_is_empty(&dec->blocks))
-		return CBOR_ERR_OPER;
+		return error(dec, CBOR_ERR_OPER, NULL);
 
 	block = stack_pop(&dec->blocks);
 
 	if (block->type.major != major_type)
-		return CBOR_ERR_OPER;
+		return error(dec, CBOR_ERR_OPER, NULL);
 
 	if (block->type.indef)
 		return decode_break(dec);
 
 	if (block->num_items != block->type.val)
-		return CBOR_ERR_OPER;
+		return error(dec, CBOR_ERR_OPER, NULL);
 	
 	return CBOR_ERR_OK;
 }
@@ -376,7 +380,7 @@ static cbor_err_t decode_chunk(struct cbor_decoder *dec, struct cbor_hdr *stream
 
 	*bytes = cbor_realloc(*bytes, 1 + *len + chunk_hdr->val);
 	if (!*bytes)
-		return CBOR_ERR_NOMEM;
+		return error(dec, CBOR_ERR_NOMEM, "No memory to decode another stream chunk.");
 
 	if ((err = cbor_stream_read(dec->stream, *bytes + *len, 0, chunk_hdr->val)) != CBOR_ERR_OK) {
 		free(*bytes);
@@ -473,7 +477,7 @@ static cbor_err_t decode_array_items(struct cbor_decoder *dec, struct cbor_hdr *
 
 	*items = cbor_realloc(*items, size * sizeof(**items));
 	if (!*items)
-		return CBOR_ERR_NOMEM;
+		return error(dec, CBOR_ERR_NOMEM, "No memory to decode array items.");
 
 	i = 0;
 
@@ -507,13 +511,30 @@ out_free:
 }
 
 
+static cbor_err_t decode_map_items(struct cbor_decoder *dec, struct cbor_hdr *map_hdr,
+	struct cbor_pair **pairs, uint64_t *nitems)
+{
+	struct cbor_item *items;
+	cbor_err_t err;
+
+	if ((err = decode_array_items(dec, map_hdr, &items, nitems)) != CBOR_ERR_OK)
+		return err;
+
+	/* TODO (A lot of) further checks ... */
+
+	/* TODO Is this safe? Ask MM */
+	pairs = (struct cbor_pair **)items;
+	return CBOR_ERR_OK;
+}
+
+
 static cbor_err_t decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 {
 	cbor_err_t err;
 
 	switch (item->type.major) {
 	case CBOR_MAJOR_NEGATIVE_INT:
-		return uint64_to_negint(item->type.val, &item->i64);
+		return uint64_to_negint(dec, item->type.val, &item->i64);
 
 	case CBOR_MAJOR_BYTES:
 		return decode_stream(dec, &item->type, &item->bytes, &item->len);
@@ -525,7 +546,7 @@ static cbor_err_t decode_item(struct cbor_decoder *dec, struct cbor_item *item)
 		return decode_array_items(dec, &item->type, &item->items, &item->len);
 
 	case CBOR_MAJOR_MAP:
-		return decode_array_items(dec, &item->type, &item->items, &item->len);
+		return decode_map_items(dec, &item->type, &item->pairs, &item->len);
 
 	default:
 		return CBOR_ERR_OK;

@@ -1,4 +1,5 @@
 #include "error.h"
+#include <stdlib.h>
 
 
 const char *cbor_err_to_string(cbor_err_t err)
@@ -25,7 +26,9 @@ const char *cbor_err_to_string(cbor_err_t err)
 		return "Indefinite length item is not allowed here.";
 	case CBOR_ERR_READ:
 		return "An error occured during read().";
-	default:
-		return "Unknown error (invalid flag?).";
+	case CBOR_ERR_UNSUP:
+		return "Operation not supported or feature not implemented.";
 	}
+
+	return NULL;
 }

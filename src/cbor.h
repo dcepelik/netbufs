@@ -108,6 +108,8 @@ void cbor_item_dump(struct cbor_item *item);
 
 /*
  * CBOR Key-Value Pair.
+ *
+ * Beware, This struct's topology affects decode_map_items.
  */
 struct cbor_pair
 {
