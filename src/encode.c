@@ -407,7 +407,7 @@ cbor_err_t cbor_map_encode(struct cbor_encoder *enc, struct cbor_item *map)
 	if (err != CBOR_ERR_OK)
 		return err;
 
-	if ((err = encode_array_items(enc, (struct cbor_item *)map->pairs, map->len)) != CBOR_ERR_OK)
+	if ((err = encode_array_items(enc, (struct cbor_item *)map->pairs, 2 * map->len)) != CBOR_ERR_OK)
 		return err;
 
 	if ((err = cbor_map_encode_end(enc)) != CBOR_ERR_OK)

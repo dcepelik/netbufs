@@ -471,8 +471,9 @@ static cbor_err_t decode_array_items(struct cbor_decoder *dec, struct cbor_hdr *
 	size_t i;
 
 	size = CBOR_ARRAY_INIT_SIZE;
-	if (!array_hdr->indef)
+	if (!array_hdr->indef) {
 		size = array_hdr->val;
+	}
 	*items = NULL;
 
 	*items = cbor_realloc(*items, size * sizeof(**items));
@@ -512,18 +513,30 @@ out_free:
 
 
 static cbor_err_t decode_map_items(struct cbor_decoder *dec, struct cbor_hdr *map_hdr,
-	struct cbor_pair **pairs, uint64_t *nitems)
+	struct cbor_pair **pairs, uint64_t *npairs)
 {
-	struct cbor_item *items;
 	cbor_err_t err;
+	struct cbor_hdr array_hdr;
+	struct cbor_item *items;
 
-	if ((err = decode_array_items(dec, map_hdr, &items, nitems)) != CBOR_ERR_OK)
+	/* maps are just arrays, so pretend we have one and reuse decode_array_items */
+	array_hdr = (struct cbor_hdr) {
+		.major = CBOR_MAJOR_ARRAY,
+		.indef = map_hdr->indef,
+		.val = 2 * map_hdr->val,
+	};
+
+	if ((err = decode_array_items(dec, &array_hdr, &items, npairs)) != CBOR_ERR_OK)
 		return err;
 
 	/* TODO (A lot of) further checks ... */
+	TEMP_ASSERT(*npairs % 2 == 0);
+	*npairs /= 2;
 
 	/* TODO Is this safe? Ask MM */
-	pairs = (struct cbor_pair **)items;
+	*pairs = ((struct cbor_pair *)items);
+
+
 	return CBOR_ERR_OK;
 }
 

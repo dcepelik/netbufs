@@ -63,6 +63,19 @@ void cbor_item_dump(struct cbor_item *item)
 		fprintf(stderr, "]");
 		break;
 
+	case CBOR_MAJOR_MAP:
+		fprintf(stderr, "{");
+		for (i = 0; i < item->len; i++) {
+			if (i > 0)
+				fputs(", ", stderr);
+
+			cbor_item_dump(&item->pairs[i].key);
+			fputs(": ", stderr);
+			cbor_item_dump(&item->pairs[i].value);
+		}
+		fprintf(stderr, "}");
+		break;
+
 	default:
 		fprintf(stderr, "type: %s\n", cbor_type_to_string(&item->type));
 		TEMP_ASSERT(false);

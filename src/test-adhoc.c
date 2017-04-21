@@ -132,7 +132,48 @@ void tags_test_encode(struct cbor_encoder *enc)
 
 void map_test_encode(struct cbor_encoder *enc)
 {
+	char *str1 = "Hello World!";
+	unsigned char bytes[8] = { 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49 };
+
 	cbor_map_encode_begin(enc, 0);
+	cbor_map_encode_end(enc);
+
+	cbor_map_encode_begin(enc, 1);
+		cbor_map_encode_begin(enc, 0);
+		cbor_map_encode_end(enc);
+
+		cbor_map_encode_begin(enc, 0);
+		cbor_map_encode_end(enc);
+	cbor_map_encode_end(enc);
+
+	cbor_map_encode_begin_indef(enc);
+		cbor_int32_encode(enc, 1);
+
+		cbor_map_encode_begin_indef(enc);
+			cbor_int32_encode(enc, 2);
+			cbor_map_encode_begin(enc, 1);
+				cbor_int32_encode(enc, 3);
+				cbor_map_encode_begin_indef(enc);
+				cbor_map_encode_end(enc);
+			cbor_map_encode_end(enc);
+		cbor_map_encode_end(enc);
+	cbor_map_encode_end(enc);
+
+	cbor_map_encode_begin(enc, 2);
+		cbor_int32_encode(enc, 4);
+		cbor_map_encode_begin_indef(enc);
+			cbor_int32_encode(enc, 5);
+			cbor_map_encode_begin_indef(enc);
+				cbor_text_encode(enc, (unsigned char *)str1, strlen(str1));
+				cbor_int32_encode(enc, 256);
+
+				cbor_int32_encode(enc, 6);
+				cbor_bytes_encode(enc, bytes, ARRAY_SIZE(bytes));
+			cbor_map_encode_end(enc);
+		cbor_map_encode_end(enc);
+
+		cbor_int32_encode(enc, 7);
+		cbor_int32_encode(enc, 8);
 	cbor_map_encode_end(enc);
 }
 
