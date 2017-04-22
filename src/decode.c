@@ -203,53 +203,6 @@ static inline cbor_err_t predecode_check(struct cbor_stream *cs, struct cbor_ite
 }
 
 
-/* refactoring aid */
-static cbor_err_t decode_hdr(struct cbor_stream *cs, struct cbor_hdr *hdr)
-{
-	struct cbor_item item;
-	cbor_err_t err;
-
-	err = predecode(cs, &item);
-
-	if (err == CBOR_ERR_BREAK) {
-		hdr->major = CBOR_MAJOR_7;
-		hdr->minor = 31;
-		return CBOR_ERR_OK;
-	}
-
-	if (err != CBOR_ERR_OK)
-		return err;
-
-	if (item.type == CBOR_TYPE_SVAL) {
-		hdr->major = CBOR_MAJOR_7;
-		hdr->minor = CBOR_MINOR_1B_SVAL;
-	}
-	else {
-		hdr->major = item.type;
-		hdr->u64 = item.u64;
-		hdr->minor = CBOR_MINOR_1B_SVAL;
-	}
-
-	return CBOR_ERR_OK;
-}
-
-
-static cbor_err_t decode_hdr_check(struct cbor_stream *cs, struct cbor_hdr *hdr, enum cbor_major major)
-{
-	cbor_err_t err;
-
-	if ((err = decode_hdr(cs, hdr)) != CBOR_ERR_OK)
-		return err;
-
-	if (hdr->major != major)
-		/* TODO msg */
-		return error(cs, CBOR_ERR_ITEM, "%s was unexpected, %s was expected.",
-			hdr->major, major);
-	
-	return CBOR_ERR_OK;
-}
-
-
 static uint64_t decode_uint(struct cbor_stream *cs, cbor_err_t *err, uint64_t max)
 {
 	struct cbor_item item;

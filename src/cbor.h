@@ -136,7 +136,7 @@ struct cbor_item
 	bool indefinite;
 
 	uint64_t len;				/* go away! */
-	uint64_t u64;			/* CBOR_MAJOR_UINT */
+	uint64_t u64;				/* CBOR_MAJOR_UINT */
 	union {
 		int64_t i64;			/* CBOR_MAJOR_NEGINT */
 		byte_t *bytes;			/* CBOR_MAJOR_BYTES */
@@ -144,6 +144,7 @@ struct cbor_item
 		struct cbor_item *items;	/* CBOR_MAJOR_ARRAY */
 		struct cbor_pair *pairs;	/* CBOR_MAJOR_MAP */
 		uint64_t tag;			/* CBOR_MAJOR_TAG */
+		enum cbor_sval sval;
 	};
 };
 
