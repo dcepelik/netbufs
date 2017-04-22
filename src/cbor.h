@@ -35,6 +35,8 @@ void buf_close(struct buf *buf);
 struct cbor_stream *cbor_stream_new(struct buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 
+char *cbor_stream_strerror(struct cbor_stream *cs);
+
 /*
  * CBOR Simple Values
  * @see RFC 7049, section 2.3.
@@ -94,6 +96,7 @@ struct cbor_item
 };
 
 void cbor_item_dump(struct cbor_item *item, FILE *file);
+void cbor_stream_dump(struct cbor_stream *cs, FILE *file);
 
 /*
  * CBOR Key-Value Pair.

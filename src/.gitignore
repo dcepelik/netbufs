@@ -1,3 +1,4 @@
 *.a
 test-*
 !test-*.c
+cbordump

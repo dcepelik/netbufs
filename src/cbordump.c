@@ -16,28 +16,38 @@ int main(int argc, char *argv[])
 {
 	char *infn;
 	struct buf *in;
-	struct cbor_stream *cs_in;
+	struct cbor_stream *cs;
 	struct cbor_item item;
 	cbor_err_t err;
 
-	assert(argc == 2);
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+		return EXIT_FAILURE;
+	}
 
 	infn = argv[1];
 
 	in = buf_new();
-	assert(in != NULL);
-
-	assert(buf_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
-
-	cs_in = cbor_stream_new(in);
-	assert(cs_in != NULL);
-
-	while ((err = cbor_decode_item(cs_in, &item)) == CBOR_ERR_OK) {
-		cbor_item_dump(&item, stdout);
-		fprintf(stdout, ", \n");
+	if (!in) {
+		fprintf(stderr, "%s: cannot create input buffer: out of memory\n", argv[0]);
+		return EXIT_FAILURE;
 	}
 
+	if (buf_open_file(in, infn, O_RDONLY, 0) != CBOR_ERR_OK) {
+		fprintf(stderr, "%s: cannot open input file\n", argv[0]);
+		return EXIT_FAILURE;
+	}
+
+	cs = cbor_stream_new(in);
+	if (!cs) {
+		fprintf(stderr, "%s: cannot create input stream: out of memory\n", argv[0]);
+		return EXIT_FAILURE;
+	}
+
+	cbor_stream_dump(cs, stdout);
+	putchar('\n');
+
 	buf_close(in);
-	cbor_stream_delete(cs_in);
+	cbor_stream_delete(cs);
 	return EXIT_SUCCESS;
 }

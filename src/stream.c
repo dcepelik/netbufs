@@ -58,3 +58,9 @@ cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 	va_end(args);
 	return err;
 }
+
+
+char *cbor_stream_strerror(struct cbor_stream *cs)
+{
+	return cs->err_buf.str;
+}

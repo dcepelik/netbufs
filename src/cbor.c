@@ -242,6 +242,35 @@ void cbor_item_dump(struct cbor_item *item, FILE *file)
 }
 
 
+void cbor_stream_dump(struct cbor_stream *cs, FILE *file)
+{
+	struct isbuf isbuf;
+	struct cbor_item item;
+	cbor_err_t err;
+	size_t i = 0;
+
+	isbuf_init(&isbuf);
+
+	while (!buf_is_eof(cs->buf)) {
+		if ((err = cbor_decode_item(cs, &item)) != CBOR_ERR_OK)
+			break;
+
+		if (i > 0)
+			isbuf_printfln(&isbuf, ",");
+
+		dump_item(&isbuf, &item);
+		i++;
+	}
+
+	fputs(isbuf.strbuf.str, file);
+	if (err != CBOR_ERR_OK) {
+		fprintf(stdout, "\nError: %s", cbor_stream_strerror(cs)); /* TODO */
+	}
+
+	isbuf_free(&isbuf);
+}
+
+
 const char *cbor_type_string(enum cbor_type type)
 {
 	switch (type) {

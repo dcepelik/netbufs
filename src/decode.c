@@ -49,7 +49,8 @@ static inline cbor_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, ui
 	}
 
 	if (lbits > LBITS_8B)
-		return error(cs, CBOR_ERR_PARSE, "Invalid value of additional information.");
+		return error(cs, CBOR_ERR_PARSE, "Invalid value of "
+			"Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
 	if ((err = buf_read(cs->buf, bytes, 0, nbytes)) != CBOR_ERR_OK)
@@ -119,7 +120,9 @@ static cbor_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 
 	if (lbits == LBITS_INDEFINITE) {
 		if (!major_allows_indefinite(major))
-			return error(cs, CBOR_ERR_INDEF, NULL);
+			return error(cs, CBOR_ERR_INDEF, "Indefinite-length "
+				"encoding is not allowed for %s items.",
+				cbor_type_string(major));
 		indefinite = true;
 	}
 	item->indefinite = indefinite;
@@ -180,8 +183,8 @@ static inline cbor_err_t predecode_check(struct cbor_stream *cs, struct cbor_ite
 
 	if (item->type != type)
 		/* TODO msg */
-		return error(cs, CBOR_ERR_ITEM, "%i was unexpected, %i was expected.",
-			item->type, type);
+		return error(cs, CBOR_ERR_ITEM, "%s was unexpected, %s was expected.",
+			cbor_type_string(item->type), cbor_type_string(type));
 
 	return CBOR_ERR_OK;
 }
