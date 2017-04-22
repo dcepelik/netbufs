@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
 
 	while ((err = cbor_decode_item(cs_in, &item)) == CBOR_ERR_OK) {
 		DEBUG_TRACE;
-		cbor_item_dump(&item);
+		cbor_item_dump(&item, stderr);
 	}
 
 	if (err != CBOR_ERR_EOF) {

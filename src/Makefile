@@ -3,12 +3,13 @@
 PROG=playground
 LIB=libcbor.a
 LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o
-BINS=test-stream test-decenc test-adhoc test-corrupt
+TESTS=test-stream test-decenc test-adhoc test-corrupt
+BINS=cbordump
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
 LDFLAGS+=-Wall
 
-all: $(LIB) $(BINS)
+all: $(LIB) $(TESTS) $(BINS)
 
 $(LIB): $(LIBOBJS)
 	ar rcs $(LIB) $(LIBOBJS)
@@ -25,15 +26,18 @@ test-adhoc: test-adhoc.o $(LIBOBJS)
 test-corrupt: test-corrupt.o $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
+cbordump: cbordump.o $(LIBOBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -o $@ $<
 
 clean:
-	rm -f -- $(LIB) *.o $(BINS) vgcore.*
+	rm -f -- $(LIB) *.o $(TESTS) $(BINS) vgcore.*
 
 metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc
 
-tests: $(BINS)
+tests: $(TESTS)
 	cd ../tests; ./genfiles.sh
 	./run-tests.sh

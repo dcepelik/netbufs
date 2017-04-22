@@ -6,13 +6,6 @@
 #include "strbuf.h"
 #include <stdlib.h>
 
-typedef unsigned char		cbor_extra_t;
-
-#define CBOR_MAJOR_MASK		0xE0
-#define CBOR_EXTRA_MASK		0x1F
-
-#define CBOR_BREAK		((CBOR_MAJOR_7 << 5) + 31)
-
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
 
@@ -48,34 +41,65 @@ cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t offset, size_t count)
 /* XXX This is a temporary tests helper */
 size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes);
 
+/* XXX Yuk! */
 static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
 {
 	return buf->last_read_len;
 }
 
-
-enum cbor_ebits
+/*
+ * CBOR Major Types
+ * @see RFC 7049, section 2.1.
+ */
+enum major
 {
-	CBOR_EBITS_1B = 24,
-	CBOR_EBITS_2B,
-	CBOR_EBITS_4B,
-	CBOR_EBITS_8B,
-	CBOR_EBITS_INDEF = 31,
+	CBOR_MAJOR_UINT,
+	CBOR_MAJOR_NEGINT,
+	CBOR_MAJOR_BYTES,
+	CBOR_MAJOR_TEXT,
+	CBOR_MAJOR_ARRAY,
+	CBOR_MAJOR_MAP,
+	CBOR_MAJOR_TAG,
+	CBOR_MAJOR_7,
 };
 
-struct errlist
+/* Additional Information for Major Types 1..6
+ * @see TODO
+ */
+enum lbits
 {
-	int i;
+	/* 0, ..., 23: small unsigned integer */
+	LBITS_1B = 24,
+	LBITS_2B,
+	LBITS_4B,
+	LBITS_8B,
+	/* 28, 29, 30: unassigned */
+	LBITS_INDEFINITE = 31,
 };
+
+/*
+ * Additional Information for Major Type 7
+ * @see RFC 7049, section 2.3., Table 1.
+ */
+enum minor
+{
+	/* 0, ..., 23: simple value (direct) */
+	CBOR_MINOR_SVAL = 24,
+	CBOR_MINOR_FLOAT16,
+	CBOR_MINOR_FLOAT32,
+	CBOR_MINOR_FLOAT64,
+	/* 28, 29, 30: unassigned */
+	CBOR_MINOR_BREAK = 31,
+};
+
 
 struct block
 {
-	struct cbor_hdr hdr;
-	size_t num_items;
+	enum major major;	/* Major Type for which this block has been open */
+	bool indefinite;	/* is indefinite-lenght encoding used? */
+	uint64_t len;		/* intended length of the block when !indefinite */
+	size_t num_items;	/* actual number of items encoded */
 };
-
-cbor_err_t stack_block_begin(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
-cbor_err_t stack_block_end(struct stack *stack, enum cbor_major hdr, bool indef, uint64_t len);
 
 struct cbor_stream
 {
@@ -84,16 +108,11 @@ struct cbor_stream
 	cbor_err_t err;
 	struct strbuf err_buf;
 
-	/* various options */
-};
-
-struct cbor_document
-{
-	struct cbor_item root;
+	/* TODO various encoding/decoding options to come as needed */
 };
 
 
-static inline bool major_allows_indefinite(enum cbor_major major)
+static inline bool major_allows_indefinite(enum major major)
 {
 	return major == CBOR_MAJOR_TEXT
 		|| major == CBOR_MAJOR_BYTES
@@ -102,10 +121,7 @@ static inline bool major_allows_indefinite(enum cbor_major major)
 }
 
 
-static inline bool is_break(struct cbor_hdr *hdr)
-{
-	return hdr->major == CBOR_MAJOR_7
-		&& hdr->minor == CBOR_MINOR_INDEFINITE_BREAK;
-}
+cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...);
+cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite, uint64_t len);
 
 #endif

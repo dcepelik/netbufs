@@ -15,20 +15,6 @@
 #define INT64_MIN_ABS		(-(INT64_MIN + 1))
 
 
-static cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
-{
-	//assert(err == CBOR_ERR_OK); /* uncomment for easier debugging */
-
-	va_list args;
-
-	cs->err = err;
-	va_start(args, str);
-	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
-	va_end(args);
-	return err;
-}
-
-
 static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 {
 	assert(lbits >= LBITS_1B && lbits <= LBITS_8B);
@@ -110,7 +96,7 @@ static cbor_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *i
 static cbor_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 {
 	byte_t hdr;
-	enum cbor_major major;
+	enum major major;
 	byte_t lbits;
 	bool indefinite = false;
 	uint64_t u64;
@@ -136,24 +122,22 @@ static cbor_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 			return error(cs, CBOR_ERR_INDEF, NULL);
 		indefinite = true;
 	}
-	item->hdr.indef = indefinite;
+	item->indefinite = indefinite;
+
+	if (!indefinite) {
+		if ((err = decode_u64(cs, lbits, &u64)) != CBOR_ERR_OK)
+			return err;
+	}
 
 	if (indefinite || major == CBOR_MAJOR_ARRAY || major == CBOR_MAJOR_MAP) {
-		block = stack_push(&cs->blocks);
-		if (!block)
-			return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
-		block->num_items = 0;
-		block->hdr.indef = indefinite;
+		if ((err = push_block(cs, major, indefinite, u64)) != CBOR_ERR_OK)
+			return err;
 
 		if (indefinite)
 			return CBOR_ERR_OK;
 	}
 
-	if ((err = decode_u64(cs, lbits, &u64)) != CBOR_ERR_OK)
-		return err;
-
 	item->u64 = u64;
-	item->hdr.u64 = u64;
 
 	//switch (item->type)
 	//{
@@ -368,7 +352,7 @@ static cbor_err_t decode_break(struct cbor_stream *cs)
 //}
 //
 //
-//static cbor_err_t decode_block_end(struct cbor_stream *cs, enum cbor_major major_type)
+//static cbor_err_t decode_block_end(struct cbor_stream *cs, enum major major_type)
 //{
 //	struct block *block;
 //
@@ -421,7 +405,7 @@ static cbor_err_t decode_break(struct cbor_stream *cs)
 //}
 
 
-static cbor_err_t read_stream_chunk_n(struct cbor_stream *cs, struct cbor_item *stream,
+static cbor_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stream,
 	struct cbor_item *chunk, byte_t **bytes, size_t *len)
 {
 	cbor_err_t err;
@@ -443,7 +427,7 @@ static cbor_err_t read_stream_chunk_n(struct cbor_stream *cs, struct cbor_item *
 }
 
 
-static cbor_err_t read_stream_n(struct cbor_stream *cs, struct cbor_item *stream,
+static cbor_err_t read_stream(struct cbor_stream *cs, struct cbor_item *stream,
 	byte_t **bytes, size_t *len)
 {
 	struct cbor_item chunk;
@@ -452,11 +436,11 @@ static cbor_err_t read_stream_n(struct cbor_stream *cs, struct cbor_item *stream
 	*len = 0;
 	*bytes = NULL;
 
-	if (!stream->hdr.indef)
-		return read_stream_chunk_n(cs, stream, stream, bytes, len);
+	if (!stream->indefinite)
+		return read_stream_chunk(cs, stream, stream, bytes, len);
 
 	while ((err = predecode_check(cs, &chunk, stream->type)) == CBOR_ERR_OK) {
-		if ((err = read_stream_chunk_n(cs, stream, &chunk, bytes, len) != CBOR_ERR_OK))
+		if ((err = read_stream_chunk(cs, stream, &chunk, bytes, len) != CBOR_ERR_OK))
 			break;
 
 		/* check indef */
@@ -470,10 +454,10 @@ static cbor_err_t read_stream_n(struct cbor_stream *cs, struct cbor_item *stream
 }
 
 
-static cbor_err_t read_stream_null_n(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len)
+static cbor_err_t read_stream_0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len)
 {
 	cbor_err_t err;
-	if ((err = read_stream_n(cs, stream, bytes, len)) == CBOR_ERR_OK)
+	if ((err = read_stream(cs, stream, bytes, len)) == CBOR_ERR_OK)
 		(*bytes)[*len] = 0;
 	return err;
 }
@@ -485,7 +469,7 @@ cbor_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **str, size_t *len)
 	cbor_err_t err;
 
 	if ((err = predecode_check(cs, &item, CBOR_TYPE_BYTES)) == CBOR_ERR_OK)
-		return read_stream_n(cs, &item, str, len);
+		return read_stream(cs, &item, str, len);
 	return err;
 }
 
@@ -496,12 +480,12 @@ cbor_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len)
 	cbor_err_t err;
 
 	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) == CBOR_ERR_OK)
-		return read_stream_null_n(cs, &item, str, len);
+		return read_stream_0(cs, &item, str, len);
 	return err;
 }
 
 
-static cbor_err_t decode_array_items_n(struct cbor_stream *cs, struct cbor_item *arr,
+static cbor_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr,
 	struct cbor_item **items, uint64_t *nitems)
 {
 	struct cbor_item *item;
@@ -510,7 +494,7 @@ static cbor_err_t decode_array_items_n(struct cbor_stream *cs, struct cbor_item 
 	size_t i;
 
 	size = CBOR_ARRAY_INIT_SIZE;
-	if (!arr->hdr.indef)
+	if (!arr->indefinite)
 		size = arr->u64;
 
 	*items = NULL;
@@ -529,7 +513,7 @@ static cbor_err_t decode_array_items_n(struct cbor_stream *cs, struct cbor_item 
 		}
 
 		size *= 2;
-	} while (arr->hdr.indef && err != CBOR_ERR_BREAK && err != CBOR_ERR_EOF);
+	} while (arr->indefinite && err != CBOR_ERR_BREAK && err != CBOR_ERR_EOF);
 
 	*nitems = i;
 
@@ -544,7 +528,7 @@ static cbor_err_t decode_array_items_n(struct cbor_stream *cs, struct cbor_item 
 
 /* XXX RIde cbor major */
 
-static cbor_err_t decode_map_items_n(struct cbor_stream *cs, struct cbor_item *map,
+static cbor_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 	struct cbor_pair **pairs, uint64_t *npairs)
 {
 	cbor_err_t err;
@@ -554,15 +538,15 @@ static cbor_err_t decode_map_items_n(struct cbor_stream *cs, struct cbor_item *m
 	/* maps are just arrays, so pretend we have one and reuse decode_array_items */
 	arr = (struct cbor_item) {
 		.type = CBOR_TYPE_ARRAY,
-		.hdr.indef = map->hdr.indef,
+		.indefinite = map->indefinite,
 		.u64 = 2 * map->u64,
 	};
 
-	if ((err = decode_array_items_n(cs, &arr, &items, npairs)) != CBOR_ERR_OK)
+	if ((err = decode_array_items(cs, &arr, &items, npairs)) != CBOR_ERR_OK)
 		return err;
 
-	/* TODO (A lot of) further checks ... */
-	TEMP_ASSERT(*npairs % 2 == 0);
+	if (*npairs % 2 != 0)
+		return error(cs, CBOR_ERR_NITEMS, "Odd number of items in a map.");
 	*npairs /= 2;
 
 	/* TODO Is this safe? Ask MM */
@@ -579,18 +563,6 @@ cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	if ((err = predecode(cs, item)) != CBOR_ERR_OK)
 		return err;
 
-	if (err == CBOR_ERR_OK) {
-		if (item->type == CBOR_TYPE_SVAL) {
-			item->hdr.major = CBOR_MAJOR_7;
-			item->hdr.minor = CBOR_MINOR_1B_SVAL;
-		}
-		else {
-			item->hdr.major = item->type;
-			item->hdr.u64 = item->u64;
-			item->hdr.minor = CBOR_MINOR_1B_SVAL;
-		}
-	}
-
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
 	case CBOR_TYPE_INT:
@@ -600,20 +572,15 @@ cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_FLOAT32:
 	case CBOR_TYPE_FLOAT64:
 		return CBOR_ERR_OK;
-
 	case CBOR_TYPE_BYTES:
-		return read_stream_n(cs, item, &item->bytes, &item->len);
-
+		return read_stream(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_TEXT:
-		return read_stream_null_n(cs, item, &item->bytes, &item->len);
-
+		return read_stream_0(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_ARRAY:
-		return decode_array_items_n(cs, item, &item->items, &item->len);
-
+		return decode_array_items(cs, item, &item->items, &item->len);
 	case CBOR_TYPE_MAP:
-		return decode_map_items_n(cs, item, &item->pairs, &item->len);
-
+		return decode_map_items(cs, item, &item->pairs, &item->len);
 	default:
-		return CBOR_ERR_OK;
+		return error(cs, CBOR_ERR_UNSUP, NULL);
 	}
 }

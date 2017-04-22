@@ -7,6 +7,7 @@
 
 #include "error.h"
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
@@ -16,7 +17,7 @@
 #define CBOR_EXTRA_8B		27
 #define CBOR_EXTRA_VAR_LEN	31
 
-/* temporary */
+/* temporarily here, move to internal.h */
 typedef unsigned char		byte_t;
 
 struct cbor_stream;
@@ -35,62 +36,6 @@ struct cbor_stream *cbor_stream_new(struct buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 
 /*
- * CBOR Major Types
- * @see RFC 7049, section 2.1.
- */
-enum cbor_major
-{
-	CBOR_MAJOR_UINT,
-	CBOR_MAJOR_NEGINT,
-	CBOR_MAJOR_BYTES,
-	CBOR_MAJOR_TEXT,
-	CBOR_MAJOR_ARRAY,
-	CBOR_MAJOR_MAP,
-	CBOR_MAJOR_TAG,
-	CBOR_MAJOR_7,
-};
-
-const char *cbor_major_to_string(enum cbor_major major);
-
-/*
- * Additional Information for Major Type 7
- * @see RFC 7049, section 2.3., Table 1.
- */
-enum cbor_minor
-{
-	/* 0, ..., 23: simple value (direct) */
-	CBOR_MINOR_1B_SVAL = 24,
-	CBOR_MINOR_2B_FLOAT16,
-	CBOR_MINOR_4B_FLOAT32,
-	CBOR_MINOR_8B_FLOAT64,
-	/* 28, 29, 30: unassigned */
-	CBOR_MINOR_INDEFINITE_BREAK = 31,
-};
-
-
-enum lbits
-{
-	/* 0, ..., 23: small unsigned integer */
-	LBITS_1B = 24,
-	LBITS_2B,
-	LBITS_4B,
-	LBITS_8B,
-	/* 28, 29, 30: unassigned */
-	LBITS_INDEFINITE = 31,
-};
-
-/*
- * Header of a CBOR Data Item
- */
-struct cbor_hdr
-{
-	enum cbor_major major;
-	enum cbor_minor minor;
-	bool indef;		/* indefinite-length item? */
-	uint64_t u64;		/* value of integers or length of others */
-};
-
-/*
  * CBOR Simple Values
  * @see RFC 7049, section 2.3.
  */
@@ -104,7 +49,7 @@ enum cbor_sval
 
 /*
  * Type of a CBOR Data Item as percieved by the user.
- * The first 6 items coincide with enum cbor_major.
+ * The first 6 items coincide with enum major.
  */
 enum cbor_type
 {
@@ -119,8 +64,10 @@ enum cbor_type
 	CBOR_TYPE_FLOAT16,
 	CBOR_TYPE_FLOAT32,
 	CBOR_TYPE_FLOAT64,
-	CBOR_TYPE_BREAK,	/* temporary refactoring aid */
 };
+
+const char *cbor_type_string(enum cbor_type type);
+
 
 struct cbor_pair;
 
@@ -129,12 +76,10 @@ struct cbor_pair;
  */
 struct cbor_item
 {
-	struct cbor_hdr hdr;
-
-	/* refactoring aid */
 	enum cbor_type type;
 	bool indefinite;
 
+	/* refactoring aid */
 	uint64_t len;				/* go away! */
 	uint64_t u64;				/* CBOR_MAJOR_UINT */
 	union {
@@ -148,7 +93,7 @@ struct cbor_item
 	};
 };
 
-void cbor_item_dump(struct cbor_item *item);
+void cbor_item_dump(struct cbor_item *item, FILE *file);
 
 /*
  * CBOR Key-Value Pair.

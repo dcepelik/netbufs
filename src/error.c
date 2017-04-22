@@ -32,6 +32,8 @@ const char *cbor_err_to_string(cbor_err_t err)
 		return "No more items.";
 	case CBOR_ERR_BREAK:
 		return "Unexpected Break.";
+	case CBOR_ERR_NITEMS:
+		return "Invalid number of items.";
 	}
 
 	return NULL;

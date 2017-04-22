@@ -11,21 +11,7 @@
 #include <stdbool.h>
 
 
-static cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
-{
-	assert(err == CBOR_ERR_OK);
-
-	va_list args;
-
-	cs->err = err;
-	va_start(args, str);
-	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
-	va_end(args);
-	return err;
-}
-
-
-static cbor_err_t write_hdr(struct cbor_stream *cs, enum cbor_major major, byte_t lbits)
+static cbor_err_t write_hdr(struct cbor_stream *cs, enum major major, byte_t lbits)
 {
 	byte_t hdr;
 	hdr = (major << 5) + lbits;
@@ -33,13 +19,13 @@ static cbor_err_t write_hdr(struct cbor_stream *cs, enum cbor_major major, byte_
 }
 
 
-static cbor_err_t write_hdr_indef(struct cbor_stream *cs, enum cbor_major major)
+static cbor_err_t write_hdr_indef(struct cbor_stream *cs, enum major major)
 {
 	return write_hdr(cs, major, LBITS_INDEFINITE);
 }
 
 
-static cbor_err_t write_hdr_major7(struct cbor_stream *cs, enum cbor_minor minor)
+static cbor_err_t write_hdr_major7(struct cbor_stream *cs, enum minor minor)
 {
 	return write_hdr(cs, CBOR_MAJOR_7, minor);
 }
@@ -47,11 +33,11 @@ static cbor_err_t write_hdr_major7(struct cbor_stream *cs, enum cbor_minor minor
 
 static cbor_err_t write_break(struct cbor_stream *cs)
 {
-	return write_hdr_major7(cs, CBOR_MINOR_INDEFINITE_BREAK);
+	return write_hdr_major7(cs, CBOR_MINOR_BREAK);
 }
 
 
-static cbor_err_t write_hdr_u64(struct cbor_stream *cs, enum cbor_major major, uint64_t u64)
+static cbor_err_t write_hdr_u64(struct cbor_stream *cs, enum major major, uint64_t u64)
 {
 	byte_t lbits;
 	byte_t bytes[8];
@@ -69,19 +55,19 @@ static cbor_err_t write_hdr_u64(struct cbor_stream *cs, enum cbor_major major, u
 
 	if (u64 <= UINT8_MAX) {
 		len = 1;
-		lbits = CBOR_MINOR_1B_SVAL;
+		lbits = LBITS_1B;
 	}
 	else if (u64 <= UINT16_MAX) {
 		len = 2;
-		lbits = CBOR_MINOR_2B_FLOAT16;
+		lbits = LBITS_2B;
 	}
 	else if (u64 <= UINT32_MAX) {
 		len = 4;
-		lbits = CBOR_MINOR_4B_FLOAT32;
+		lbits = LBITS_4B;
 	}
 	else {
 		len = 8;
-		lbits = CBOR_MINOR_8B_FLOAT64;
+		lbits = LBITS_8B;
 	}
 
 	if ((err = write_hdr(cs, major, lbits)) != CBOR_ERR_OK)
@@ -164,23 +150,7 @@ cbor_err_t cbor_encode_int64(struct cbor_stream *cs, int64_t val)
 }
 
 
-static cbor_err_t push_block(struct cbor_stream *cs, enum cbor_major major, bool indefinite, uint64_t len)
-{
-	struct block *block;
-
-	block = stack_push(&cs->blocks);
-	if (!block)
-		return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
-
-	block->hdr.major = major;
-	block->hdr.indef = indefinite;
-	block->hdr.u64 = len;
-	block->num_items = 0;
-	return CBOR_ERR_OK;
-}
-
-
-static cbor_err_t start_block(struct cbor_stream *cs, enum cbor_major major, uint64_t len)
+static cbor_err_t start_block(struct cbor_stream *cs, enum major major, uint64_t len)
 {
 	cbor_err_t err;
 	if ((err = push_block(cs, major, false, len)) == CBOR_ERR_OK)
@@ -189,7 +159,7 @@ static cbor_err_t start_block(struct cbor_stream *cs, enum cbor_major major, uin
 }
 
 
-static cbor_err_t start_block_indef(struct cbor_stream *cs, enum cbor_major major)
+static cbor_err_t start_block_indef(struct cbor_stream *cs, enum major major)
 {
 	cbor_err_t err;
 	if ((err = push_block(cs, major, true, 0)) == CBOR_ERR_OK)
@@ -198,7 +168,7 @@ static cbor_err_t start_block_indef(struct cbor_stream *cs, enum cbor_major majo
 }
 
 
-static cbor_err_t end_block(struct cbor_stream *cs, enum cbor_major major_type)
+static cbor_err_t end_block(struct cbor_stream *cs, enum major major_type)
 {
 	struct block *block;
 
@@ -207,11 +177,11 @@ static cbor_err_t end_block(struct cbor_stream *cs, enum cbor_major major_type)
 
 	block = stack_pop(&cs->blocks);
 
-	if (block->hdr.major != major_type)
+	if (block->major != major_type)
 		/* TODO msg */
 		return error(cs, CBOR_ERR_OPER, "Attempting to close block of ..., but ... is open.");
 
-	if (block->hdr.indef)
+	if (block->indefinite)
 		return write_break(cs);
 
 	//if (block->num_items != block->hdr.u64) {
@@ -258,7 +228,7 @@ cbor_err_t cbor_encode_map_end(struct cbor_stream *cs)
 }
 
 
-static cbor_err_t encode_bytes(struct cbor_stream *cs, enum cbor_major major, byte_t *bytes, size_t len)
+static cbor_err_t encode_bytes(struct cbor_stream *cs, enum major major, byte_t *bytes, size_t len)
 {
 	cbor_err_t err;
 	if ((err = write_hdr_u64(cs, major, len)) == CBOR_ERR_OK)
@@ -317,7 +287,7 @@ cbor_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 		if (sval <= 23)
 			return write_hdr_major7(cs, (byte_t)sval);
 		
-		if ((err = write_hdr_major7(cs, CBOR_MINOR_1B_SVAL)) == CBOR_ERR_OK)
+		if ((err = write_hdr_major7(cs, CBOR_MINOR_SVAL)) == CBOR_ERR_OK)
 			return buf_write(cs->buf, (byte_t *)&sval, 1);
 		return err;
 	}
@@ -346,7 +316,7 @@ cbor_err_t encode_array(struct cbor_stream *cs, struct cbor_item *array)
 	size_t i;
 	cbor_err_t err;
 
-	if (array->hdr.indef)
+	if (array->indefinite)
 		err = cbor_encode_array_begin_indef(cs);
 	else
 		err = cbor_encode_array_begin(cs, array->len);
@@ -370,7 +340,7 @@ cbor_err_t encode_map(struct cbor_stream *cs, struct cbor_item *map)
 	size_t i;
 	cbor_err_t err;
 
-	if (map->hdr.indef)
+	if (map->indefinite)
 		err = cbor_encode_map_begin_indef(cs);
 	else
 		err = cbor_encode_map_begin(cs, map->len);
@@ -390,7 +360,7 @@ cbor_err_t encode_map(struct cbor_stream *cs, struct cbor_item *map)
 
 cbor_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 {
-	switch (item->hdr.major)
+	switch (item->type)
 	{
 	case CBOR_TYPE_UINT:
 		return cbor_encode_uint64(cs, item->u64);

@@ -16,6 +16,7 @@ enum cbor_err
 	CBOR_ERR_UNSUP,		/* operation not supported */
 	CBOR_ERR_NOMORE,	/* no more items */
 	CBOR_ERR_BREAK,		/* Break was hit */
+	CBOR_ERR_NITEMS,	/* Invalid number of items */
 };
 
 typedef enum cbor_err cbor_err_t;
