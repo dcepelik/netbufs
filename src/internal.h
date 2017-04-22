@@ -93,7 +93,7 @@ struct cbor_document
 };
 
 
-static inline bool major_allows_indef(enum cbor_major major)
+static inline bool major_allows_indefinite(enum cbor_major major)
 {
 	return major == CBOR_MAJOR_TEXT
 		|| major == CBOR_MAJOR_BYTES

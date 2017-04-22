@@ -55,13 +55,9 @@ const char *cbor_major_to_string(enum cbor_major major);
 /*
  * Additional Information for Major Type 7
  * @see RFC 7049, section 2.3., Table 1.
- *
- * The minor type's meaning depends on major type, hence the names:
- * CBOR_MINOR_1B_SVAL means either a 1-byte extension, or a simple value.
  */
 enum cbor_minor
 {
-	CBOR_MINOR_UNDEF = -1,
 	/* 0, ..., 23: simple value (direct) */
 	CBOR_MINOR_1B_SVAL = 24,
 	CBOR_MINOR_2B_FLOAT16,
@@ -69,6 +65,18 @@ enum cbor_minor
 	CBOR_MINOR_8B_FLOAT64,
 	/* 28, 29, 30: unassigned */
 	CBOR_MINOR_INDEFINITE_BREAK = 31,
+};
+
+
+enum lbits
+{
+	/* 0, ..., 23: small unsigned integer */
+	LBITS_1B = 24,
+	LBITS_2B,
+	LBITS_4B,
+	LBITS_8B,
+	/* 28, 29, 30: unassigned */
+	LBITS_INDEFINITE = 31,
 };
 
 /*
@@ -94,6 +102,26 @@ enum cbor_sval
 	CBOR_SVAL_UNDEF,
 };
 
+/*
+ * Type of a CBOR Data Item as percieved by the user.
+ * The first 6 items coincide with enum cbor_major.
+ */
+enum cbor_type
+{
+	CBOR_TYPE_UINT,
+	CBOR_TYPE_INT,
+	CBOR_TYPE_BYTES,
+	CBOR_TYPE_TEXT,
+	CBOR_TYPE_ARRAY,
+	CBOR_TYPE_MAP,
+	CBOR_TYPE_TAG,
+	CBOR_TYPE_SVAL,
+	CBOR_TYPE_FLOAT16,
+	CBOR_TYPE_FLOAT32,
+	CBOR_TYPE_FLOAT64,
+	CBOR_TYPE_BREAK,	/* temporary refactoring aid */
+};
+
 struct cbor_pair;
 
 /*
@@ -102,18 +130,21 @@ struct cbor_pair;
 struct cbor_item
 {
 	struct cbor_hdr hdr;
-	uint64_t len;
 
+	/* refactoring aid */
+	enum cbor_type type;
+	bool indefinite;
+
+	uint64_t len;				/* go away! */
+	uint64_t u64;			/* CBOR_MAJOR_UINT */
 	union {
-		uint64_t u64;			/* CBOR_MAJOR_UINT */
 		int64_t i64;			/* CBOR_MAJOR_NEGINT */
 		byte_t *bytes;			/* CBOR_MAJOR_BYTES */
-		char *str;			/* CBOR_MAJOR_STRING */
+		char *str;			/* CBOR_MAJOR_TEXT */
 		struct cbor_item *items;	/* CBOR_MAJOR_ARRAY */
 		struct cbor_pair *pairs;	/* CBOR_MAJOR_MAP */
 		uint64_t tag;			/* CBOR_MAJOR_TAG */
 	};
-
 };
 
 void cbor_item_dump(struct cbor_item *item);
