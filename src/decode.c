@@ -53,7 +53,7 @@ static inline cbor_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, ui
 			"Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
-	if ((err = buf_read(cs->buf, bytes, 0, nbytes)) != CBOR_ERR_OK)
+	if ((err = buf_read(cs->buf, bytes, nbytes)) != CBOR_ERR_OK)
 		return err;
 
 	for (i = 0; i < nbytes; i++)
@@ -126,7 +126,7 @@ static cbor_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 
 	struct block *block;
 
-	if ((err = buf_read(cs->buf, &hdr, 0, 1)) != CBOR_ERR_OK)
+	if ((err = buf_read(cs->buf, &hdr, 1)) != CBOR_ERR_OK)
 		return err;
 
 	major = (hdr & 0xE0) >> 5;
@@ -441,7 +441,7 @@ static cbor_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *st
 	if (!*bytes)
 		return error(cs, CBOR_ERR_NOMEM, "No memory to decode another buf chunk.");
 
-	if ((err = buf_read(cs->buf, *bytes + *len, 0, chunk->u64)) != CBOR_ERR_OK) {
+	if ((err = buf_read(cs->buf, *bytes + *len, chunk->u64)) != CBOR_ERR_OK) {
 		free(*bytes);
 		return err;
 	}
@@ -551,8 +551,6 @@ static cbor_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *a
 	return err;
 }
 
-
-/* XXX RIde cbor major */
 
 static cbor_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 	struct cbor_pair **pairs, uint64_t *npairs)

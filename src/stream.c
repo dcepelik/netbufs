@@ -10,7 +10,7 @@
 
 cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 {
-	assert(!err);
+	//assert(!err);
 
 	va_list args;
 

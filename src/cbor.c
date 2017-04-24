@@ -4,6 +4,7 @@
 #include "strbuf.h"
 #include "util.h"
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -102,6 +103,30 @@ static bool is_simple_item(struct cbor_item *item)
 }
 
 
+static void dump_char_printable(struct isbuf *isbuf, char c)
+{
+	switch (c) {
+	case '\n':
+		isbuf_printf(isbuf, "\\n");
+		return;
+	case '\t':
+		isbuf_printf(isbuf, "\\t");
+		return;
+	case '\r':
+		isbuf_printf(isbuf, "\\r");
+		return;
+	case '\"':
+		isbuf_printf(isbuf, "\\\"");
+		return;
+	case '\\':
+		isbuf_printf(isbuf, "\\\\");
+		return;
+	default:
+		isbuf_printf(isbuf, "%c", c);
+	}
+}
+
+
 static void dump_text(struct isbuf *isbuf, char *bytes, size_t len)
 {
 	size_t i;
@@ -109,7 +134,7 @@ static void dump_text(struct isbuf *isbuf, char *bytes, size_t len)
 
 	isbuf_printf(isbuf, "\"");
 	for (i = 0; i < dump_len; i++)
-		isbuf_printf(isbuf, "%c", bytes[i]);
+		dump_char_printable(isbuf, bytes[i]);
 	if (len > dump_len)
 		isbuf_printf(isbuf, "...");
 	isbuf_printf(isbuf, "\"");
@@ -211,7 +236,7 @@ static void dump_sval(struct isbuf *isbuf, struct cbor_item *sval)
 		isbuf_printf(isbuf, "null");
 		break;
 	case CBOR_SVAL_UNDEF:
-		isbuf_printf(isbuf, "undef");
+		isbuf_printf(isbuf, "undefined");
 		break;
 	default:
 		isbuf_printf(isbuf, "simple(%lu)", sval->u64);
@@ -271,7 +296,7 @@ void cbor_item_dump(struct cbor_item *item, FILE *file)
 }
 
 
-void cbor_stream_dump(struct cbor_stream *cs, FILE *file)
+cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 {
 	struct isbuf isbuf;
 	struct cbor_item item;
@@ -292,11 +317,8 @@ void cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 	}
 
 	fputs(isbuf.strbuf.str, file);
-	if (err != CBOR_ERR_OK) {
-		fprintf(stderr, "Error: %s", cbor_stream_strerror(cs)); /* TODO */
-	}
-
 	isbuf_free(&isbuf);
+	return err;
 }
 
 

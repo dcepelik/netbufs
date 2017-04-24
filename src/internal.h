@@ -1,56 +1,13 @@
 #ifndef INTERNAL_H
 #define INTERNAL_H
 
+#include "buf.h"
 #include "cbor.h"
 #include "stack.h"
 #include "strbuf.h"
 #include <stdlib.h>
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
-
-typedef cbor_err_t (filter_t)(struct buf *buf, byte_t *bytes, size_t offset, size_t nbytes);
-
-struct buf
-{
-	byte_t *buf;	/* data buffer */
-	size_t bufsize;	/* size of the buffer */
-	size_t pos;	/* current read/write position within the buf */
-	size_t len;	/* number of valid bytes in the buffer (for reading) */
-	size_t last_read_len;
-	bool dirty;	/* do we have data to be written? */
-	bool eof;	/* did we hit EOF during last filling? */
-
-	/* for file streams */
-	char *filename;	/* filename of currently open file */
-	int fd;		/* file descriptor */
-	int mode;	/* file flags (@see man 3p open) */
-
-	/* for in-memory streams */
-	byte_t *memory;	/* the memory */
-	size_t memory_size;	/* memory size */
-	size_t memory_len;	/* number of valid bytes in memory */
-	size_t memory_pos;	/* position in memory (for reading/writing) */
-
-	void (*flush)(struct buf *buf);
-	void (*fill)(struct buf *buf);
-	void (*close)(struct buf *buf);
-	filter_t *filter;
-};
-
-cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t count);
-cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t offset, size_t count);
-void buf_set_filter(struct buf *buf, filter_t *filter);
-
-/* XXX This is a temporary tests helper */
-size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes);
-
-/* XXX Yuk! */
-static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
-{
-	return buf->last_read_len;
-}
-
-cbor_err_t buf_hex_filter(struct buf *buf, byte_t *bytes, size_t offset, size_t nbytes);
 
 /*
  * CBOR Major Types

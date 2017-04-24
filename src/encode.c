@@ -373,6 +373,16 @@ cbor_err_t encode_map(struct cbor_stream *cs, struct cbor_item *map)
 }
 
 
+static cbor_err_t encode_tagged_item(struct cbor_stream *cs, struct cbor_item *item)
+{
+	cbor_err_t err;
+
+	if ((err = cbor_encode_tag(cs, item->u64)) != CBOR_ERR_OK)
+		return err;
+	return cbor_encode_item(cs, item->tagged_item);
+}
+
+
 cbor_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 {
 	switch (item->type)
@@ -390,7 +400,7 @@ cbor_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_MAP:
 		return encode_map(cs, item);
 	case CBOR_TYPE_TAG:
-		return cbor_encode_tag(cs, item->u64);
+		return encode_tagged_item(cs, item);
 	case CBOR_TYPE_SVAL:
 		return cbor_encode_sval(cs, item->sval);
 

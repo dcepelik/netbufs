@@ -2,7 +2,7 @@
 
 PROG=playground
 LIB=libcbor.a
-LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o
+LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o buf.o
 TESTS=test-stream test-decenc test-adhoc test-corrupt
 BINS=cbordump
 

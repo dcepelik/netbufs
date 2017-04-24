@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 #
 # A shell script to run various tests automatically.
 #
@@ -10,6 +10,11 @@ OK="OK"
 
 num_errs=0
 num_ok=0
+
+if ! command -v jq 2>&1 >/dev/null; then
+	echo "$0: the jq binary is needed to run this test suite"
+	exit 1;
+fi
 
 echo "stream-echo:"
 for testfile in ../tests/stream/*; do
@@ -26,7 +31,8 @@ for testfile in ../tests/stream/*; do
 done
 
 echo "decenc:"
-for testfile in ../tests/libcbor/*.cbor; do
+for test in ../tests/libcbor/local/*; do
+	testfile=$test/in.cbor
 	outfile=$testfile.out
 	valgrind_result=$(valgrind ./test-decenc $testfile $outfile 2>&1 >/dev/null | tail -n1 | cut -d ' ' -f4,10)
 
@@ -51,7 +57,8 @@ for testfile in ../tests/libcbor/*.cbor; do
 done
 
 echo "corrupt:"
-for testfile in ../tests/libcbor/corrupt/*.corrupt ../tests/libcbor/random/*.random; do
+for test in ../tests/libcbor/corrupt/*; do
+	testfile=$test/in.corrupt
 	outfile=$testfile.out
 	valgrind_result=$(valgrind ./test-corrupt $testfile 2>&1 >/dev/null | tail -n1 | cut -d ' ' -f4,10)
 

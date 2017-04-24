@@ -23,16 +23,6 @@ typedef unsigned char		byte_t;
 struct cbor_stream;
 struct buf;
 
-struct buf *buf_new(void);
-void buf_delete(struct buf *buf);
-
-bool buf_is_eof(struct buf *buf);
-
-cbor_err_t buf_open_file(struct buf *buf, char *filename, int flags, int mode);
-cbor_err_t buf_open_stdin(struct buf *buf);
-cbor_err_t buf_open_memory(struct buf *buf);
-void buf_close(struct buf *buf);
-
 struct cbor_stream *cbor_stream_new(struct buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 
@@ -99,7 +89,7 @@ struct cbor_item
 };
 
 void cbor_item_dump(struct cbor_item *item, FILE *file);
-void cbor_stream_dump(struct cbor_stream *cs, FILE *file);
+cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file);
 
 /*
  * CBOR Key-Value Pair.

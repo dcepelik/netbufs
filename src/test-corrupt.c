@@ -7,6 +7,7 @@
 
 #include "cbor.h"
 #include "debug.h"
+#include "buf.h"
 
 #include <assert.h>
 #include <fcntl.h>

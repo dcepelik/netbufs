@@ -1,1 +1,3 @@
-stream/random-*
+cbor/rfc/
+cbor/random/
+vgcore.*
