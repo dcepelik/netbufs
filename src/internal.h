@@ -8,6 +8,7 @@
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 
+typedef cbor_err_t (filter_t)(struct buf *buf, byte_t *bytes, size_t offset, size_t nbytes);
 
 struct buf
 {
@@ -33,10 +34,12 @@ struct buf
 	void (*flush)(struct buf *buf);
 	void (*fill)(struct buf *buf);
 	void (*close)(struct buf *buf);
+	filter_t *filter;
 };
 
 cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t count);
 cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t offset, size_t count);
+void buf_set_filter(struct buf *buf, filter_t *filter);
 
 /* XXX This is a temporary tests helper */
 size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes);
@@ -46,6 +49,8 @@ static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
 {
 	return buf->last_read_len;
 }
+
+cbor_err_t buf_hex_filter(struct buf *buf, byte_t *bytes, size_t offset, size_t nbytes);
 
 /*
  * CBOR Major Types
@@ -109,6 +114,7 @@ struct cbor_stream
 	struct strbuf err_buf;
 
 	/* TODO various encoding/decoding options to come as needed */
+	bool fail_on_error;
 };
 
 
@@ -123,5 +129,6 @@ static inline bool major_allows_indefinite(enum major major)
 
 cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...);
 cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite, uint64_t len);
+struct block *top_block(struct cbor_stream *cs);
 
 #endif

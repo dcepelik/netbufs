@@ -121,7 +121,7 @@ static void dump_bytes(struct isbuf *isbuf, byte_t *bytes, size_t len)
 	size_t i;
 	size_t dump_len = MIN(len, BYTES_DUMP_MAXLEN);
 
-	isbuf_printf(isbuf, "b'");
+	isbuf_printf(isbuf, "h'");
 	for (i = 0; i < dump_len; i++)
 		isbuf_printf(isbuf, "%02X", bytes[i]);
 	if (len > dump_len)
@@ -198,6 +198,35 @@ static void dump_array(struct isbuf *isbuf, struct cbor_item *array)
 }
 
 
+static void dump_sval(struct isbuf *isbuf, struct cbor_item *sval)
+{
+	switch (sval->u64) {
+	case CBOR_SVAL_FALSE:
+		isbuf_printf(isbuf, "false");
+		break;
+	case CBOR_SVAL_TRUE:
+		isbuf_printf(isbuf, "true");
+		break;
+	case CBOR_SVAL_NULL:
+		isbuf_printf(isbuf, "null");
+		break;
+	case CBOR_SVAL_UNDEF:
+		isbuf_printf(isbuf, "undef");
+		break;
+	default:
+		isbuf_printf(isbuf, "simple(%lu)", sval->u64);
+	}
+}
+
+
+static void dump_tag(struct isbuf *isbuf, struct cbor_item *tag)
+{
+	isbuf_printf(isbuf, "%u(", tag->u64);
+	dump_item(isbuf, tag->tagged_item);
+	isbuf_printf(isbuf, ")");
+}
+
+
 static void dump_item(struct isbuf *isbuf, struct cbor_item *item)
 {
 	switch (item->type) {
@@ -220,10 +249,10 @@ static void dump_item(struct isbuf *isbuf, struct cbor_item *item)
 		dump_map(isbuf, item);
 		break;
 	case CBOR_TYPE_TAG:
-		isbuf_printf(isbuf, ">tag< %lu", item->u64);
+		dump_tag(isbuf, item);
 		break;
 	case CBOR_TYPE_SVAL:
-		isbuf_printf(isbuf, ">sval< %lu", item->u64);
+		dump_sval(isbuf, item);
 		break;
 	default:
 		break;
@@ -264,7 +293,7 @@ void cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 
 	fputs(isbuf.strbuf.str, file);
 	if (err != CBOR_ERR_OK) {
-		fprintf(stdout, "\nError: %s", cbor_stream_strerror(cs)); /* TODO */
+		fprintf(stderr, "Error: %s", cbor_stream_strerror(cs)); /* TODO */
 	}
 
 	isbuf_free(&isbuf);

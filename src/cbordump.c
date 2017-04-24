@@ -3,44 +3,59 @@
  */
 
 #include "cbor.h"
+#include "internal.h"
 
 #include <assert.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 
 int main(int argc, char *argv[])
 {
-	char *infn;
+	char *fn;
 	struct buf *in;
 	struct cbor_stream *cs;
 	struct cbor_item item;
 	cbor_err_t err;
+	char *argv0;
+	
+	argv0 = basename(argv[0]);
 
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+		fprintf(stderr, "Usage: %s <filename>\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	infn = argv[1];
+	fn = argv[1];
 
 	in = buf_new();
 	if (!in) {
-		fprintf(stderr, "%s: cannot create input buffer: out of memory\n", argv[0]);
+		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	if (buf_open_file(in, infn, O_RDONLY, 0) != CBOR_ERR_OK) {
-		fprintf(stderr, "%s: cannot open input file\n", argv[0]);
+	if (strcmp(fn, "-") == 0) {
+		err = buf_open_stdin(in);
+		buf_set_filter(in, buf_hex_filter);
+
+	}
+	else {
+		err = buf_open_file(in, fn, O_RDONLY, 0);
+	}
+
+	if (err != CBOR_ERR_OK) {
+		fprintf(stderr, "%s: cannot open input file\n", argv0);
 		return EXIT_FAILURE;
 	}
 
 	cs = cbor_stream_new(in);
 	if (!cs) {
-		fprintf(stderr, "%s: cannot create input stream: out of memory\n", argv[0]);
+		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 

@@ -50,8 +50,7 @@ void *stack_pop(struct stack *stack)
 void *stack_top(struct stack *stack)
 {
 	assert(stack->num_items > 0);
-
-	return stack->items + (stack->num_items * stack->item_size);
+	return stack->items + ((stack->num_items - 1) * stack->item_size);
 }
 
 

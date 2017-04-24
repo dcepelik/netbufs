@@ -29,6 +29,7 @@ void buf_delete(struct buf *buf);
 bool buf_is_eof(struct buf *buf);
 
 cbor_err_t buf_open_file(struct buf *buf, char *filename, int flags, int mode);
+cbor_err_t buf_open_stdin(struct buf *buf);
 cbor_err_t buf_open_memory(struct buf *buf);
 void buf_close(struct buf *buf);
 
@@ -83,16 +84,18 @@ struct cbor_item
 
 	/* refactoring aid */
 	uint64_t len;				/* go away! */
-	uint64_t u64;				/* CBOR_MAJOR_UINT */
+	uint64_t u64;				/* CBOR_TYPE_UINT */
+
 	union {
-		int64_t i64;			/* CBOR_MAJOR_NEGINT */
-		byte_t *bytes;			/* CBOR_MAJOR_BYTES */
-		char *str;			/* CBOR_MAJOR_TEXT */
-		struct cbor_item *items;	/* CBOR_MAJOR_ARRAY */
-		struct cbor_pair *pairs;	/* CBOR_MAJOR_MAP */
-		uint64_t tag;			/* CBOR_MAJOR_TAG */
+		int64_t i64;			/* CBOR_TYPE_NEGINT */
+		byte_t *bytes;			/* CBOR_TYPE_BYTES */
+		char *str;			/* CBOR_TYPE_TEXT */
+		struct cbor_item *items;	/* CBOR_TYPE_ARRAY */
+		struct cbor_pair *pairs;	/* CBOR_TYPE_MAP */
+		uint64_t tag;			/* CBOR_TYPE_TAG */
 		enum cbor_sval sval;
 	};
+	struct cbor_item *tagged_item;
 };
 
 void cbor_item_dump(struct cbor_item *item, FILE *file);

@@ -1,31 +1,30 @@
 #include "cbor.h"
+#include "debug.h"
 #include "internal.h"
-#include "strbuf.h"
 #include "memory.h"
+#include "strbuf.h"
+#include "util.h"
+
+#include <assert.h>
 
 
-struct cbor_stream *cbor_stream_new(struct buf *buf)
+cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 {
-	struct cbor_stream *cs;
+	assert(!err);
 
-	cs = cbor_malloc(sizeof(*cs));
-	cs->buf = buf;
+	va_list args;
 
-	strbuf_init(&cs->err_buf, 24);
+	cs->err = err;
+	va_start(args, str);
+	strbuf_reset(&cs->err_buf);
+	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
+	va_end(args);
 
-	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
-		free(cs);
-		return NULL;
+	if (cs->fail_on_error) {
+		die("Error: %s\n", cs->err_buf.str);
 	}
 
-	return cs;
-}
-
-
-void cbor_stream_delete(struct cbor_stream *cs)
-{
-	strbuf_free(&cs->err_buf);
-	cbor_free(cs);
+	return err;
 }
 
 
@@ -46,17 +45,41 @@ cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite,
 }
 
 
-cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
+struct block *top_block(struct cbor_stream *cs)
 {
-	//assert(err == CBOR_ERR_OK); /* uncomment for easier debugging */
+	assert(!stack_is_empty(&cs->blocks));
+	return stack_top(&cs->blocks);
+}
 
-	va_list args;
 
-	cs->err = err;
-	va_start(args, str);
-	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
-	va_end(args);
-	return err;
+struct cbor_stream *cbor_stream_new(struct buf *buf)
+{
+	struct cbor_stream *cs;
+
+	cs = cbor_malloc(sizeof(*cs));
+	cs->buf = buf;
+	cs->err = CBOR_ERR_OK;
+
+	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
+		free(cs);
+		return NULL;
+	}
+
+	 /* bottom stack block: avoids corner-cases */
+	push_block(cs, -1, true, 0);
+
+	strbuf_init(&cs->err_buf, 24); /* TODO change API, what if this fails? */
+
+	cs->fail_on_error = false;
+
+	return cs;
+}
+
+
+void cbor_stream_delete(struct cbor_stream *cs)
+{
+	strbuf_free(&cs->err_buf);
+	cbor_free(cs);
 }
 
 

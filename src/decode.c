@@ -68,7 +68,7 @@ static inline cbor_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, ui
 static inline cbor_err_t u64_to_i64(struct cbor_stream *cs, uint64_t u64, int64_t *i64)
 {
 	if (u64 <= INT64_MIN_ABS) {
-		*i64 = (-1 - u64);
+		*i64 = -u64 - 1;
 		return CBOR_ERR_OK;
 	}
 
@@ -77,20 +77,41 @@ static inline cbor_err_t u64_to_i64(struct cbor_stream *cs, uint64_t u64, int64_
 }
 
 
-static cbor_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item, enum lbits lbits)
+static cbor_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item, enum minor minor)
 {
-	if (lbits <= 23) {
-		item->u64 = lbits;
+	uint64_t u64;
+
+	assert(minor >= 0);
+
+	if (minor <= 23) {
 		item->type = CBOR_TYPE_SVAL;
+		item->sval = minor;
+		item->u64 = item->sval;
 		return CBOR_ERR_OK;
 	}
 
-	if (lbits == 31)
+	if (minor == CBOR_MINOR_BREAK)
 		return CBOR_ERR_BREAK;
 
-	item->type = CBOR_TYPE_UINT;
-	item->u64 = 0;
-	return CBOR_ERR_OK;
+	/* leverage decode_u64 to read the appropriate amount of data */
+	decode_u64(cs, (enum lbits)minor, &u64);
+
+	switch (minor) {
+	case CBOR_MINOR_SVAL:
+		item->type = CBOR_TYPE_SVAL;
+		item->sval = u64;
+		item->u64 = item->sval; /* TODO */
+		return CBOR_ERR_OK;
+	case CBOR_MINOR_FLOAT16:
+	case CBOR_MINOR_FLOAT32:
+	case CBOR_MINOR_FLOAT64:
+		return error(cs, CBOR_ERR_UNSUP, "Float decoding not supported.");
+	default:
+		break;
+	}
+
+	return error(cs, CBOR_ERR_PARSE, "Invalid Additional Information "
+		"value for Major Type 7: 0x%02X.", minor);
 }
 
 
@@ -508,11 +529,13 @@ static cbor_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *a
 		if (!*items)
 			return error(cs, CBOR_ERR_NOMEM, "No memory to decode array items.");
 
-		for (; i < size; i++) {
+		while (i < size) {
 			item = *items + i;
 
 			if ((err = cbor_decode_item(cs, item)) != CBOR_ERR_OK)
 				break;
+
+			i++;
 		}
 
 		size *= 2;
@@ -537,6 +560,7 @@ static cbor_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map
 	cbor_err_t err;
 	struct cbor_item arr;
 	struct cbor_item *items;
+	uint64_t nitems;
 
 	/* maps are just arrays, so pretend we have one and reuse decode_array_items */
 	arr = (struct cbor_item) {
@@ -545,12 +569,12 @@ static cbor_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map
 		.u64 = 2 * map->u64,
 	};
 
-	if ((err = decode_array_items(cs, &arr, &items, npairs)) != CBOR_ERR_OK)
+	if ((err = decode_array_items(cs, &arr, &items, &nitems)) != CBOR_ERR_OK)
 		return err;
 
-	if (*npairs % 2 != 0)
+	if (nitems % 2 != 0)
 		return error(cs, CBOR_ERR_NITEMS, "Odd number of items in a map.");
-	*npairs /= 2;
+	*npairs = nitems / 2;
 
 	/* TODO Is this safe? Ask MM */
 	*pairs = ((struct cbor_pair *)items);
@@ -569,7 +593,6 @@ cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
 	case CBOR_TYPE_INT:
-	case CBOR_TYPE_TAG:
 	case CBOR_TYPE_SVAL:
 	case CBOR_TYPE_FLOAT16:
 	case CBOR_TYPE_FLOAT32:
@@ -583,6 +606,14 @@ cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 		return decode_array_items(cs, item, &item->items, &item->len);
 	case CBOR_TYPE_MAP:
 		return decode_map_items(cs, item, &item->pairs, &item->len);
+
+	case CBOR_TYPE_TAG:
+		/* TODO clean this up */
+		item->tagged_item = cbor_malloc(sizeof(*item->tagged_item));
+		if (!item->tagged_item)
+			return CBOR_ERR_NOMEM;
+		return cbor_decode_item(cs, item->tagged_item);
+
 	default:
 		return error(cs, CBOR_ERR_UNSUP, NULL);
 	}
