@@ -1,5 +1,5 @@
 #include "parse.h"
-#include "util.h"
+#include "util-bench.h"
 
 #include <assert.h>
 #include <ctype.h>

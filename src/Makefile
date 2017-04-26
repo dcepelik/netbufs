@@ -1,26 +1,29 @@
 .PHONY: all clean metrics tests
 
-PROG=playground
 LIB=libcbor.a
-LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o buf.o
+OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o buf.o
+BENCHMARK_OBJS=serialize-bird.o parse.o util-bench.o
 TESTS=test-stream test-adhoc
-BINS=cbordump
+BINS=cbordump benchmark
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
 LDFLAGS+=-Wall
 
 all: $(LIB) $(TESTS) $(BINS)
 
-$(LIB): $(LIBOBJS)
-	ar rcs $(LIB) $(LIBOBJS)
+$(LIB): $(OBJS)
+	ar rcs $(LIB) $(OBJS)
 
-test-stream: test-stream.o $(LIBOBJS)
+test-stream: test-stream.o $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
-test-adhoc: test-adhoc.o $(LIBOBJS)
+test-adhoc: test-adhoc.o $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
-cbordump: cbordump.o $(LIBOBJS)
+cbordump: cbordump.o $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+benchmark: benchmark.o $(OBJS) $(BENCHMARK_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 %.o: %.c %.h

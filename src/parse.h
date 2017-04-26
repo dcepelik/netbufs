@@ -1,51 +1,20 @@
+/*
+ * parse:
+ * Read a BIRD dump into well-defined data structures for benchmarking.
+ */
+
 #ifndef PARSE_H
 #define PARSE_H
+
+#include "serialize.h"
 
 #define PARSER_RT_INIT_SIZE	256
 #define PARSER_STR_INIT_SIZE	8
 #define PARSER_ARRAY_INIT_SIZE	4
 #define PARSER_BUF_SIZE		4096
 
-#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-
-typedef uint32_t ipv4_t;
-
-
-enum bgp_origin
-{
-	BGP_ORIGIN_IGP,
-	BGP_ORIGIN_EGP,
-	BGP_ORIGIN_INCOMPLETE,
-};
-
-
-struct rte
-{
-	ipv4_t netaddr;
-	int netmask;
-	ipv4_t gwaddr;
-	char *ifname;
-	struct tm uplink;
-	ipv4_t uplink_from;
-
-	struct {
-		struct {
-			int *as_path;
-			enum bgp_origin origin;
-		} bgp;
-	} attrs;
-};
-
-
-struct rt
-{
-	struct rte *entries;	/* entries of the routing table */
-	size_t size;		/* size of *entries */
-	size_t count;		/* number of entries in *entries */
-};
 
 
 struct parser
@@ -63,8 +32,7 @@ struct parser
 
 
 void parser_init(struct parser *p, char *filename);
-void parser_free(struct parser *p);
-
 void parser_parse_rt(struct parser *p, struct rt *rt);
+void parser_free(struct parser *p);
 
 #endif

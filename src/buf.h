@@ -17,16 +17,20 @@ struct buf
 	bool dirty;	/* do we have data to be written? */
 	bool eof;	/* did we hit EOF during last filling? */
 
-	/* for file streams */
-	char *filename;	/* filename of currently open file */
-	int fd;		/* file descriptor */
-	int mode;	/* file flags (@see man 3p open) */
+	union {
+		struct { /* for file streams */
+			char *filename;	/* filename of currently open file */
+			int fd;		/* file descriptor */
+			int mode;	/* file flags (@see man 3p open) */
+		};
 
-	/* for in-memory streams */
-	byte_t *memory;	/* the memory */
-	size_t memory_size;	/* memory size */
-	size_t memory_len;	/* number of valid bytes in memory */
-	size_t memory_pos;	/* position in memory (for reading/writing) */
+		struct { /* for in-memory streams */
+			byte_t *memory;	/* the memory */
+			size_t memory_size;	/* memory size */
+			size_t memory_len;	/* number of valid bytes in memory */
+			size_t memory_pos;	/* position in memory (for reading/writing) */
+		};
+	};
 
 	void (*flush)(struct buf *buf);
 	void (*fill)(struct buf *buf);
