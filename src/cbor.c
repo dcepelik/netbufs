@@ -291,7 +291,7 @@ void cbor_item_dump(struct cbor_item *item, FILE *file)
 
 	isbuf_init(&isbuf);
 	dump_item(&isbuf, item);
-	fputs(isbuf.strbuf.str, file);
+	fputs(strbuf_get_string(&isbuf.strbuf), file);
 	isbuf_free(&isbuf);
 }
 
@@ -300,7 +300,7 @@ cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 {
 	struct isbuf isbuf;
 	struct cbor_item item;
-	cbor_err_t err;
+	cbor_err_t err = CBOR_ERR_OK;
 	size_t i = 0;
 
 	isbuf_init(&isbuf);
@@ -316,7 +316,7 @@ cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 		i++;
 	}
 
-	fputs(isbuf.strbuf.str, file);
+	fputs(strbuf_get_string(&isbuf.strbuf), file);
 	isbuf_free(&isbuf);
 	return err;
 }

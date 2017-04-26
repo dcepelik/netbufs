@@ -59,10 +59,6 @@ setup_test_files() {
 				dirname=$CBOR_RFC_DIR/$(printf %02i $i)
 				mkdir -p $dirname
 
-				if [ \( $i -ge 19 -a $i -le 40 \) -o $i -eq 50 ]; then
-					touch $dirname/skip
-				fi
-
 				echo -n $hex | tr -d '"' > $dirname/in
 
 				if [ "$decoded" != "null" ]; then
@@ -76,6 +72,18 @@ setup_test_files() {
 
 		rm $CBOR_RFC_TESTS_JSON
 	fi
+
+	# disable float tests
+	for i in $(seq 19 40); do
+		echo "Skip float test" > $CBOR_RFC_DIR/$i/skip
+	done
+	echo "Skip float test" > $CBOR_RFC_DIR/50/skip
+
+	echo "No positive bignum support" > $CBOR_RFC_DIR/12/skip
+	echo "The integer doesn't fit into int64 range" > $CBOR_RFC_DIR/13/skip
+	echo "No negative bignum support" > $CBOR_RFC_DIR/14/skip
+	echo "No way to compare outputs easily" > $CBOR_RFC_DIR/68/skip
+	echo "cbordump cats bytestreams implicitly" > $CBOR_RFC_DIR/72/skip
 }
 
 runtime_error() {
@@ -84,7 +92,7 @@ runtime_error() {
 }
 
 skip() {
-	echo SKIPPED $1
+	printf "SKIPPED %i (%s)\n" $i "$(cat $2)"
 	num_skipped=$(($num_skipped + 1))
 }
 
@@ -120,17 +128,19 @@ cbordump_vg() {
 		valgrind_error $test
 		got_err=1
 		return 1
+	else
+		pass
 	fi
 }
 
 print_results() {
-	echo "$num_ok OK, $num_skipped SKIPPED, $num_errs ERRORS"
+	echo "$num_ok tests OK, $num_errs ERRORS, $num_skipped suites SKIPPED"
 }
 
 run_cbor_positive_tests() {
 	for test in $CBOR_LOCAL_DIR/* $CBOR_RFC_DIR/*; do
 		if [ -f $test/skip ]; then
-			skip $test
+			skip $test $test/skip
 			continue
 		fi
 
@@ -146,9 +156,7 @@ run_cbor_positive_tests() {
 		else
 			pass
 
-			if cbordump_vg $in; then
-				pass
-			fi
+			cbordump_vg $in
 
 			if [ -f $out ]; then
 				if ! diff -q --ignore-all-space $out $out_test >/dev/null; then
@@ -180,11 +188,29 @@ run_cbor_negative_tests() {
 		cbordump_retval $in
 		if [ $? -eq 2 ]; then
 			pass
+			cbordump_vg $in
 		elif [ $? -eq 0 ]; then
 			should_fail $test
+			cbordump_vg $in
 		else
 			runtime_error $test
 		fi
+	done
+}
+
+
+run_io_buf_echo_tests() {
+	for test in $IO_DIR/*; do
+		out=$test.out
+		../src/test-stream $test $out
+
+		if ! diff -q $test $out >/dev/null; then
+			diff_error $test
+		else
+			pass
+		fi
+
+		rm $out
 	done
 }
 
@@ -196,4 +222,5 @@ num_ok=0
 setup_test_files
 run_cbor_positive_tests
 run_cbor_negative_tests
+run_io_buf_echo_tests
 print_results

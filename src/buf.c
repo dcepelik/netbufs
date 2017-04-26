@@ -131,6 +131,7 @@ cbor_err_t buf_hex_read_filter(struct buf *buf, byte_t *bytes, size_t nbytes)
 	byte_t *tmpbuf;
 	size_t i;
 	size_t j;
+	size_t read_len;
 	cbor_err_t err;
 
 	nnbytes = 2 * nbytes;
@@ -141,8 +142,9 @@ cbor_err_t buf_hex_read_filter(struct buf *buf, byte_t *bytes, size_t nbytes)
 		return err;
 
 	TEMP_ASSERT(buf_get_last_read_len(buf) % 2 == 0);
+	read_len = buf_get_last_read_len(buf) / 2;
 
-	for (i = 0, j = 0; i < buf_get_last_read_len(buf) / 2; i++, j += 2) {
+	for (i = 0, j = 0; i < read_len; i++, j += 2) {
 		bytes[i] = 16 * hexval(tmpbuf[j]) + hexval(tmpbuf[j + 1]);
 	}
 

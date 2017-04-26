@@ -3,7 +3,7 @@
 PROG=playground
 LIB=libcbor.a
 LIBOBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o buf.o
-TESTS=test-stream test-decenc test-adhoc test-corrupt
+TESTS=test-stream test-adhoc
 BINS=cbordump
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
@@ -17,13 +17,7 @@ $(LIB): $(LIBOBJS)
 test-stream: test-stream.o $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
-test-decenc: test-decenc.o $(LIBOBJS)
-	$(CC) $(LDFLAGS) -o $@ $^
-
 test-adhoc: test-adhoc.o $(LIBOBJS)
-	$(CC) $(LDFLAGS) -o $@ $^
-
-test-corrupt: test-corrupt.o $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 cbordump: cbordump.o $(LIBOBJS)
@@ -39,5 +33,4 @@ metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc
 
 tests: $(TESTS)
-	cd ../tests; ./genfiles.sh
-	./run-tests.sh
+	cd ../tests; ./run-tests.sh

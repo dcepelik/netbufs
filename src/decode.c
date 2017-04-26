@@ -464,10 +464,14 @@ static cbor_err_t read_stream(struct cbor_stream *cs, struct cbor_item *stream,
 		return read_stream_chunk(cs, stream, stream, bytes, len);
 
 	while ((err = predecode_check(cs, &chunk, stream->type)) == CBOR_ERR_OK) {
+		/* check indef */
+		if (chunk.indefinite) {
+			err = CBOR_ERR_INDEF;
+			break;
+		}
+
 		if ((err = read_stream_chunk(cs, stream, &chunk, bytes, len) != CBOR_ERR_OK))
 			break;
-
-		/* check indef */
 	}
 
 	if (err == CBOR_ERR_BREAK)

@@ -85,5 +85,5 @@ void cbor_stream_delete(struct cbor_stream *cs)
 
 char *cbor_stream_strerror(struct cbor_stream *cs)
 {
-	return cs->err_buf.str;
+	return strbuf_get_string(&cs->err_buf);
 }
