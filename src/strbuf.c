@@ -40,10 +40,18 @@ void strbuf_prepare_write(struct strbuf *buf, size_t count)
 }
 
 
-void strbuf_putc(struct strbuf *buf, char c)
+size_t strbuf_putc(struct strbuf *buf, char c)
 {
 	strbuf_prepare_write(buf, 1);
 	buf->str[buf->len++] = c;
+	return 1;
+}
+
+
+size_t strbuf_puts(struct strbuf *buf, char *str)
+{
+	strbuf_printf(buf, "%s", str);
+	return strlen(str);
 }
 
 

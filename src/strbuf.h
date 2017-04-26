@@ -15,7 +15,8 @@ struct strbuf
 void strbuf_init(struct strbuf *buf, size_t init_size);
 void strbuf_free(struct strbuf *buf);
 void strbuf_reset(struct strbuf *buf);
-void strbuf_putc(struct strbuf *buf, char c);
+size_t strbuf_putc(struct strbuf *buf, char c);
+size_t strbuf_puts(struct strbuf *buf, char *str);
 
 void strbuf_prepare_write(struct strbuf *buf, size_t count);
 

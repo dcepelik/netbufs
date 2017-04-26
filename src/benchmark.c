@@ -27,6 +27,8 @@ int main(int argc, char *argv[])
 	printf("Routing table loaded, count=%lu\n", rt.count);
 	printf("Transferring data using method '%s'\n", method);
 
+	serialize_bird(&rt);
+
 	printf("Done.\n");
 	parser_free(&p);
 

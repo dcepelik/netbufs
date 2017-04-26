@@ -70,4 +70,6 @@ static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
 cbor_err_t buf_hex_read_filter(struct buf *buf, byte_t *bytes, size_t nbytes);
 cbor_err_t buf_hex_write_filter(struct buf *buf, byte_t *bytes, size_t nbytes);
 
+cbor_err_t buf_printf(struct buf *buf, char *msg, ...);
+
 #endif
