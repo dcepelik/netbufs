@@ -437,7 +437,7 @@ static cbor_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *st
 	if (chunk->u64 > SIZE_MAX)
 		return error(cs, CBOR_ERR_RANGE, "Chunk is too large to be decoded by this implementation.");
 
-	*bytes = cbor_realloc(*bytes, 1 + *len + chunk->u64);
+	*bytes = nb_realloc(*bytes, 1 + *len + chunk->u64);
 	if (!*bytes)
 		return error(cs, CBOR_ERR_NOMEM, "No memory to decode another buf chunk.");
 
@@ -529,7 +529,7 @@ static cbor_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *a
 	i = 0;
 
 	do {
-		*items = cbor_realloc(*items, size * sizeof(**items));
+		*items = nb_realloc(*items, size * sizeof(**items));
 		if (!*items)
 			return error(cs, CBOR_ERR_NOMEM, "No memory to decode array items.");
 
@@ -551,7 +551,7 @@ static cbor_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *a
 		return CBOR_ERR_OK;
 
 	if (err != CBOR_ERR_OK)
-		cbor_free(*items);
+		nb_free(*items);
 	return err;
 }
 
@@ -611,7 +611,7 @@ cbor_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 
 	case CBOR_TYPE_TAG:
 		/* TODO clean this up */
-		item->tagged_item = cbor_malloc(sizeof(*item->tagged_item));
+		item->tagged_item = nb_malloc(sizeof(*item->tagged_item));
 		if (!item->tagged_item)
 			return CBOR_ERR_NOMEM;
 		return cbor_decode_item(cs, item->tagged_item);

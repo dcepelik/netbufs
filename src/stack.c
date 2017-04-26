@@ -7,7 +7,7 @@ static bool stack_resize(struct stack *stack, size_t new_size)
 {
 	void *new_mry;
 
-	new_mry = cbor_realloc(stack->items, new_size * stack->item_size);
+	new_mry = nb_realloc(stack->items, new_size * stack->item_size);
 	if (!new_mry)
 		return false;
 

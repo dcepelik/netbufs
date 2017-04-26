@@ -1,9 +1,9 @@
 .PHONY: all clean metrics tests
 
 LIB=libcbor.a
-OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o error.o strbuf.o stream.o buf.o
-BENCHMARK_OBJS=serialize-bird.o parse.o array.o
-TESTS=test-stream test-adhoc
+OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o
+BENCHMARK_OBJS=serialize-bird.o parse.o
+TESTS=test-stream test-adhoc test-array
 BINS=cbordump benchmark
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
@@ -18,6 +18,9 @@ test-stream: test-stream.o $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 test-adhoc: test-adhoc.o $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+test-array: test-array.o $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 cbordump: cbordump.o $(OBJS)

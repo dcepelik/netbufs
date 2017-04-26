@@ -5,23 +5,39 @@
 #ifndef CBOR_H
 #define CBOR_H
 
-#include "error.h"
+#include "common.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
-#define CBOR_EXTRA_1B		24
-#define CBOR_EXTRA_2B		25
-#define CBOR_EXTRA_4B		26
-#define CBOR_EXTRA_8B		27
-#define CBOR_EXTRA_VAR_LEN	31
-
-/* temporarily here, move to internal.h */
-typedef unsigned char		byte_t;
-
 struct cbor_stream;
 struct buf;
+
+
+/*
+ * CBOR operation result flags
+ */
+enum cbor_err
+{
+	CBOR_ERR_OK,		/* no error */
+	CBOR_ERR_NOMEM,		/* unable to allocate memory */
+	CBOR_ERR_PARSE,		/* unable to parse input */
+	CBOR_ERR_ITEM,		/* unexpected item */
+	CBOR_ERR_EOF,		/* unexpected EOF */
+	CBOR_ERR_RANGE,		/* value is out of range */
+	CBOR_ERR_OPER,		/* invalid operation */
+	CBOR_ERR_NOFILE,	/* file not found */
+	CBOR_ERR_INDEF,		/* (in)definite-length item was unexpected */
+	CBOR_ERR_READ,		/* read()-related error */
+	CBOR_ERR_UNSUP,		/* operation not supported */
+	CBOR_ERR_NOMORE,	/* no more items */
+	CBOR_ERR_BREAK,		/* Break was hit */
+	CBOR_ERR_NITEMS,	/* Invalid number of items */
+};
+
+typedef enum cbor_err cbor_err_t;
 
 struct cbor_stream *cbor_stream_new(struct buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);

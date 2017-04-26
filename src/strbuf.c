@@ -13,7 +13,7 @@ static void strbuf_resize(struct strbuf *buf, size_t new_size)
 {
 	assert(new_size > 0);
 
-	buf->str = cbor_realloc(buf->str, new_size);
+	buf->str = nb_realloc(buf->str, new_size);
 
 	buf->size = new_size;
 	if (buf->len > buf->size - 1)
@@ -72,7 +72,7 @@ char *strbuf_strcpy(struct strbuf *buf)
 {
 	char *copy;
 
-	copy = cbor_malloc(buf->len + 1);
+	copy = nb_malloc(buf->len + 1);
 	strncpy(copy, buf->str, buf->len + 1);
 
 	return copy;

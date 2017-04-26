@@ -17,7 +17,7 @@ void buf_init(struct buf *buf)
 {
 	size_t size = 1024;
 
-	buf->buf = cbor_malloc(size);
+	buf->buf = nb_malloc(size);
 	TEMP_ASSERT(buf->buf);
 
 	buf->bufsize = size;
@@ -44,7 +44,7 @@ void buf_set_write_filter(struct buf *buf, filter_t *filter)
 
 void buf_free(struct buf *buf)
 {
-	cbor_free(buf->buf);
+	nb_free(buf->buf);
 }
 
 
@@ -257,7 +257,7 @@ static void buf_file_flush(struct buf *buf)
 
 static void buf_memory_close(struct buf *buf)
 {
-	cbor_free(buf->memory);
+	nb_free(buf->memory);
 }
 
 
@@ -282,7 +282,7 @@ static void buf_memory_flush(struct buf *buf)
 
 	if (buf->memory_len + buf->len > buf->memory_size) {
 		new_mry_size = MAX(2 * buf->memory_size, buf->bufsize);
-		buf->memory = cbor_realloc(buf->memory, new_mry_size);
+		buf->memory = nb_realloc(buf->memory, new_mry_size);
 		buf->memory_size = new_mry_size;
 	}
 
@@ -297,7 +297,7 @@ struct buf *buf_new(void)
 {
 	struct buf *buf;
 	
-	buf = cbor_malloc(sizeof(*buf));
+	buf = nb_malloc(sizeof(*buf));
 	if (buf)
 		buf_init(buf);
 
@@ -308,7 +308,7 @@ struct buf *buf_new(void)
 void buf_delete(struct buf *buf)
 {
 	buf_free(buf);
-	cbor_free(buf);
+	nb_free(buf);
 }
 
 

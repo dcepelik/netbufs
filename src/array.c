@@ -1,5 +1,6 @@
 #include "array.h"
 #include "memory.h"
+#include "util.h"
 
 
 struct array_header
@@ -16,7 +17,7 @@ static inline struct array_header *array_get_header(void *arr)
 }
 
 
-static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
+static void *resize(void *arr, size_t new_capacity, size_t item_size)
 {
 	size_t actual_size;
 	struct array_header *header = NULL;
@@ -26,10 +27,9 @@ static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
 
 	actual_size = sizeof(struct array_header) + new_capacity * item_size;
 
-	header = realloc_safe(header, actual_size);
+	header = nb_realloc(header, actual_size);
 	header->item_size = item_size;
 	header->capacity = new_capacity; 
-
 	return header + 1;
 
 }
@@ -37,25 +37,25 @@ static void *array_resize(void *arr, size_t new_capacity, size_t item_size)
 
 void *array_new(size_t init_capacity, size_t item_size)
 {
-	void *arr = array_resize(NULL, init_capacity, item_size);
+	void *arr = resize(NULL, init_capacity, item_size);
 	array_get_header(arr)->num_items = 0;
-	
 	return arr;
 }
 
 
-void *array_claim(void *arr, size_t num_items)
+void *array_push(void *arr, size_t num_items)
 {
 	struct array_header *header;
+	size_t capacity_reqd;
 
 	header = array_get_header(arr);
-	if (header->num_items + num_items > header->capacity) {
-		arr = array_resize(arr, 2 * header->capacity, header->item_size);
+	capacity_reqd = header->num_items + num_items;
+	if (capacity_reqd > header->capacity) {
+		arr = resize(arr, MAX(capacity_reqd, 2 * header->capacity), header->item_size);
 		header = array_get_header(arr);
 	}
 
 	header->num_items += num_items;
-
 	return arr;
 }
 
