@@ -3,8 +3,8 @@
  * Read a BIRD dump into well-defined data structures for benchmarking.
  */
 
-#ifndef PARSE_H
-#define PARSE_H
+#ifndef PARSER_H
+#define PARSER_H
 
 #include "serialize.h"
 
@@ -19,8 +19,8 @@
 
 struct parser
 {
-	char *filename;		/* filename of an open file */
 	FILE *file;		/* open file */
+	char *filename;		/* filename of open file */
 	size_t line_no;		/* current line number */
 	size_t col_no;		/* current column number */
 	char *buf;		/* input buffer */

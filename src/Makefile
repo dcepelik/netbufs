@@ -2,7 +2,7 @@
 
 LIB=libcbor.a
 OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o
-BENCHMARK_OBJS=serialize-bird.o parse.o
+BENCHMARK_OBJS=serialize-bird.o parser.o
 TESTS=test-stream test-adhoc test-array
 BINS=cbordump benchmark
 

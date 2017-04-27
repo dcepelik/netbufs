@@ -29,6 +29,21 @@ static inline byte_t ipv4_get_byte(ipv4_t *ip, size_t i)
 	return ip_ptr[i];
 }
 
+enum as_path_flag
+{
+	AS_PATH_FLAG_END = -1,
+	AS_PATH_FLAG_LBRACE = -2,
+	AS_PATH_FLAG_RBRACE = -3
+};
+
+enum rte_src
+{
+	RTE_SRC_INTERNAL,
+	RTE_SRC_EXTERNAL,
+	RTE_SRC_U, /* TODO Ask MM */
+	RTE_SRC_WHO_KNOWS,
+};
+
 enum bgp_origin
 {
 	BGP_ORIGIN_IGP,
@@ -44,34 +59,52 @@ enum rte_attr_type
 	RTE_ATTR_TYPE_BGP_LOCAL_PREF,
 	RTE_ATTR_TYPE_BGP_COMMUNITY,
 	RTE_ATTR_TYPE_BGP_AGGREGATOR,
+	RTE_ATTR_TYPE_OTHER,
 };
 
 /*
- * BGP boolean flags: key-values pairs (flag, as_no).
+ * BGP boolean flags: key-value pairs (flag, as_no)
  */
 struct bgp_cflag
 {
-	int flag;		/* the flag being set */
-	int as_no;		/* number of AS that set it */
+	uint32_t flag;		/* the flag being set */
+	uint32_t as_no;		/* number of AS that set it */
 };
 
+/*
+ * BGP aggregator
+ */
 struct bgp_aggr
 {
 	ipv4_t ip;
-	int as_no;
+	uint32_t as_no;
 };
 
+/*
+ * Key-value pair for other route attributes (unknown to Bird)
+ */
+struct kvp
+{
+	char *key;
+	char *value;
+};
+
+/*
+ * Routing table attribute
+ */
 struct rte_attr
 {
 	enum rte_attr_type type;		/* type of the attribute */
+	bool tflag;				/* [t] flag on this attr? */
 
 	union {
 		int *bgp_as_path;		/* BGP.as_path */
 		enum bgp_origin bgp_origin;	/* BGP.orogin */
 		ipv4_t bgp_next_hop;		/* BGP.next_hop */
-		int bgp_local_pref;		/* BGP.local_pref */
+		uint32_t bgp_local_pref;	/* BGP.local_pref */
 		struct bgp_cflag *cflags;	/* BGP.community */
-		struct bgp_aggr aggr;
+		struct bgp_aggr aggr;		/* BGP.aggregator */
+		struct kvp other_attr;		/* other attributes */
 	};
 };
 
@@ -80,20 +113,25 @@ enum rte_type
 	RTE_TYPE_BGP = 1,
 	RTE_TYPE_UNICAST = 2,
 	RTE_TYPE_UNIV = 4,
+	RTE_TYPE_STATIC = 8,
 };
 
 struct rte
 {
 	ipv4_t netaddr;
-	int netmask;
+	uint32_t netmask;
 	ipv4_t gwaddr;
 	char *ifname;
 	struct tm uplink;
+	bool uplink_from_valid;
 	ipv4_t uplink_from;
 	struct rte_attr *attrs;
 	size_t num_attrs;
 	size_t attrs_size;
 	enum rte_type type;
+	bool as_no_valid;
+	uint32_t as_no;
+	enum rte_src src;
 };
 
 static inline struct rte_attr *rte_add_attr(struct rte *rte, enum rte_attr_type type)
@@ -114,6 +152,7 @@ static inline struct rte_attr *rte_add_attr(struct rte *rte, enum rte_attr_type 
 
 struct rt
 {
+	char *version_str;	/* Bird version string */
 	struct rte *entries;	/* entries of the routing table */
 	size_t size;		/* size of *entries */
 	size_t count;		/* number of entries in *entries */

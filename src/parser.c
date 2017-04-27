@@ -1,4 +1,4 @@
-#include "parse.h"
+#include "parser.h"
 #include "util.h"
 #include "memory.h"
 #include "debug.h"
@@ -12,7 +12,7 @@
 #include <time.h>
 
 
-static void parser_fill_buffer(struct parser *p)
+static void fill_buffer(struct parser *p)
 {
 	p->avail = fread(p->buf, sizeof(char), PARSER_BUF_SIZE, p->file);
 	p->offset = 0;
@@ -33,7 +33,7 @@ void parser_init(struct parser *p, char *filename)
 	p->buf = malloc(PARSER_BUF_SIZE);
 	p->unget = '\0';
 
-	parser_fill_buffer(p);
+	fill_buffer(p);
 }
 
 
@@ -67,7 +67,7 @@ static char parser_getc(struct parser *p)
 	}
 
 	if (p->offset >= p->avail) {
-		parser_fill_buffer(p);
+		fill_buffer(p);
 
 		if (p->avail == 0)
 			return '\0';
@@ -92,10 +92,10 @@ static void parser_ungetc(struct parser *p, char c)
 	assert(p->unget == '\0');
 
 	if (c != '\0') {
-		if (c == '{') {
-			fprintf(stderr, "%lu\n", p->line_no);
-			assert(false);
-		}
+		//if (c == '{') {
+		//	fprintf(stderr, "%lu\n", p->line_no);
+		//	assert(false);
+		//}
 
 		p->unget = c;
 	}
@@ -172,7 +172,7 @@ static void match_eol(struct parser *p)
 }
 
 
-static size_t parser_try_parse_int(struct parser *p, int *n)
+static size_t parser_try_parse_int(struct parser *p, uint32_t *n)
 {
 	char c;
 	size_t num_digits = 0;
@@ -195,7 +195,7 @@ static size_t parser_try_parse_int(struct parser *p, int *n)
 }
 
 
-static void parse_int(struct parser *p, int *n)
+static void parse_u32(struct parser *p, uint32_t *n)
 {
 	size_t num_digits;
 
@@ -276,16 +276,35 @@ static char *parse_key(struct parser *p)
 }
 
 
+static char *parse_version_str(struct parser *p)
+{
+	return parse_key(p); /* same rules as for keys apply here */
+}
+
+
+static int is_not_eol(int c)
+{
+	return c != '\n' && c != '\0';
+}
+
+
+static char *parse_line(struct parser *p)
+{
+	eat_ws(p);
+	return parser_try_accum(p, is_not_eol);
+}
+
+
 static void parse_ipv4(struct parser *p, ipv4_t *ip)
 {
 	int i;
-	int b;
+	uint32_t b;
 
 	ipv4_init(ip);
 	eat_ws(p);
 
 	for (i = 0; i < 4; i++) {
-		parse_int(p, &b);
+		parse_u32(p, &b);
 		ipv4_set_byte(ip, i, b);
 
 		if (i < 3)
@@ -296,27 +315,28 @@ static void parse_ipv4(struct parser *p, ipv4_t *ip)
 
 static void parse_time(struct parser *p, struct tm *tm)
 {
+	uint32_t hour;
+	uint32_t min;
+	uint32_t sec;
+
 	tm->tm_year = tm->tm_mon = tm->tm_mday = 0;
 	tm->tm_isdst = -1;
 
-	parse_int(p, &tm->tm_hour);
+	parse_u32(p, &hour);
 	match(p, ":");
-	parse_int(p, &tm->tm_min);
+	parse_u32(p, &min);
 	match(p, ":");
-	parse_int(p, &tm->tm_sec);
+	parse_u32(p, &sec);
+
+	assert(hour >= 0 && min >= 0 && sec >= 0);
+
+	tm->tm_hour = hour;
+	tm->tm_min = min;
+	tm->tm_sec = sec;
 }
 
 
-static void parser_attr_ignore(struct parser *p, struct rte *rte)
-{
-	(void) p;
-	(void) rte;
-
-	parser_skip_line(p);
-}
-
-
-static void parse_attr_type(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_type(struct parser *p, struct rte *rte)
 {
 	char *word;
 
@@ -328,14 +348,18 @@ static void parse_attr_type(struct parser *p, struct rte *rte)
 			rte->type |= RTE_TYPE_UNICAST;
 		else if (strcmp(word, "univ") == 0)
 			rte->type |= RTE_TYPE_UNIV;
+		else if (strcmp(word, "static") == 0)
+			rte->type |= RTE_TYPE_STATIC;
 		else
 			error(p, "Unknown value of Type attribute: %s\n", word);
 	}
-	parser_skip_line(p);
+
+	match_eol(p);
+	return NULL;
 }
 
 
-static void parse_attr_bgp_origin(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_origin(struct parser *p, struct rte *rte)
 {
 	struct rte_attr *attr;
 	char *origin;
@@ -354,15 +378,17 @@ static void parse_attr_bgp_origin(struct parser *p, struct rte *rte)
 			origin);
 
 	match_eol(p);
+	return attr;
 }
 
 
-static void parse_attr_bgp_as_path(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_as_path(struct parser *p, struct rte *rte)
 {
-	int as_no;
+	uint32_t as_no;
 	size_t num_items = 0;
 	size_t size = PARSER_ARRAY_INIT_SIZE;
 	struct rte_attr *attr;
+	char c;
 
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_AS_PATH);
 	attr->bgp_as_path = NULL;
@@ -371,6 +397,7 @@ array_resize:
 	attr->bgp_as_path = realloc_safe(attr->bgp_as_path, size * sizeof(as_no));
 
 	while (parser_try_parse_int(p, &as_no) > 0) {
+write_as_no:
 		attr->bgp_as_path[num_items++] = as_no;
 
 		if (num_items == size) {
@@ -379,35 +406,51 @@ array_resize:
 		}
 	}
 
+	eat_ws(p);
+
+	c = parser_getc(p);
+	if (c == '{' || c == '}') {
+		as_no = (c == '{') ? AS_PATH_FLAG_LBRACE : AS_PATH_FLAG_RBRACE;
+		goto write_as_no;
+	}
+	else {
+		parser_ungetc(p, c);
+	}
+
 	/* there's room for the extra item */
-	attr->bgp_as_path[num_items] = -1;
+	attr->bgp_as_path[num_items] = AS_PATH_FLAG_END;
 
 	match_eol(p);
+	return attr;
 }
 
 
-static void parse_attr_bgp_next_hop(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_next_hop(struct parser *p, struct rte *rte)
 {
 	struct rte_attr *attr;
+
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_NEXT_HOP);
 	parse_ipv4(p, &attr->bgp_next_hop);
 	match_eol(p);
+	return attr;
 }
 
 
-static void parse_attr_bgp_local_pref(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_local_pref(struct parser *p, struct rte *rte)
 {
 	struct rte_attr *attr;
+
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_LOCAL_PREF);
-	parse_int(p, &attr->bgp_local_pref);
+	parse_u32(p, &attr->bgp_local_pref);
 	match_eol(p);
+	return attr;
 }
 
 
-static void parse_attr_bgp_community(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_community(struct parser *p, struct rte *rte)
 {
-	struct bgp_cflag *cflag;
 	struct rte_attr *attr;
+	struct bgp_cflag *cflag;
 
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_COMMUNITY);
 	attr->cflags = array_new(2, sizeof(*attr->cflags));
@@ -418,43 +461,58 @@ static void parse_attr_bgp_community(struct parser *p, struct rte *rte)
 		cflag = &attr->cflags[array_size(attr->cflags) - 1];
 
 		match(p, "(");
-		parse_int(p, &cflag->flag);
+		parse_u32(p, &cflag->flag);
 		match(p, ",");
-		parse_int(p, &cflag->as_no);
+		parse_u32(p, &cflag->as_no);
 		match(p, ")");
 
 		eat_ws(p);
 	}
 
 	match_eol(p);
+	return attr;
 }
 
 
-static void parse_attr_bgp_aggregator(struct parser *p, struct rte *rte)
+static struct rte_attr *parse_attr_bgp_aggregator(struct parser *p, struct rte *rte)
 {
 	struct rte_attr *attr;
 
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_AGGREGATOR);
 	parse_ipv4(p, &attr->aggr.ip);
 	match_ws(p, "AS");
-	parse_int(p, &attr->aggr.as_no);
-
+	parse_u32(p, &attr->aggr.as_no);
 
 	match_eol(p);
+	return attr;
+}
+
+
+static struct rte_attr *parse_attr_other(struct parser *p, char *key, struct rte *rte)
+{
+	struct rte_attr *attr;
+
+	attr = rte_add_attr(rte, RTE_ATTR_TYPE_OTHER);
+	attr->other_attr.key = key;
+	attr->other_attr.value = parse_line(p);
+
+	match_eol(p);
+	return attr;
 }
 
 
 static void parse_rte_attrs(struct parser *p, struct rte *rte)
 {
-	char c;
-	char *key;
-	size_t i;
 	struct rte_attr *attr;
+	char *key;
 	bool handled;
+	bool tflag;
+	char c;
+	size_t i;
 
 	struct {
 		char *key;
-		void (*handler)(struct parser *p, struct rte *rte);
+		struct rte_attr *(*handler)(struct parser *p, struct rte *rte);
 	} handlers[] = {
 		 { .key = "Type", .handler = parse_attr_type },
 		 { .key = "BGP.origin", .handler = parse_attr_bgp_origin },
@@ -463,12 +521,6 @@ static void parse_rte_attrs(struct parser *p, struct rte *rte)
 		 { .key = "BGP.local_pref", .handler = parse_attr_bgp_local_pref },
 		 { .key = "BGP.community", .handler = parse_attr_bgp_community },
 		 { .key = "BGP.aggregator", .handler = parse_attr_bgp_aggregator },
-		 { .key = "BGP.atomic_aggr", .handler = parser_attr_ignore },
-		 { .key = "BGP.med", .handler = parser_attr_ignore },
-		 { .key = "BGP.80", .handler = parser_attr_ignore },
-		 { .key = "BGP.20", .handler = parser_attr_ignore },
-		 { .key = "BGP.15", .handler = parser_attr_ignore },
-		 { .key = "BGP.ext_community", .handler = parser_attr_ignore },
 	};
 
 	while ((c = parser_getc(p)) != '\0') {
@@ -480,39 +532,87 @@ static void parse_rte_attrs(struct parser *p, struct rte *rte)
 		key = parse_key(p);
 		eat_ws(p);
 
-		if (parser_peek(p) == '[')
-			match(p, "[t]");
-		else
+		if (parser_peek(p) == '[') {
+			match(p, "[t]:");
+			tflag = true;
+		}
+		else {
 			match(p, ":");
+			tflag = false;
+		}
+		eat_ws(p);
 
 		handled = false;
-		for (i = 0; i <= ARRAY_SIZE(handlers); i++) {
+		for (i = 0; i < ARRAY_SIZE(handlers); i++) {
 			if (strcmp(key, handlers[i].key) == 0) {
-				handlers[i].handler(p, rte);
+				attr = handlers[i].handler(p, rte);
 				handled = true;
 				break;
 			}
 		}
 
 		if (!handled)
-			error(p, "attr '%s' not supported\n", key);
+			attr = parse_attr_other(p, key, rte);
+
+		if (!attr && tflag)
+			error(p, "[t]-flag on required attribute unsupported\n");
+
+		if (attr)
+			attr->tflag = tflag;
+	}
+}
+
+
+static void parse_as_name(struct parser *p, struct rte *rte)
+{
+	char c;
+
+	if (parser_peek(p) == 'A') {
+		match(p, "AS");
+		parse_u32(p, &rte->as_no);
+		rte->as_no_valid = true;
+	}
+	else {
+		rte->as_no_valid = false;
+	}
+
+	c = parser_getc(p);
+	switch (c) {
+	case 'i':
+		rte->src = RTE_SRC_INTERNAL;
+		break;
+	case 'e':
+		rte->src = RTE_SRC_EXTERNAL;
+		break;
+	case 'u':
+		rte->src = RTE_SRC_U;
+		break;
+	case '?':
+		rte->src = RTE_SRC_WHO_KNOWS;  
+		break;
+	default:
+		error(p, "Unknown AS number suffix: '%c'\n", c);
 	}
 }
 
 
 static bool parse_rte(struct parser *p, struct rte *rte)
 {
+	char c;
+	char *as_name;
+
 	rte->attrs = NULL;
 	rte->attrs_size = 0;
 	rte->num_attrs = 0;
 	rte->ifname = NULL;
+	rte->uplink_from_valid = false;
 
 	if (parser_peek(p) == '\0')
 		return false;
 
 	parse_ipv4(p, &rte->netaddr);
 	match(p, "/");
-	parse_int(p, &rte->netmask);
+	parse_u32(p, &rte->netmask);
 	eat_ws(p);
 
 	match_ws(p, "via");
@@ -533,14 +633,28 @@ static bool parse_rte(struct parser *p, struct rte *rte)
 		eat_ws(p);
 		parse_time(p, &rte->uplink);
 
+		rte->uplink_from_valid = true;
 		match_ws(p, "from");
 		parse_ipv4(p, &rte->uplink_from);
 	}
 
 	match_ws(p, "]");
 	
-	/* TODO I don't know the meaning of remaining data */
-	parser_skip_line(p);
+	/* NOTE: I'm skipping the "* (100/?)" part here */
+	while ((c = parser_getc(p)) != '\0') {
+		if (c == '\n') {
+			parser_ungetc(p, c);
+			break;
+		}
+		if (c == '[')
+			break;
+	}
+
+	if (c == '[') {
+		parse_as_name(p, rte);
+		match(p, "]");
+	}
+	match_eol(p);
 
 	parse_rte_attrs(p, rte);
 
@@ -550,7 +664,9 @@ static bool parse_rte(struct parser *p, struct rte *rte)
 
 void parser_parse_rt(struct parser *p, struct rt *rt)
 {
-	match(p, "BIRD 1.5.0 ready.");
+	match(p, "BIRD ");
+	rt->version_str = parse_version_str(p); /* or haskellogue? */
+	match(p, " ready.");
 	match_eol(p);
 
 	rt->entries = NULL;

@@ -1,4 +1,3 @@
-#include "parse.h"
 #include "serialize.h"
 #include "strbuf.h"
 #include "util.h"
@@ -30,13 +29,42 @@ static size_t print_ipv4_nm(struct strbuf *sb, ipv4_t *ip, byte_t netmask)
 
 static void print_time(struct strbuf *sb, struct tm *tm)
 {
-	strbuf_printf(sb, "%u:%u:%u", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	strbuf_printf(sb, "%02u:%02u:%02u", tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
+
+static const char *attr_key(struct rte_attr *attr)
+{
+	switch (attr->type) {
+	case RTE_ATTR_TYPE_BGP_AS_PATH:
+		return "BGP.as_path";
+	case RTE_ATTR_TYPE_BGP_ORIGIN:
+		return "BGP.origin";
+	case RTE_ATTR_TYPE_BGP_NEXT_HOP:
+		return "BGP.next_hop";
+	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
+		return "BGP.local_pref";
+	case RTE_ATTR_TYPE_BGP_COMMUNITY:
+		return "BGP.community";
+	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
+		return "BGP.aggregator";
+	case RTE_ATTR_TYPE_OTHER:
+		return (const char *)attr->other_attr.key;
+	}
+
+	return NULL;
+}
+
+
+static void print_attr_key(struct strbuf *sb, struct rte_attr *attr)
+{
+	strbuf_printf(sb, "\t%s%s: ", attr_key(attr), attr->tflag ? " [t]" : "");
 }
 
 
 static void print_attr_bgp_origin(struct strbuf *sb, struct rte_attr *attr)
 {
-	strbuf_printf(sb, "\tBGP.origin: ");
+	print_attr_key(sb, attr);
 	switch (attr->bgp_origin) {
 	case BGP_ORIGIN_IGP:
 		strbuf_printf(sb, "IGP");
@@ -55,16 +83,26 @@ static void print_attr_bgp_origin(struct strbuf *sb, struct rte_attr *attr)
 static void print_attr_bgp_as_path(struct strbuf *sb, struct rte_attr *attr)
 {
 	size_t i;
-	strbuf_printf(sb, "\tBGP.as_path: ");
-	for (i = 0; attr->bgp_as_path[i] >= 0; i++)
-		strbuf_printf(sb, "%u ", attr->bgp_as_path[i]);
+	print_attr_key(sb, attr);
+	for (i = 0; attr->bgp_as_path[i] != AS_PATH_FLAG_END; i++) {
+		switch (attr->bgp_as_path[i]) {
+		case AS_PATH_FLAG_LBRACE:
+			strbuf_puts(sb, "{ ");
+			break;
+		case AS_PATH_FLAG_RBRACE:
+			strbuf_puts(sb, "} ");
+			break;
+		default:
+			strbuf_printf(sb, "%u ", attr->bgp_as_path[i]);
+		}
+	}
 	strbuf_putc(sb, '\n');
 }
 
 
 static void print_attr_bgp_next_hop(struct strbuf *sb, struct rte_attr *attr)
 {
-	strbuf_printf(sb, "\tBGP.next_hop: ");
+	print_attr_key(sb, attr);
 	print_ipv4(sb, &attr->bgp_next_hop);
 	strbuf_putc(sb, '\n');
 }
@@ -72,14 +110,15 @@ static void print_attr_bgp_next_hop(struct strbuf *sb, struct rte_attr *attr)
 
 static void print_attr_bgp_local_pref(struct strbuf *sb, struct rte_attr *attr)
 {
-	strbuf_printf(sb, "\tBGP.local_pref: %i\n", attr->bgp_local_pref);
+	print_attr_key(sb, attr);
+	strbuf_printf(sb, "%i\n", attr->bgp_local_pref);
 }
 
 
 static void print_attr_bgp_community(struct strbuf *sb, struct rte_attr *attr)
 {
 	size_t i;
-	strbuf_puts(sb, "\tBGP.community: ");
+	print_attr_key(sb, attr);
 	for (i = 0; i < array_size(attr->cflags); i++)
 		strbuf_printf(sb, "(%i,%i) ", attr->cflags[i].flag, attr->cflags[i].as_no);
 	strbuf_putc(sb, '\n');
@@ -88,9 +127,20 @@ static void print_attr_bgp_community(struct strbuf *sb, struct rte_attr *attr)
 
 static void print_attr_bgp_aggregator(struct strbuf *sb, struct rte_attr *attr)
 {
-	strbuf_puts(sb, "\tBGP.aggregator: ");
+	print_attr_key(sb, attr);
 	print_ipv4(sb, &attr->aggr.ip);
-	strbuf_printf(sb, " AS%i\n", attr->aggr.as_no);
+	strbuf_printf(sb, " AS%u\n", attr->aggr.as_no);
+}
+
+
+static void print_attr_other(struct strbuf *sb, struct rte_attr *attr)
+{
+	if (!attr->other_attr.value)
+		attr->other_attr.value = "";
+
+	print_attr_key(sb, attr);
+	strbuf_puts(sb, attr->other_attr.value);
+	strbuf_putc(sb, '\n');
 }
 
 
@@ -115,9 +165,38 @@ static void print_rte_attr(struct strbuf *sb, struct rte_attr *attr)
 	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
 		print_attr_bgp_aggregator(sb, attr);
 		break;
+	case RTE_ATTR_TYPE_OTHER:
+		print_attr_other(sb, attr);
+		break;
 	default:
 		die("Unsupported attribute type.\n");
 	}
+}
+
+
+static void print_rte_src_as(struct strbuf *sb, struct rte *rte)
+{
+	char c;
+
+	switch (rte->src) {
+	case RTE_SRC_INTERNAL:
+		c = 'i';
+		break;
+	case RTE_SRC_EXTERNAL:
+		c = 'e';
+		break;
+	case RTE_SRC_U:
+		c = 'u';
+		break;
+	case RTE_SRC_WHO_KNOWS:
+		c = '?';
+		break;
+	}
+
+	if (rte->as_no_valid)
+		strbuf_printf(sb, "[AS%u%c]", rte->as_no, c);
+	else
+		strbuf_printf(sb, "[%c]", c);
 }
 
 
@@ -127,8 +206,8 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 
 	i = print_ipv4_nm(sb, &rte->netaddr, rte->netmask);
 
-	/* pad IP and netmask to the left */
-	for (; i < 19; i++)
+	/* align IP and netmask to the left */
+	for (; i <= 17; i++)
 		strbuf_putc(sb, ' ');
 
 	strbuf_puts(sb, " via ");
@@ -136,10 +215,15 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 	strbuf_printf(sb, " on %s", rte->ifname);
 	strbuf_puts(sb, " [uplink ");
 	print_time(sb, &rte->uplink);
-	strbuf_puts(sb, " from ");
-	print_ipv4(sb, &rte->uplink_from);
-	strbuf_puts(sb, "]");
-	strbuf_puts(sb, " * (100/?) ...\n"); /* TODO */
+	if (rte->uplink_from_valid) {
+		strbuf_puts(sb, " from ");
+		print_ipv4(sb, &rte->uplink_from);
+	}
+	strbuf_putc(sb, ']');
+
+	strbuf_puts(sb, " * (100/?) "); /* NOTE: this part is fishy */
+	print_rte_src_as(sb, rte);
+	strbuf_putc(sb, '\n');
 
 	strbuf_printf(sb, "\tType: ");
 	if (rte->type & RTE_TYPE_BGP)
@@ -148,6 +232,8 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 		strbuf_printf(sb, "unicast ");
 	if (rte->type & RTE_TYPE_UNIV)
 		strbuf_printf(sb, "univ ");
+	if (rte->type & RTE_TYPE_STATIC)
+		strbuf_printf(sb, "static ");
 	strbuf_putc(sb, '\n');
 
 	for (i = 0; i < rte->num_attrs; i++)
@@ -163,6 +249,7 @@ void serialize_bird(struct rt *rt)
 
 	strbuf_init(&sb, 1024);
 
+	strbuf_printf(&sb, "BIRD %s ready.\n", rt->version_str);
 	for (i = 0; i < rt->count; i++)
 		print_rte(&sb, &rt->entries[i]);
 
