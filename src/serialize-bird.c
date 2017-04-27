@@ -76,6 +76,24 @@ static void print_attr_bgp_local_pref(struct strbuf *sb, struct rte_attr *attr)
 }
 
 
+static void print_attr_bgp_community(struct strbuf *sb, struct rte_attr *attr)
+{
+	size_t i;
+	strbuf_puts(sb, "\tBGP.community: ");
+	for (i = 0; i < array_size(attr->cflags); i++)
+		strbuf_printf(sb, "(%i,%i) ", attr->cflags[i].flag, attr->cflags[i].as_no);
+	strbuf_putc(sb, '\n');
+}
+
+
+static void print_attr_bgp_aggregator(struct strbuf *sb, struct rte_attr *attr)
+{
+	strbuf_puts(sb, "\tBGP.aggregator: ");
+	print_ipv4(sb, &attr->aggr.ip);
+	strbuf_printf(sb, " AS%i\n", attr->aggr.as_no);
+}
+
+
 static void print_rte_attr(struct strbuf *sb, struct rte_attr *attr)
 {
 	switch (attr->type) {
@@ -90,6 +108,12 @@ static void print_rte_attr(struct strbuf *sb, struct rte_attr *attr)
 		break;
 	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
 		print_attr_bgp_local_pref(sb, attr);
+		break;
+	case RTE_ATTR_TYPE_BGP_COMMUNITY:
+		print_attr_bgp_community(sb, attr);
+		break;
+	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
+		print_attr_bgp_aggregator(sb, attr);
 		break;
 	default:
 		die("Unsupported attribute type.\n");
