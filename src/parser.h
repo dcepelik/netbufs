@@ -8,11 +8,6 @@
 
 #include "benchmark.h"
 
-#define PARSER_RT_INIT_SIZE	256
-#define PARSER_STR_INIT_SIZE	8
-#define PARSER_ARRAY_INIT_SIZE	4
-#define PARSER_BUF_SIZE		4096
-
 #include <stdio.h>
 #include <stdlib.h>
 

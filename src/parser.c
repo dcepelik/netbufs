@@ -1,7 +1,9 @@
-#include "parser.h"
-#include "util.h"
-#include "memory.h"
+#include "array.h"
 #include "debug.h"
+#include "memory.h"
+#include "parser.h"
+#include "strbuf.h"
+#include "util.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -10,6 +12,11 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+
+#define PARSER_RT_INIT_SIZE	256
+#define PARSER_STR_INIT_SIZE	8
+#define PARSER_ARRAY_INIT_SIZE	4
+#define PARSER_BUF_SIZE		4096
 
 
 void parser_init(struct parser *p, struct buf *buf)
@@ -90,7 +97,6 @@ static void match(struct parser *p, char *str)
 
 	for (i = 0; str[i] != '\0'; i++) {
 		c = parser_getc(p);
-
 		if (c == BUF_EOF || c != str[i])
 			error(p, "unexpected '%c', '%c' was expected\n",
 				c, str[i]);
@@ -159,36 +165,28 @@ static void parse_u32(struct parser *p, uint32_t *n)
 
 static char *parser_try_accum(struct parser *p, int (*predicate)(int c))
 {
-	size_t len = 0;
-	size_t size = PARSER_STR_INIT_SIZE;
+	struct strbuf sb;
+	char *word;
 	char c;
-	char *word = NULL;
 
+	strbuf_init(&sb, PARSER_STR_INIT_SIZE);
 	eat_ws(p);
 
-resize_word:
-	word = realloc_safe(word, size);
-
 	while ((c = parser_getc(p)) != BUF_EOF) {
-		if (predicate(c)) {
-			word[len++] = c;
-			if (len == size) {
-				size *= 2;
-				goto resize_word;
-			}
-		}
-		else {
+		if (!predicate(c)) {
 			parser_ungetc(p, c);
 			break;
 		}
+
+		strbuf_putc(&sb, c);
 	}
 
-	if (len == 0) {
-		free(word);
-		return NULL;
-	}
+	if (strbuf_strlen(&sb) == 0)
+		word = NULL;
+	else
+		word = strbuf_strcpy(&sb);
 
-	word[len] = '\0';
+	strbuf_free(&sb);
 	return word;
 }
 
@@ -335,25 +333,17 @@ static struct rte_attr *parse_attr_bgp_origin(struct parser *p, struct rte *rte)
 static struct rte_attr *parse_attr_bgp_as_path(struct parser *p, struct rte *rte)
 {
 	uint32_t as_no;
-	size_t num_items = 0;
 	size_t size = PARSER_ARRAY_INIT_SIZE;
 	struct rte_attr *attr;
 	char c;
 
 	attr = rte_add_attr(rte, RTE_ATTR_TYPE_BGP_AS_PATH);
-	attr->bgp_as_path = NULL;
+	attr->bgp_as_path = array_new(PARSER_ARRAY_INIT_SIZE, sizeof(*attr->bgp_as_path));
 
-array_resize:
-	attr->bgp_as_path = realloc_safe(attr->bgp_as_path, size * sizeof(as_no));
-
+go_again:
 	while (parser_try_parse_int(p, &as_no) > 0) {
-write_as_no:
-		attr->bgp_as_path[num_items++] = as_no;
-
-		if (num_items == size) {
-			size *= 2;
-			goto array_resize;
-		}
+		attr->bgp_as_path = array_push(attr->bgp_as_path, 1);
+		attr->bgp_as_path[array_size(attr->bgp_as_path) - 1] = as_no;
 	}
 
 	eat_ws(p);
@@ -361,14 +351,13 @@ write_as_no:
 	c = parser_getc(p);
 	if (c == '{' || c == '}') {
 		as_no = (c == '{') ? AS_PATH_FLAG_LBRACE : AS_PATH_FLAG_RBRACE;
-		goto write_as_no;
+		attr->bgp_as_path = array_push(attr->bgp_as_path, 1);
+		attr->bgp_as_path[array_size(attr->bgp_as_path) - 1] = as_no;
+		goto go_again;
 	}
 	else {
 		parser_ungetc(p, c);
 	}
-
-	/* there's room for the extra item */
-	attr->bgp_as_path[num_items] = AS_PATH_FLAG_END;
 
 	match_eol(p);
 	return attr;
@@ -546,19 +535,22 @@ static void parse_as_name(struct parser *p, struct rte *rte)
 }
 
 
-static bool parse_rte(struct parser *p, struct rte *rte)
+static bool parse_rte(struct parser *p, struct rt *rt)
 {
+	struct rte *rte;
 	char c;
-	char *as_name;
+
+	if (parser_peek(p) == BUF_EOF)
+		return false;
+
+	rt->entries = array_push(rt->entries, 1);
+	rte = rt->entries + array_size(rt->entries) - 1; /* TODO! */
 
 	rte->attrs = NULL;
 	rte->attrs_size = 0;
 	rte->num_attrs = 0;
 	rte->ifname = NULL;
 	rte->uplink_from_valid = false;
-
-	if (parser_peek(p) == BUF_EOF)
-		return false;
 
 	parse_ipv4(p, &rte->netaddr);
 	match(p, "/");
@@ -619,18 +611,7 @@ void parser_parse_rt(struct parser *p, struct rt *rt)
 	match(p, " ready.");
 	match_eol(p);
 
-	rt->entries = NULL;
-	rt->count = 0;
-	rt->size = PARSER_RT_INIT_SIZE;
+	rt->entries = array_new(256, sizeof(*rt->entries));
 
-resize_table:
-	rt->entries = realloc_safe(rt->entries, rt->size * sizeof(rt->entries[0]));
-
-	while (parse_rte(p, &rt->entries[rt->count])) {
-		rt->count++;
-		if (rt->count == rt->size) {
-			rt->size *= 2;
-			goto resize_table;
-		}
-	}
+	while (parse_rte(p, rt)) ;
 }

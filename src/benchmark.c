@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 	parser_init(&p, buf);
 	parser_parse_rt(&p, &rt);
 
-	printf("Routing table loaded with %lu entries\n", rt.count);
+	printf("Routing table loaded with %lu entries\n", array_size(rt.entries));
 	printf("Transferring data using method '%s'\n", method);
 
 	if (strcmp(method, "bird") == 0) {

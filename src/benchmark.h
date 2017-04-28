@@ -154,8 +154,6 @@ struct rt
 {
 	char *version_str;	/* Bird version string */
 	struct rte *entries;	/* entries of the routing table */
-	size_t size;		/* size of *entries */
-	size_t count;		/* number of entries in *entries */
 };
 
 

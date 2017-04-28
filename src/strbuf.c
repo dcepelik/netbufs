@@ -72,9 +72,9 @@ char *strbuf_strcpy(struct strbuf *buf)
 {
 	char *copy;
 
+	buf->str[buf->len] = '\0';
 	copy = nb_malloc(buf->len + 1);
 	strncpy(copy, buf->str, buf->len + 1);
-
 	return copy;
 }
 

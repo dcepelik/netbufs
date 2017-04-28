@@ -83,7 +83,7 @@ static void print_attr_bgp_as_path(struct strbuf *sb, struct rte_attr *attr)
 	size_t i;
 
 	print_attr_key(sb, attr);
-	for (i = 0; attr->bgp_as_path[i] != AS_PATH_FLAG_END; i++) {
+	for (i = 0; i < array_size(attr->bgp_as_path); i++) {
 		switch (attr->bgp_as_path[i]) {
 		case AS_PATH_FLAG_LBRACE:
 			strbuf_puts(sb, "{ ");
@@ -270,7 +270,7 @@ void serialize_bird(struct rt *rt)
 	strbuf_init(&sb, 1024);
 
 	strbuf_printf(&sb, "BIRD %s ready.\n", rt->version_str);
-	for (i = 0; i < rt->count; i++)
+	for (i = 0; i < array_size(rt->entries); i++)
 		print_rte(&sb, &rt->entries[i]);
 
 	fprintf(stderr, strbuf_get_string(&sb));
