@@ -12,28 +12,11 @@
 #include <time.h>
 
 
-static void fill_buffer(struct parser *p)
+void parser_init(struct parser *p, struct buf *buf)
 {
-	p->avail = fread(p->buf, sizeof(char), PARSER_BUF_SIZE, p->file);
-	p->offset = 0;
-}
-
-
-void parser_init(struct parser *p, char *filename)
-{
-	p->file = fopen(filename, "r");
-	if (!p->file) {
-		die("cannot open input file '%s' for reading: %s\n",
-			filename, strerror(errno));
-	}
-
-	p->filename = filename;
+	p->buf = buf;
 	p->line_no = 1;
 	p->col_no = 1;
-	p->buf = malloc(PARSER_BUF_SIZE);
-	p->unget = '\0';
-
-	fill_buffer(p);
 }
 
 
@@ -52,64 +35,31 @@ static void error(struct parser *p, char *fmt, ...)
 
 void parser_free(struct parser *p)
 {
-	fclose(p->file);
 }
 
 
 static char parser_getc(struct parser *p)
 {
-	char c;
-
-	if (p->unget != '\0') {
-		c = p->unget;
-		p->unget = '\0';
-		goto out;
-	}
-
-	if (p->offset >= p->avail) {
-		fill_buffer(p);
-
-		if (p->avail == 0)
-			return '\0';
-	}
-
-	c = p->buf[p->offset++];
-
-	if (c == '\n') {
+	p->cur = buf_getc(p->buf);
+	if (p->cur == '\n') {
 		p->line_no++;
 		p->col_no = 0;
 	}
 
 	p->col_no++;
-
-out:
-	return p->cur = c;
+	return p->cur;
 }
 
 
 static void parser_ungetc(struct parser *p, char c)
 {
-	assert(p->unget == '\0');
-
-	if (c != '\0') {
-		//if (c == '{') {
-		//	fprintf(stderr, "%lu\n", p->line_no);
-		//	assert(false);
-		//}
-
-		p->unget = c;
-	}
+	buf_ungetc(p->buf, c);
 }
 
 
 static char parser_peek(struct parser *p)
 {
-	char c;
-
-	c = parser_getc(p);
-	parser_ungetc(p, c);
-
-	return c;
+	return buf_peek(p->buf);
 }
 
 
@@ -123,7 +73,7 @@ static void eat_ws(struct parser *p)
 {
 	char c;
 
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (c == ' ' || c == '\t')
 			continue;
 
@@ -141,7 +91,7 @@ static void match(struct parser *p, char *str)
 	for (i = 0; str[i] != '\0'; i++) {
 		c = parser_getc(p);
 
-		if (c == '\0' || c != str[i])
+		if (c == BUF_EOF || c != str[i])
 			error(p, "unexpected '%c', '%c' was expected\n",
 				c, str[i]);
 	}
@@ -159,7 +109,7 @@ static void parser_skip_line(struct parser *p)
 {
 	char c;
 
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (c == '\n')
 			break;
 	}
@@ -180,7 +130,7 @@ static size_t parser_try_parse_int(struct parser *p, uint32_t *n)
 	eat_ws(p);
 
 	*n = 0;
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (c >= '0' && c <= '9') {
 			*n = 10 * (*n) + (c - '0');
 			num_digits++;
@@ -219,7 +169,7 @@ static char *parser_try_accum(struct parser *p, int (*predicate)(int c))
 resize_word:
 	word = realloc_safe(word, size);
 
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (predicate(c)) {
 			word[len++] = c;
 			if (len == size) {
@@ -284,7 +234,7 @@ static char *parse_version_str(struct parser *p)
 
 static int is_not_eol(int c)
 {
-	return c != '\n' && c != '\0';
+	return c != '\n' && c != BUF_EOF;
 }
 
 
@@ -523,7 +473,7 @@ static void parse_rte_attrs(struct parser *p, struct rte *rte)
 		 { .key = "BGP.aggregator", .handler = parse_attr_bgp_aggregator },
 	};
 
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (c != '\t') {
 			parser_ungetc(p, c);
 			break;
@@ -607,7 +557,7 @@ static bool parse_rte(struct parser *p, struct rte *rte)
 	rte->ifname = NULL;
 	rte->uplink_from_valid = false;
 
-	if (parser_peek(p) == '\0')
+	if (parser_peek(p) == BUF_EOF)
 		return false;
 
 	parse_ipv4(p, &rte->netaddr);
@@ -641,7 +591,7 @@ static bool parse_rte(struct parser *p, struct rte *rte)
 	match_ws(p, "]");
 	
 	/* NOTE: I'm skipping the "* (100/?)" part here */
-	while ((c = parser_getc(p)) != '\0') {
+	while ((c = parser_getc(p)) != BUF_EOF) {
 		if (c == '\n') {
 			parser_ungetc(p, c);
 			break;
@@ -665,7 +615,7 @@ static bool parse_rte(struct parser *p, struct rte *rte)
 void parser_parse_rt(struct parser *p, struct rt *rt)
 {
 	match(p, "BIRD ");
-	rt->version_str = parse_version_str(p); /* or haskellogue? */
+	rt->version_str = parse_version_str(p);
 	match(p, " ready.");
 	match_eol(p);
 

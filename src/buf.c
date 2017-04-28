@@ -27,6 +27,7 @@ void buf_init(struct buf *buf)
 	buf->eof = false;
 	buf->read_filter = NULL;
 	buf->write_filter = NULL;
+	buf->ungetc = -1;
 }
 
 
@@ -56,10 +57,11 @@ static void buf_flush(struct buf *buf)
 }
 
 
-static void buf_fill(struct buf *buf)
+static bool buf_fill(struct buf *buf)
 {
 	buf->fill(buf);
 	buf->pos = 0;
+	return buf->len > 0;
 }
 
 
@@ -230,6 +232,40 @@ static cbor_err_t write_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
 	assert(nbytes == 0);
 
 	return CBOR_ERR_OK;
+}
+
+
+int buf_getc(struct buf *buf)
+{
+	char c;
+
+	if (buf->ungetc != BUF_EOF) {
+		c = buf->ungetc;
+		buf->ungetc = BUF_EOF;
+		return c;
+	}
+
+	if (buf->pos >= buf->len)
+		if (!buf_fill(buf))
+			return BUF_EOF;
+
+	return buf->buf[buf->pos++];
+}
+
+
+void buf_ungetc(struct buf *buf, int c)
+{
+	assert(buf->ungetc == BUF_EOF); /* don't override ungetc */
+	buf->ungetc = c;
+}
+
+
+int buf_peek(struct buf *buf)
+{
+	char c;
+	c = buf_getc(buf);
+	buf_ungetc(buf, c);
+	return c;
 }
 
 

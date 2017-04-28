@@ -6,7 +6,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "serialize.h"
+#include "benchmark.h"
 
 #define PARSER_RT_INIT_SIZE	256
 #define PARSER_STR_INIT_SIZE	8
@@ -19,19 +19,14 @@
 
 struct parser
 {
-	FILE *file;		/* open file */
-	char *filename;		/* filename of open file */
 	size_t line_no;		/* current line number */
 	size_t col_no;		/* current column number */
-	char *buf;		/* input buffer */
-	size_t offset;		/* offset within buf */
-	size_t avail;		/* length of content in buf */
-	char unget;		/* character to return on next parser_getc */
+	struct buf *buf;	/* input buffer */
 	char cur;		/* current character */
 };
 
 
-void parser_init(struct parser *p, char *filename);
+void parser_init(struct parser *p, struct buf *buf);
 void parser_parse_rt(struct parser *p, struct rt *rt);
 void parser_free(struct parser *p);
 

@@ -2,7 +2,7 @@
 
 LIB=libcbor.a
 OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o
-BENCHMARK_OBJS=serialize-bird.o parser.o
+BENCHMARK_OBJS=benchmark-bird.o parser.o
 TESTS=test-stream test-adhoc test-array
 BINS=cbordump benchmark
 
@@ -38,5 +38,5 @@ clean:
 metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc
 
-tests: $(TESTS)
+tests: $(TESTS) $(BINS)
 	cd ../tests; ./run-tests.sh

@@ -1,3 +1,8 @@
+/*
+ * decode:
+ * CBOR decoder
+ */
+
 #include "debug.h"
 #include "internal.h"
 #include "memory.h"
