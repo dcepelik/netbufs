@@ -58,7 +58,7 @@ static inline cbor_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, ui
 			"Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
-	if ((err = buf_read(cs->buf, bytes, nbytes)) != CBOR_ERR_OK)
+	if ((err = nb_buf_read(cs->buf, bytes, nbytes)) != CBOR_ERR_OK)
 		return err;
 
 	for (i = 0; i < nbytes; i++)
@@ -131,7 +131,7 @@ static cbor_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 
 	struct block *block;
 
-	if ((err = buf_read(cs->buf, &hdr, 1)) != CBOR_ERR_OK)
+	if ((err = nb_buf_read(cs->buf, &hdr, 1)) != CBOR_ERR_OK)
 		return err;
 
 	major = (hdr & 0xE0) >> 5;
@@ -446,7 +446,7 @@ static cbor_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *st
 	if (!*bytes)
 		return error(cs, CBOR_ERR_NOMEM, "No memory to decode another buf chunk.");
 
-	if ((err = buf_read(cs->buf, *bytes + *len, chunk->u64)) != CBOR_ERR_OK) {
+	if ((err = nb_buf_read(cs->buf, *bytes + *len, chunk->u64)) != CBOR_ERR_OK) {
 		free(*bytes);
 		return err;
 	}
@@ -583,7 +583,6 @@ static cbor_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map
 		return error(cs, CBOR_ERR_NITEMS, "Odd number of items in a map.");
 	*npairs = nitems / 2;
 
-	/* TODO Is this safe? Ask MM */
 	*pairs = ((struct cbor_pair *)items);
 
 	return CBOR_ERR_OK;

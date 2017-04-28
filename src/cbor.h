@@ -13,7 +13,7 @@
 #include <inttypes.h>
 
 struct cbor_stream;
-struct buf;
+struct nb_buf;
 
 
 /*
@@ -39,7 +39,7 @@ enum cbor_err
 
 typedef enum cbor_err cbor_err_t;
 
-struct cbor_stream *cbor_stream_new(struct buf *buf);
+struct cbor_stream *cbor_stream_new(struct nb_buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 
 char *cbor_stream_strerror(struct cbor_stream *cs);

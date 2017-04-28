@@ -65,7 +65,7 @@ struct block
 
 struct cbor_stream
 {
-	struct buf *buf;
+	struct nb_buf *buf;
 	struct stack blocks;
 	cbor_err_t err;
 	struct strbuf err_buf;

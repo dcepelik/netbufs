@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
 {
 	char *fn_in;
 	char *fn_out;
-	struct buf *buf_in;
-	struct buf *buf_out;
+	struct nb_buf *nb_buf_in;
+	struct nb_buf *nb_buf_out;
 	struct cbor_stream *cs_in;
 	struct cbor_stream *cs_out;
 	struct cbor_item item;
@@ -84,55 +84,55 @@ int main(int argc, char *argv[])
 
 	}
 
-	buf_in = buf_new();
-	if (!buf_in) {
+	nb_buf_in = nb_buf_new();
+	if (!nb_buf_in) {
 		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
 	if (do_file_input)
-		err = buf_open_file(buf_in, fn_in, O_RDONLY, 0);
+		err = nb_buf_open_file(nb_buf_in, fn_in, O_RDONLY, 0);
 	else
-		err = buf_open_stdin(buf_in);
+		err = nb_buf_open_stdin(nb_buf_in);
 
 	if (hex_input)
-		buf_set_read_filter(buf_in, buf_hex_read_filter);
+		nb_buf_set_read_filter(nb_buf_in, nb_buf_hex_read_filter);
 
 	if (err != CBOR_ERR_OK) {
 		fprintf(stderr, "%s: cannot open input file\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	cs_in = cbor_stream_new(buf_in);
+	cs_in = cbor_stream_new(nb_buf_in);
 	if (!cs_in) {
 		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	buf_out = buf_new();
-	if (!buf_out) {
+	nb_buf_out = nb_buf_new();
+	if (!nb_buf_out) {
 		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
 	if (do_file_output)
-		err = buf_open_file(buf_out, fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
+		err = nb_buf_open_file(nb_buf_out, fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	else
-		err = buf_open_stdout(buf_out);
+		err = nb_buf_open_stdout(nb_buf_out);
 	
 	if (err != CBOR_ERR_OK) {
 		fprintf(stderr, "%s: cannot open output file\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	cs_out = cbor_stream_new(buf_out);
+	cs_out = cbor_stream_new(nb_buf_out);
 	if (!cs_out) {
 		fprintf(stderr, "%s: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
 	if (hex_output)
-		buf_set_write_filter(buf_out, buf_hex_write_filter);
+		nb_buf_set_write_filter(nb_buf_out, nb_buf_hex_write_filter);
 
 	if (!passthru) {
 		if ((err = cbor_stream_dump(cs_in, stdout)) != CBOR_ERR_OK) {
@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
 		putchar('\n');
 	}
 	else {
-		while (!buf_is_eof(buf_in)) {
+		while (!nb_buf_is_eof(nb_buf_in)) {
 			if ((err = cbor_decode_item(cs_in, &item)) != CBOR_ERR_OK) {
 				fprintf(stderr, "Error decoding item: %s\n",
 					cbor_stream_strerror(cs_in));
@@ -157,9 +157,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	buf_close(buf_in);
+	nb_buf_close(nb_buf_in);
 	cbor_stream_delete(cs_in);
-	buf_close(buf_out);
+	nb_buf_close(nb_buf_out);
 	cbor_stream_delete(cs_out);
 	return EXIT_SUCCESS;
 }

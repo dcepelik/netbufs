@@ -22,7 +22,7 @@ static cbor_err_t write_hdr(struct cbor_stream *cs, enum major major, byte_t lbi
 	struct block *block;
 
 	hdr = (major << 5) + lbits;
-	return buf_write(cs->buf, &hdr, 1);
+	return nb_buf_write(cs->buf, &hdr, 1);
 }
 
 
@@ -91,7 +91,7 @@ static cbor_err_t write_hdr_u64(struct cbor_stream *cs, enum major major, uint64
 	for (i = 0; i < len; i++)
 		bytes[i] = u64be_ptr[(8 - len) + i];
 
-	return buf_write(cs->buf, bytes, len);
+	return nb_buf_write(cs->buf, bytes, len);
 }
 
 
@@ -252,7 +252,7 @@ static cbor_err_t encode_bytes(struct cbor_stream *cs, enum major major, byte_t 
 {
 	cbor_err_t err;
 	if ((err = write_hdr_u64(cs, major, len)) == CBOR_ERR_OK)
-		return buf_write(cs->buf, bytes, len);
+		return nb_buf_write(cs->buf, bytes, len);
 	return err;
 }
 
@@ -308,7 +308,7 @@ cbor_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 			return write_hdr_major7(cs, (byte_t)sval);
 		
 		if ((err = write_hdr_major7(cs, CBOR_MINOR_SVAL)) == CBOR_ERR_OK)
-			return buf_write(cs->buf, (byte_t *)&sval, 1);
+			return nb_buf_write(cs->buf, (byte_t *)&sval, 1);
 		return err;
 	}
 

@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 	struct rt rt;
 	char *method;
 	const char *argv0;
-	struct buf *buf;
+	struct nb_buf *buf;
 
 	argv0 = (const char *)basename(argv[0]);
 
@@ -27,13 +27,13 @@ int main(int argc, char *argv[])
 	method = argv[1];
 	filename = argv[2];
 
-	buf = buf_new();
+	buf = nb_buf_new();
 	if (!buf) {
-		fprintf(stderr, "%s: buf_new() failed: out of memory\n", argv0);
+		fprintf(stderr, "%s: nb_buf_new() failed: out of memory\n", argv0);
 		return EXIT_FAILURE;
 	}
 
-	if (buf_open_file(buf, filename, O_RDONLY, 0) != CBOR_ERR_OK) {
+	if (nb_buf_open_file(buf, filename, O_RDONLY, 0) != NB_ERR_OK) {
 		fprintf(stderr, "%s: cannot open file '%s'\n", argv0, filename);
 		return EXIT_FAILURE;
 	}
@@ -57,6 +57,6 @@ int main(int argc, char *argv[])
 	printf("Done.\n");
 
 	parser_free(&p);
-	buf_delete(buf);
+	nb_buf_delete(buf);
 	return EXIT_SUCCESS;
 }

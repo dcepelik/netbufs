@@ -252,19 +252,19 @@ void nesting_test_encode(struct cbor_stream *cs)
 
 int main(int argc, char *argv[])
 {
-	struct buf *out;
+	struct nb_buf *out;
 	struct cbor_stream *cs;
 	cbor_err_t err;
 	int mode;
 	int oflags;
 
-	out = buf_new();
+	out = nb_buf_new();
 	assert(out);
 
 	mode = S_IRUSR | S_IWUSR;
 	oflags = O_RDWR | O_CREAT | O_TRUNC;
 
-	assert(buf_open_file(out, "../tests/libcbor/arrays+maps.cbor", oflags, mode) == CBOR_ERR_OK);
+	assert(nb_buf_open_file(out, "../tests/libcbor/arrays+maps.cbor", oflags, mode) == NB_ERR_OK);
 
 	cs = cbor_stream_new(out);
 	assert(cs);
@@ -288,7 +288,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	buf_close(out);
+	nb_buf_close(out);
 	cbor_stream_delete(cs);
 	return EXIT_SUCCESS;
 }

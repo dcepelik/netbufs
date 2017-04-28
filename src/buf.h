@@ -1,8 +1,10 @@
-#ifndef BUF_H
-#define BUF_H
+#ifndef NB_BUF_H
+#define NB_BUF_H
+
+#include "error.h"
 
 /*
- * TODO buf module should be separated from libcbor, don't return cbor_err_t.
+ * TODO buf module should be separated from libcbor, don't return nb_err_t.
  */
 
 #include "cbor.h"
@@ -11,9 +13,9 @@
 
 #define BUF_EOF	(-1)
 
-typedef cbor_err_t (filter_t)(struct buf *buf, byte_t *bytes, size_t nbytes);
+typedef nb_err_t (filter_t)(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
-struct buf
+struct nb_buf
 {
 	byte_t *buf;	/* data buffer */
 	size_t bufsize;	/* size of the buffer */
@@ -39,50 +41,50 @@ struct buf
 		};
 	};
 
-	void (*flush)(struct buf *buf);
-	void (*fill)(struct buf *buf);
-	void (*close)(struct buf *buf);
+	void (*flush)(struct nb_buf *buf);
+	void (*fill)(struct nb_buf *buf);
+	void (*close)(struct nb_buf *buf);
 
 	filter_t *read_filter;
 	filter_t *write_filter;
 };
 
 
-struct buf *buf_new(void);
-void buf_delete(struct buf *buf);
+struct nb_buf *nb_buf_new(void);
+void nb_buf_delete(struct nb_buf *buf);
 
-bool buf_is_eof(struct buf *buf);
+bool nb_buf_is_eof(struct nb_buf *buf);
 
-cbor_err_t buf_open_file(struct buf *buf, char *filename, int oflags, int mode);
-cbor_err_t buf_open_stdin(struct buf *buf);
-cbor_err_t buf_open_stdout(struct buf *buf);
+nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int oflags, int mode);
+nb_err_t nb_buf_open_stdin(struct nb_buf *buf);
+nb_err_t nb_buf_open_stdout(struct nb_buf *buf);
 
-cbor_err_t buf_open_memory(struct buf *buf);
+nb_err_t nb_buf_open_memory(struct nb_buf *buf);
 
-void buf_close(struct buf *buf);
+void nb_buf_close(struct nb_buf *buf);
 
-cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t count);
-cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t count);
+nb_err_t nb_buf_write(struct nb_buf *buf, byte_t *bytes, size_t count);
+nb_err_t nb_buf_read(struct nb_buf *buf, byte_t *bytes, size_t count);
 
-int buf_getc(struct buf *buf);
-void buf_ungetc(struct buf *buf, int c);
-int buf_peek(struct buf *buf);
+int nb_buf_getc(struct nb_buf *buf);
+void nb_buf_ungetc(struct nb_buf *buf, int c);
+int nb_buf_peek(struct nb_buf *buf);
 
-void buf_set_read_filter(struct buf *buf, filter_t *filter);
-void buf_set_write_filter(struct buf *buf, filter_t *filter);
+void nb_buf_set_read_filter(struct nb_buf *buf, filter_t *filter);
+void nb_buf_set_write_filter(struct nb_buf *buf, filter_t *filter);
 
 /* XXX This is a temporary tests helper */
-size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes);
+size_t nb_buf_read_len(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
 /* XXX Yuk! */
-static inline cbor_err_t buf_get_last_read_len(struct buf *buf)
+static inline nb_err_t nb_buf_get_last_read_len(struct nb_buf *buf)
 {
 	return buf->last_read_len;
 }
 
-cbor_err_t buf_hex_read_filter(struct buf *buf, byte_t *bytes, size_t nbytes);
-cbor_err_t buf_hex_write_filter(struct buf *buf, byte_t *bytes, size_t nbytes);
+nb_err_t nb_buf_hex_read_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
+nb_err_t nb_buf_hex_write_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
-cbor_err_t buf_printf(struct buf *buf, char *msg, ...);
+nb_err_t nb_buf_printf(struct nb_buf *buf, char *msg, ...);
 
 #endif

@@ -52,7 +52,7 @@ struct block *top_block(struct cbor_stream *cs)
 }
 
 
-struct cbor_stream *cbor_stream_new(struct buf *buf)
+struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 {
 	struct cbor_stream *cs;
 

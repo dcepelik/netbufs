@@ -277,7 +277,7 @@ void serialize_bird(struct rt *rt)
 }
 
 
-struct rt *deserialize_bird(struct buf *buf)
+struct rt *deserialize_bird(struct nb_buf *buf)
 {
 	return NULL;
 }

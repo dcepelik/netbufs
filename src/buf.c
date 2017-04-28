@@ -10,10 +10,10 @@
 #include <string.h>
 #include <unistd.h>
 
-static cbor_err_t write_internal(struct buf *buf, byte_t *bytes, size_t nbytes);
+static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
 
-void buf_init(struct buf *buf)
+void nb_buf_init(struct nb_buf *buf)
 {
 	size_t size = 1024;
 
@@ -31,25 +31,25 @@ void buf_init(struct buf *buf)
 }
 
 
-void buf_set_read_filter(struct buf *buf, filter_t *filter)
+void nb_buf_set_read_filter(struct nb_buf *buf, filter_t *filter)
 {
 	buf->read_filter = filter;
 }
 
 
-void buf_set_write_filter(struct buf *buf, filter_t *filter)
+void nb_buf_set_write_filter(struct nb_buf *buf, filter_t *filter)
 {
 	buf->write_filter = filter;
 }
 
 
-void buf_free(struct buf *buf)
+void nb_buf_free(struct nb_buf *buf)
 {
 	nb_free(buf->buf);
 }
 
 
-static void buf_flush(struct buf *buf)
+static void nb_buf_flush(struct nb_buf *buf)
 {
 	buf->flush(buf);
 	buf->pos = 0;
@@ -57,7 +57,7 @@ static void buf_flush(struct buf *buf)
 }
 
 
-static bool buf_fill(struct buf *buf)
+static bool nb_buf_fill(struct nb_buf *buf)
 {
 	buf->fill(buf);
 	buf->pos = 0;
@@ -66,13 +66,13 @@ static bool buf_fill(struct buf *buf)
 
 
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
-static cbor_err_t read_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
+static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
 
 	if (buf->dirty)
-		buf_flush(buf);
+		nb_buf_flush(buf);
 
 	buf->last_read_len = 0;
 
@@ -81,11 +81,11 @@ static cbor_err_t read_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
 		assert(avail >= 0);
 
 		if (!avail) {
-			buf_fill(buf);
+			nb_buf_fill(buf);
 			avail = buf->len;
 
 			if (avail == 0)
-				return CBOR_ERR_EOF;
+				return NB_ERR_EOF;
 		}
 
 		ncpy = MIN(avail, nbytes);
@@ -97,9 +97,9 @@ static cbor_err_t read_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
 	}
 
 	if (nbytes > 0)
-		return CBOR_ERR_READ; /* TODO save strerror(errno) somewhere */
+		return NB_ERR_READ; /* TODO save strerror(errno) somewhere */
 
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
 }
 
 
@@ -127,41 +127,41 @@ static inline char hexchar(byte_t val)
 }
 
 
-cbor_err_t buf_hex_read_filter(struct buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_hex_read_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	size_t nnbytes;
 	byte_t *tmpbuf;
 	size_t i;
 	size_t j;
 	size_t read_len;
-	cbor_err_t err;
+	nb_err_t err;
 
 	nnbytes = 2 * nbytes;
 	tmpbuf = malloc(nnbytes);
 	TEMP_ASSERT(tmpbuf);
 
-	if ((err = read_internal(buf, tmpbuf, nnbytes)) != CBOR_ERR_OK)
+	if ((err = read_internal(buf, tmpbuf, nnbytes)) != NB_ERR_OK)
 		return err;
 
-	TEMP_ASSERT(buf_get_last_read_len(buf) % 2 == 0);
-	read_len = buf_get_last_read_len(buf) / 2;
+	TEMP_ASSERT(nb_buf_get_last_read_len(buf) % 2 == 0);
+	read_len = nb_buf_get_last_read_len(buf) / 2;
 
 	for (i = 0, j = 0; i < read_len; i++, j += 2) {
 		bytes[i] = 16 * hexval(tmpbuf[j]) + hexval(tmpbuf[j + 1]);
 	}
 
 	free(tmpbuf);
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
 }
 
 
-cbor_err_t buf_hex_write_filter(struct buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_hex_write_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	size_t nnbytes;
 	byte_t *tmpbuf;
 	size_t i;
 	size_t j;
-	cbor_err_t err;
+	nb_err_t err;
 
 	nnbytes = 2 * nbytes;
 	tmpbuf = malloc(nnbytes);
@@ -179,7 +179,7 @@ cbor_err_t buf_hex_write_filter(struct buf *buf, byte_t *bytes, size_t nbytes)
 }
 
 
-cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_read(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	if (buf->read_filter)
 		return buf->read_filter(buf, bytes, nbytes);
@@ -187,14 +187,14 @@ cbor_err_t buf_read(struct buf *buf, byte_t *bytes, size_t nbytes)
 }
 
 
-size_t buf_read_len(struct buf *buf, byte_t *bytes, size_t nbytes)
+size_t nb_buf_read_len(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	read_internal(buf, bytes, nbytes);
-	return buf_get_last_read_len(buf);
+	return nb_buf_get_last_read_len(buf);
 }
 
 
-cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_write(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	if (buf->write_filter)
 		return buf->write_filter(buf, bytes, nbytes);
@@ -202,7 +202,7 @@ cbor_err_t buf_write(struct buf *buf, byte_t *bytes, size_t nbytes)
 }
 
 
-static cbor_err_t write_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
+static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
@@ -216,7 +216,7 @@ static cbor_err_t write_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
 		assert(avail >= 0);
 
 		if (!avail) {
-			buf_flush(buf);
+			nb_buf_flush(buf);
 			avail = buf->bufsize;
 		}
 
@@ -231,11 +231,11 @@ static cbor_err_t write_internal(struct buf *buf, byte_t *bytes, size_t nbytes)
 
 	assert(nbytes == 0);
 
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
 }
 
 
-int buf_getc(struct buf *buf)
+int nb_buf_getc(struct nb_buf *buf)
 {
 	char c;
 
@@ -246,35 +246,35 @@ int buf_getc(struct buf *buf)
 	}
 
 	if (buf->pos >= buf->len)
-		if (!buf_fill(buf))
+		if (!nb_buf_fill(buf))
 			return BUF_EOF;
 
 	return buf->buf[buf->pos++];
 }
 
 
-void buf_ungetc(struct buf *buf, int c)
+void nb_buf_ungetc(struct nb_buf *buf, int c)
 {
 	assert(buf->ungetc == BUF_EOF); /* don't override ungetc */
 	buf->ungetc = c;
 }
 
 
-int buf_peek(struct buf *buf)
+int nb_buf_peek(struct nb_buf *buf)
 {
 	char c;
-	c = buf_getc(buf);
-	buf_ungetc(buf, c);
+	c = nb_buf_getc(buf);
+	nb_buf_ungetc(buf, c);
 	return c;
 }
 
 
-static void buf_file_close(struct buf *buf)
+static void nb_buf_file_close(struct nb_buf *buf)
 {
 	close(buf->fd);
 }
 
-static void buf_file_fill(struct buf *buf)
+static void nb_buf_file_fill(struct nb_buf *buf)
 {
 	buf->len = read(buf->fd, buf->buf, buf->bufsize);
 	buf->eof = (buf->len == 0);
@@ -282,7 +282,7 @@ static void buf_file_fill(struct buf *buf)
 }
 
 
-static void buf_file_flush(struct buf *buf)
+static void nb_buf_file_flush(struct nb_buf *buf)
 {
 	ssize_t written;
 
@@ -291,13 +291,13 @@ static void buf_file_flush(struct buf *buf)
 }
 
 
-static void buf_memory_close(struct buf *buf)
+static void nb_buf_memory_close(struct nb_buf *buf)
 {
 	nb_free(buf->memory);
 }
 
 
-static void buf_memory_fill(struct buf *buf)
+static void nb_buf_memory_fill(struct nb_buf *buf)
 {
 	size_t avail;
 	size_t ncpy;
@@ -312,7 +312,7 @@ static void buf_memory_fill(struct buf *buf)
 }
 
 
-static void buf_memory_flush(struct buf *buf)
+static void nb_buf_memory_flush(struct nb_buf *buf)
 {
 	size_t new_mry_size;
 
@@ -329,88 +329,84 @@ static void buf_memory_flush(struct buf *buf)
 }
 
 
-struct buf *buf_new(void)
+struct nb_buf *nb_buf_new(void)
 {
-	struct buf *buf;
+	struct nb_buf *buf;
 	
 	buf = nb_malloc(sizeof(*buf));
 	if (buf)
-		buf_init(buf);
+		nb_buf_init(buf);
 
 	return buf;
 }
 
 
-void buf_delete(struct buf *buf)
+void nb_buf_delete(struct nb_buf *buf)
 {
-	buf_free(buf);
+	nb_buf_free(buf);
 	nb_free(buf);
 }
 
 
-cbor_err_t buf_open_file(struct buf *buf, char *filename, int flags, int mode)
+nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int flags, int mode)
 {
 	if ((buf->fd = open(filename, flags, mode)) == -1)
-		return CBOR_ERR_NOFILE; /* TODO */
+		return NB_ERR_OPEN;
 
 	buf->filename = filename;
 	buf->mode = mode;
 
-	buf->close = buf_file_close;
-	buf->fill = buf_file_fill;
-	buf->flush = buf_file_flush;
+	buf->close = nb_buf_file_close;
+	buf->fill = nb_buf_file_fill;
+	buf->flush = nb_buf_file_flush;
 
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
+}
+
+
+static nb_err_t open_fd(struct nb_buf *buf, int fd)
+{
+	buf->fd = fd;
+	buf->filename = NULL;
+	buf->mode = 0;
+
+	buf->close = NULL;
+	buf->fill = nb_buf_file_fill;
+	buf->flush = nb_buf_file_flush;
+
+	return NB_ERR_OK;
 }
 
 
 /* TODO DRY */
-cbor_err_t buf_open_stdout(struct buf *buf)
+nb_err_t nb_buf_open_stdout(struct nb_buf *buf)
 {
-	buf->fd = STDOUT_FILENO;
-
-	buf->filename = NULL;
-	buf->mode = 0;
-
-	buf->close = NULL;
-	buf->fill = buf_file_fill;
-	buf->flush = buf_file_flush;
-
-	return CBOR_ERR_OK;
+	return open_fd(buf, STDOUT_FILENO);
 }
 
 
-cbor_err_t buf_open_stdin(struct buf *buf)
+nb_err_t nb_buf_open_stdin(struct nb_buf *buf)
 {
-	buf->fd = STDIN_FILENO;
-
-	buf->filename = NULL;
-	buf->mode = 0;
-
-	buf->close = NULL;
-	buf->fill = buf_file_fill;
-	buf->flush = buf_file_flush;
-
-	return CBOR_ERR_OK;
+	return open_fd(buf, STDIN_FILENO);
 }
 
 
-cbor_err_t buf_open_memory(struct buf *buf)
+nb_err_t nb_buf_open_memory(struct nb_buf *buf)
 {
 	buf->memory = NULL;
 	buf->memory_len = 0;
 	buf->memory_size = 0;
 	buf->memory_pos = 0;
 
-	buf->close = buf_memory_close;
-	buf->fill = buf_memory_fill;
-	buf->flush = buf_memory_flush;
+	buf->close = nb_buf_memory_close;
+	buf->fill = nb_buf_memory_fill;
+	buf->flush = nb_buf_memory_flush;
 
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
 }
 
 
-void buf_close(struct buf *buf)
+void nb_buf_close(struct nb_buf *buf)
 {
 	if (buf->dirty)
 		buf->flush(buf);
@@ -420,7 +416,7 @@ void buf_close(struct buf *buf)
 }
 
 
-bool buf_is_eof(struct buf *buf)
+bool nb_buf_is_eof(struct nb_buf *buf)
 {
 	assert(!buf->dirty);
 

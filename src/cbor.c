@@ -306,7 +306,7 @@ cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 
 	isbuf_init(&isbuf);
 
-	while (!buf_is_eof(cs->buf)) {
+	while (!nb_buf_is_eof(cs->buf)) {
 		if ((err = cbor_decode_item(cs, &item)) != CBOR_ERR_OK)
 			break;
 

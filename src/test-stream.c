@@ -22,8 +22,8 @@ int main(int argc, char *argv[])
 {
 	char *infn;
 	char *outfn;
-	struct buf *in;
-	struct buf *out;
+	struct nb_buf *in;
+	struct nb_buf *out;
 	unsigned char *buf;
 	size_t len;
 	int mode;
@@ -36,23 +36,23 @@ int main(int argc, char *argv[])
 	buf = malloc(BUFSIZE);
 	assert(buf != NULL);
 
-	in = buf_new();
+	in = nb_buf_new();
 	assert(in != NULL);
 
-	assert(buf_open_file(in, infn, O_RDONLY, 0) == CBOR_ERR_OK);
+	assert(nb_buf_open_file(in, infn, O_RDONLY, 0) == NB_ERR_OK);
 
-	out = buf_new();
+	out = nb_buf_new();
 	assert(out != NULL);
 
 	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-	assert(buf_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == CBOR_ERR_OK);
+	assert(nb_buf_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == NB_ERR_OK);
 
-	while ((len = buf_read_len(in, buf, BUFSIZE)) > 0) {
-		buf_write(out, buf, len);
+	while ((len = nb_buf_read_len(in, buf, BUFSIZE)) > 0) {
+		nb_buf_write(out, buf, len);
 	}
 
-	buf_close(in);
-	buf_close(out);
+	nb_buf_close(in);
+	nb_buf_close(out);
 
 	return EXIT_SUCCESS;
 }
