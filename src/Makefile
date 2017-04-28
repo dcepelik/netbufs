@@ -1,4 +1,4 @@
-.PHONY: all clean metrics tests
+.PHONY: all clean metrics tests ctags
 
 LIB=libcbor.a
 OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o
@@ -9,7 +9,7 @@ BINS=cbordump benchmark
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
 LDFLAGS+=-Wall
 
-all: $(LIB) $(TESTS) $(BINS)
+all: $(LIB) $(TESTS) $(BINS) ctags
 
 $(LIB): $(OBJS)
 	ar rcs $(LIB) $(OBJS)
@@ -40,3 +40,6 @@ metrics:
 
 tests: $(TESTS) $(BINS)
 	cd ../tests; ./run-tests.sh
+
+ctags:
+	ctags -R .

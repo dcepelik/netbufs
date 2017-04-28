@@ -1,4 +1,5 @@
 #include "array.h"
+#include "debug.h"
 #include "memory.h"
 #include "util.h"
 

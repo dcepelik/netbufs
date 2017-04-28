@@ -157,6 +157,7 @@ struct rt
 };
 
 
-void serialize_bird(struct rt *rt);
+void serialize_bird(struct rt *rt, struct nb_buf *buf);
+struct rt *deserialize_bird(struct nb_buf *buf);
 
 #endif

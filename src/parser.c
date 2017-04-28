@@ -52,7 +52,6 @@ static char parser_getc(struct parser *p)
 		p->line_no++;
 		p->col_no = 0;
 	}
-
 	p->col_no++;
 	return p->cur;
 }
@@ -97,7 +96,10 @@ static void match(struct parser *p, char *str)
 
 	for (i = 0; str[i] != '\0'; i++) {
 		c = parser_getc(p);
-		if (c == BUF_EOF || c != str[i])
+		if (c == BUF_EOF)
+			error(p, "unexpected end of file, '%c' was expected\n",
+				str[i]);
+		if (c != str[i])
 			error(p, "unexpected '%c', '%c' was expected\n",
 				c, str[i]);
 	}
@@ -352,7 +354,7 @@ go_again:
 	if (c == '{' || c == '}') {
 		as_no = (c == '{') ? AS_PATH_FLAG_LBRACE : AS_PATH_FLAG_RBRACE;
 		attr->bgp_as_path = array_push(attr->bgp_as_path, 1);
-		attr->bgp_as_path[array_size(attr->bgp_as_path) - 1] = as_no;
+		attr->bgp_as_path[array_size(attr->bgp_as_path) - 1] = as_no; /* TODO! */
 		goto go_again;
 	}
 	else {
@@ -604,14 +606,19 @@ static bool parse_rte(struct parser *p, struct rt *rt)
 }
 
 
-void parser_parse_rt(struct parser *p, struct rt *rt)
+struct rt *parser_parse_rt(struct parser *p)
 {
+	struct rt *rt;
+
+	rt = nb_malloc(sizeof(*rt));
+
 	match(p, "BIRD ");
 	rt->version_str = parse_version_str(p);
 	match(p, " ready.");
 	match_eol(p);
 
 	rt->entries = array_new(256, sizeof(*rt->entries));
-
 	while (parse_rte(p, rt)) ;
+
+	return rt;
 }

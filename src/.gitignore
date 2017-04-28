@@ -2,3 +2,4 @@
 test-*
 !test-*.c
 cbordump
+tags
