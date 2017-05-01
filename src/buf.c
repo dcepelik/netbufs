@@ -15,7 +15,7 @@ static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 
 void nb_buf_init(struct nb_buf *buf)
 {
-	size_t size = 1024;
+	size_t size = 1;
 
 	buf->buf = nb_malloc(size);
 	TEMP_ASSERT(buf->buf);
@@ -49,10 +49,11 @@ void nb_buf_free(struct nb_buf *buf)
 }
 
 
-static void nb_buf_flush(struct nb_buf *buf)
+void nb_buf_flush(struct nb_buf *buf)
 {
 	buf->flush(buf);
 	buf->pos = 0;
+	buf->len = 0;
 	buf->dirty = false;
 }
 
@@ -65,15 +66,29 @@ static bool nb_buf_fill(struct nb_buf *buf)
 }
 
 
+static void debug_write(unsigned char *bytes, size_t nbytes)
+{
+	size_t i;
+
+	for (i = 0; i < nbytes; i++) {
+		if (isprint(bytes[i])) {
+			DEBUG_PRINTF("Writing byte 0x%02X [%c]", bytes[i], bytes[i]);
+		}
+		else {
+			DEBUG_PRINTF("Writing byte 0x%02X", bytes[i]);
+		}
+	}
+	DEBUG_EXPR("%s", "---");
+}
+
+
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
 static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
 
-	if (buf->dirty)
-		nb_buf_flush(buf);
-
+	assert(!buf->dirty);
 	buf->last_read_len = 0;
 
 	while (nbytes > 0) {
@@ -96,9 +111,7 @@ static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 		buf->last_read_len += ncpy;
 	}
 
-	if (nbytes > 0)
-		return NB_ERR_READ; /* TODO save strerror(errno) somewhere */
-
+	assert(nbytes == 0);
 	return NB_ERR_OK;
 }
 
@@ -207,10 +220,6 @@ static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 	size_t avail;
 	size_t ncpy;
 
-	if (!buf->dirty) {
-		buf->pos = 0;
-	}
-
 	while (nbytes > 0) {
 		avail = buf->bufsize - buf->len;
 		assert(avail >= 0);
@@ -285,7 +294,6 @@ static void nb_buf_file_fill(struct nb_buf *buf)
 static void nb_buf_file_flush(struct nb_buf *buf)
 {
 	ssize_t written;
-
 	written = write(buf->fd, buf->buf, buf->len);
 	TEMP_ASSERT(written == buf->len);
 }
@@ -324,8 +332,6 @@ static void nb_buf_memory_flush(struct nb_buf *buf)
 
 	memcpy(buf->memory + buf->memory_len, buf->buf, buf->len);
 	buf->memory_len += buf->len;
-
-	DEBUG_EXPR("%lu", buf->memory_len);
 }
 
 
@@ -424,7 +430,7 @@ bool nb_buf_is_eof(struct nb_buf *buf)
 
 	avail = buf->len - buf->pos;
 	if (!avail) {
-		buf->fill(buf);
+		nb_buf_fill(buf);
 		return buf->len == 0;
 	}
 
