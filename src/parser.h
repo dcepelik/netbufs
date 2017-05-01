@@ -1,8 +1,6 @@
 /*
  * parse:
  * Read a BIRD dump into well-defined data structures for benchmarking.
- *
- * TODO Make this reusable.
  */
 
 #ifndef PARSER_H
@@ -24,7 +22,7 @@ struct parser
 
 
 void parser_init(struct parser *p, struct nb_buf *buf);
-struct rt *parser_parse_rt(struct parser *p);
+void parser_parse_rt(struct parser *p, struct rt *rt);
 void parser_free(struct parser *p);
 
 #endif

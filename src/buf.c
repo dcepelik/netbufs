@@ -49,21 +49,16 @@ void nb_buf_free(struct nb_buf *buf)
 }
 
 
-void nb_buf_flush(struct nb_buf *buf)
+static void nb_buf_flush(struct nb_buf *buf)
 {
 	buf->flush(buf);
 	buf->pos = 0;
-	buf->len = 0;
 	buf->dirty = false;
-	DEBUG_MSG("Flush");
 }
 
 
 static bool nb_buf_fill(struct nb_buf *buf)
 {
-	if (buf->dirty)
-		nb_buf_flush(buf);
-
 	buf->fill(buf);
 	buf->pos = 0;
 	return buf->len > 0;
@@ -73,7 +68,6 @@ static bool nb_buf_fill(struct nb_buf *buf)
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
 static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 {
-	DEBUG_MSG("Read");
 	size_t avail;
 	size_t ncpy;
 
@@ -213,8 +207,6 @@ static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 	size_t avail;
 	size_t ncpy;
 
-	DEBUG_MSG("Write");
-
 	if (!buf->dirty) {
 		buf->pos = 0;
 	}
@@ -327,9 +319,7 @@ static void nb_buf_memory_flush(struct nb_buf *buf)
 	if (buf->memory_len + buf->len > buf->memory_size) {
 		new_mry_size = MAX(2 * buf->memory_size, buf->bufsize);
 		buf->memory = nb_realloc(buf->memory, new_mry_size);
-		TEMP_ASSERT(buf->memory);
 		buf->memory_size = new_mry_size;
-		DEBUG_EXPR("%lu", buf->memory_size);
 	}
 
 	memcpy(buf->memory + buf->memory_len, buf->buf, buf->len);

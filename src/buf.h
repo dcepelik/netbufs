@@ -61,7 +61,6 @@ nb_err_t nb_buf_open_stdout(struct nb_buf *buf);
 
 nb_err_t nb_buf_open_memory(struct nb_buf *buf);
 
-void nb_buf_flush(struct nb_buf *buf);
 void nb_buf_close(struct nb_buf *buf);
 
 nb_err_t nb_buf_write(struct nb_buf *buf, byte_t *bytes, size_t count);

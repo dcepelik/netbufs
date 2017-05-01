@@ -1,5 +1,4 @@
 #include "benchmark.h"
-#include "parser.h"
 #include "strbuf.h"
 #include "util.h"
 
@@ -262,7 +261,7 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 }
 
 
-void serialize_bird(struct rt *rt, struct nb_buf *buf)
+void serialize_bird(struct rt *rt)
 {
 	struct rte rte;
 	struct strbuf sb;
@@ -274,18 +273,11 @@ void serialize_bird(struct rt *rt, struct nb_buf *buf)
 	for (i = 0; i < array_size(rt->entries); i++)
 		print_rte(&sb, &rt->entries[i]);
 
-	nb_buf_write(buf, (byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
+	fprintf(stderr, strbuf_get_string(&sb));
 }
 
 
 struct rt *deserialize_bird(struct nb_buf *buf)
 {
-	struct rt *rt;
-	struct parser p;
-
-	parser_init(&p, buf);
-	rt = parser_parse_rt(&p);
-	parser_free(&p);
-
-	return rt;
+	return NULL;
 }
