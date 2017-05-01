@@ -10,8 +10,6 @@
 
 cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 {
-	//assert(!err);
-
 	va_list args;
 
 	cs->err = err;
@@ -28,7 +26,7 @@ cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 }
 
 
-cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite, uint64_t u64)
+cbor_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len)
 {
 	struct block *block;
 
@@ -36,9 +34,9 @@ cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite,
 	if (!block)
 		return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
 
-	block->major = major;
+	block->type = type;
 	block->indefinite = indefinite;
-	block->len = u64;
+	block->len = len;
 	block->num_items = 0;
 
 	return CBOR_ERR_OK;
@@ -70,7 +68,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 
 	strbuf_init(&cs->err_buf, 24); /* TODO change API, what if this fails? */
 
-	cs->fail_on_error = false;
+	cs->fail_on_error = true;
 
 	return cs;
 }

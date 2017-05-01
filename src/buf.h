@@ -65,6 +65,7 @@ void nb_buf_close(struct nb_buf *buf);
 
 nb_err_t nb_buf_write(struct nb_buf *buf, byte_t *bytes, size_t count);
 nb_err_t nb_buf_read(struct nb_buf *buf, byte_t *bytes, size_t count);
+void nb_buf_flush(struct nb_buf *buf);
 
 int nb_buf_getc(struct nb_buf *buf);
 void nb_buf_ungetc(struct nb_buf *buf, int c);

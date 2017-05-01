@@ -2,11 +2,12 @@
 
 LIB=libcbor.a
 OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o
-BENCHMARK_OBJS=benchmark-bird.o parser.o
+BENCHMARK_OBJS=serialize-bird.o deserialize-bird.o parser.o\
+	serialize-cbor.o deserialize-cbor.o
 TESTS=test-stream test-adhoc test-array
 BINS=cbordump benchmark
 
-CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable
+CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable
 LDFLAGS+=-Wall
 
 all: $(LIB) $(TESTS) $(BINS)

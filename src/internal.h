@@ -57,10 +57,10 @@ enum minor
 
 struct block
 {
-	enum major major;	/* Major Type for which this block has been open */
-	bool indefinite;	/* is indefinite-lenght encoding used? */
-	uint64_t len;		/* intended length of the block when !indefinite */
-	size_t num_items;	/* actual number of items encoded */
+	enum cbor_type type;	/* type for which this block has been open */
+	bool indefinite;		/* is indefinite-lenght encoding used? */
+	uint64_t len;			/* intended length of the block when !indefinite */
+	size_t num_items;		/* actual number of items encoded */
 };
 
 struct cbor_stream
@@ -85,7 +85,7 @@ static inline bool major_allows_indefinite(enum major major)
 
 
 cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...);
-cbor_err_t push_block(struct cbor_stream *cs, enum major major, bool indefinite, uint64_t len);
+cbor_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len);
 struct block *top_block(struct cbor_stream *cs);
 
 #endif

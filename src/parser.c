@@ -546,9 +546,7 @@ static bool parse_rte(struct parser *p, struct rt *rt)
 	rt->entries = array_push(rt->entries, 1);
 	rte = rt->entries + array_size(rt->entries) - 1; /* TODO! */
 
-	rte->attrs = NULL;
-	rte->attrs_size = 0;
-	rte->num_attrs = 0;
+	rte->attrs = array_new(5, sizeof(*rte->attrs));
 	rte->ifname = NULL;
 	rte->uplink_from_valid = false;
 

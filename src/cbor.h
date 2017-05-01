@@ -89,16 +89,16 @@ struct cbor_item
 	bool indefinite;
 
 	/* refactoring aid */
-	uint64_t len;				/* go away! */
-	uint64_t u64;				/* CBOR_TYPE_UINT */
+	uint64_t len;					/* go away! */
+	uint64_t u64;					/* CBOR_TYPE_UINT */
 
 	union {
-		int64_t i64;			/* CBOR_TYPE_NEGINT */
-		byte_t *bytes;			/* CBOR_TYPE_BYTES */
-		char *str;			/* CBOR_TYPE_TEXT */
+		int64_t i64;				/* CBOR_TYPE_NEGINT */
+		byte_t *bytes;				/* CBOR_TYPE_BYTES */
+		char *str;					/* CBOR_TYPE_TEXT */
 		struct cbor_item *items;	/* CBOR_TYPE_ARRAY */
 		struct cbor_pair *pairs;	/* CBOR_TYPE_MAP */
-		uint64_t tag;			/* CBOR_TYPE_TAG */
+		uint64_t tag;				/* CBOR_TYPE_TAG */
 		enum cbor_sval sval;
 	};
 	struct cbor_item *tagged_item;
@@ -164,6 +164,7 @@ cbor_err_t cbor_encode_array_begin(struct cbor_stream *cs, uint64_t len);
 cbor_err_t cbor_encode_array_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_array_end(struct cbor_stream *cs);
 cbor_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len);
+cbor_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_decode_array_end(struct cbor_stream *cs);
 
 cbor_err_t cbor_encode_map_begin(struct cbor_stream *cs, size_t len);
@@ -177,9 +178,11 @@ cbor_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
 cbor_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **bytes, size_t *len);
 
+/* TODO don't ask for length, assume 0-terminated strings */
 cbor_err_t cbor_encode_text(struct cbor_stream *cs, byte_t *str, size_t len);
 cbor_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_text_end(struct cbor_stream *cs);
+/* TODO I'm given the string, so I don't really need the length most of the time */
 cbor_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len);
 
 /* TODO normalization for byte and text strings */

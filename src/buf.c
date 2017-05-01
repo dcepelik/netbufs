@@ -15,7 +15,7 @@ static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 
 void nb_buf_init(struct nb_buf *buf)
 {
-	size_t size = 1;
+	size_t size = 1024;
 
 	buf->buf = nb_malloc(size);
 	TEMP_ASSERT(buf->buf);

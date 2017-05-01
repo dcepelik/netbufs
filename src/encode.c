@@ -182,19 +182,18 @@ static cbor_err_t start_block_indef(struct cbor_stream *cs, enum major major)
 }
 
 
-static cbor_err_t end_block(struct cbor_stream *cs, enum major major_type)
+static cbor_err_t end_block(struct cbor_stream *cs, enum cbor_type type)
 {
 	struct block *block;
 
-	if (top_block(cs)->major == -1)
+	if (top_block(cs)->type == -1)
 		return error(cs, CBOR_ERR_OPER, "Cannot end block, no block is open.");
 
 	block = stack_pop(&cs->blocks);
-	if (block->major != major_type)
-		/* TODO msg */
+	if (block->type != type)
 		return error(cs, CBOR_ERR_OPER, "Attempting to close %s "
-			"block when %s is open.", cbor_type_string(major_type),
-			cbor_type_string(block->major));
+			"block when %s is open.", cbor_type_string(type),
+			cbor_type_string(block->type));
 
 	if (block->indefinite)
 		return write_break(cs);
@@ -209,31 +208,31 @@ static cbor_err_t end_block(struct cbor_stream *cs, enum major major_type)
 
 cbor_err_t cbor_encode_array_begin(struct cbor_stream *cs, uint64_t len)
 {
-	return start_block(cs, CBOR_MAJOR_ARRAY, len);
+	return start_block(cs, CBOR_TYPE_ARRAY, len);
 }
 
 
 cbor_err_t cbor_encode_array_begin_indef(struct cbor_stream *cs)
 {
-	return start_block_indef(cs, CBOR_MAJOR_ARRAY);
+	return start_block_indef(cs, CBOR_TYPE_ARRAY);
 }
 
 
 cbor_err_t cbor_encode_array_end(struct cbor_stream *cs)
 {
-	return end_block(cs, CBOR_MAJOR_ARRAY);
+	return end_block(cs, CBOR_TYPE_ARRAY);
 }
 
 
 cbor_err_t cbor_encode_map_begin(struct cbor_stream *cs, uint64_t len)
 {
-	return start_block(cs, CBOR_MAJOR_MAP, len);
+	return start_block(cs, CBOR_TYPE_MAP, len);
 }
 
 
 cbor_err_t cbor_encode_map_begin_indef(struct cbor_stream *cs)
 {
-	return start_block_indef(cs, CBOR_MAJOR_MAP);
+	return start_block_indef(cs, CBOR_TYPE_MAP);
 }
 
 

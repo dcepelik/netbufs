@@ -51,17 +51,6 @@ enum bgp_origin
 	BGP_ORIGIN_INCOMPLETE,
 };
 
-enum rte_attr_type
-{
-	RTE_ATTR_TYPE_BGP_AS_PATH = 1,
-	RTE_ATTR_TYPE_BGP_ORIGIN,
-	RTE_ATTR_TYPE_BGP_NEXT_HOP,
-	RTE_ATTR_TYPE_BGP_LOCAL_PREF,
-	RTE_ATTR_TYPE_BGP_COMMUNITY,
-	RTE_ATTR_TYPE_BGP_AGGREGATOR,
-	RTE_ATTR_TYPE_OTHER,
-};
-
 /*
  * BGP boolean flags: key-value pairs (flag, as_no)
  */
@@ -90,15 +79,29 @@ struct kvp
 };
 
 /*
+ * Type of a route attribute.
+ */
+enum rte_attr_type
+{
+	RTE_ATTR_TYPE_BGP_AS_PATH = 1,
+	RTE_ATTR_TYPE_BGP_ORIGIN,
+	RTE_ATTR_TYPE_BGP_NEXT_HOP,
+	RTE_ATTR_TYPE_BGP_LOCAL_PREF,
+	RTE_ATTR_TYPE_BGP_COMMUNITY,
+	RTE_ATTR_TYPE_BGP_AGGREGATOR,
+	RTE_ATTR_TYPE_OTHER,
+};
+
+/*
  * Routing table attribute
  */
 struct rte_attr
 {
 	enum rte_attr_type type;		/* type of the attribute */
-	bool tflag;				/* [t] flag on this attr? */
+	bool tflag;						/* [t] flag on this attr? */
 
 	union {
-		int *bgp_as_path;		/* BGP.as_path */
+		int *bgp_as_path;			/* BGP.as_path */
 		enum bgp_origin bgp_origin;	/* BGP.orogin */
 		ipv4_t bgp_next_hop;		/* BGP.next_hop */
 		uint32_t bgp_local_pref;	/* BGP.local_pref */
@@ -126,8 +129,6 @@ struct rte
 	bool uplink_from_valid;
 	ipv4_t uplink_from;
 	struct rte_attr *attrs;
-	size_t num_attrs;
-	size_t attrs_size;
 	enum rte_type type;
 	bool as_no_valid;
 	uint32_t as_no;
@@ -138,25 +139,23 @@ static inline struct rte_attr *rte_add_attr(struct rte *rte, enum rte_attr_type 
 {
 	struct rte_attr *attr;
 
-	if (rte->num_attrs == rte->attrs_size) {
-		rte->attrs_size *= 2;
-		if (rte->attrs_size == 0)
-			rte->attrs_size = 8; /* TODO */
-		rte->attrs = realloc_safe(rte->attrs, rte->attrs_size * sizeof(*rte->attrs));
-	}
-	attr = &rte->attrs[rte->num_attrs++];
+	rte->attrs = array_push(rte->attrs, 1);
+	attr = &rte->attrs[array_size(rte->attrs) - 1]; /* TODO */
 	attr->type = type;
-
 	return attr;
 }
 
 struct rt
 {
-	char *version_str;	/* Bird version string */
+	char *version_str;		/* Bird dump version string */
 	struct rte *entries;	/* entries of the routing table */
 };
 
 
-void serialize_bird(struct rt *rt);
+void serialize_bird(struct rt *rt, struct nb_buf *buf);
+struct rt *deserialize_bird(struct nb_buf *buf);
+
+void serialize_cbor(struct rt *rt, struct nb_buf *buf);
+struct rt *deserialize_cbor(struct nb_buf *buf);
 
 #endif

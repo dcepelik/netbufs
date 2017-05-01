@@ -53,6 +53,7 @@ static inline cbor_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, ui
 		return CBOR_ERR_OK;
 	}
 
+	assert(lbits != LBITS_INDEFINITE);
 	if (lbits > LBITS_8B)
 		return error(cs, CBOR_ERR_PARSE, "Invalid value of "
 			"Additional Information: 0x%02X.", lbits);
@@ -363,75 +364,78 @@ static cbor_err_t decode_break(struct cbor_stream *cs)
 }
 
 
-//static cbor_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type, bool indef, uint64_t *len)
-//{
-//	struct cbor_item item;
-//	cbor_err_t err;
-//
-//	if ((err = predecode_check(cs, &item, type)) != CBOR_ERR_OK)
-//		return err;
-//
-//	if (tmp_indef_flag != indef)
-//		return error(cs, CBOR_ERR_INDEF, NULL);
-//
-//	if (indef)
-//		*len = item.u64;
-//
-//	return CBOR_ERR_OK;
-//}
-//
-//
-//static cbor_err_t decode_block_end(struct cbor_stream *cs, enum major major_type)
-//{
-//	struct block *block;
-//
-//	if (stack_is_empty(&cs->blocks))
-//		return error(cs, CBOR_ERR_OPER, NULL);
-//
-//	block = stack_pop(&cs->blocks);
-//
-//	if (block->hdr.major != major_type)
-//		return error(cs, CBOR_ERR_OPER, NULL);
-//
-//	if (block->hdr.indef)
-//		return decode_break(cs);
-//
-//	if (block->num_items != block->hdr.u64)
-//		return error(cs, CBOR_ERR_OPER, NULL);
-//	
-//	return CBOR_ERR_OK;
-//}
-//
-//
-//cbor_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
-//{
-//	return decode_block_start(cs, CBOR_MAJOR_ARRAY, false, len);
-//}
-//
-//
-//cbor_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
-//{
-//	uint64_t tmp;
-//	return decode_block_start(cs, CBOR_MAJOR_ARRAY, true, &tmp);
-//}
-//
-//
-//cbor_err_t cbor_decode_array_end(struct cbor_stream *cs)
-//{
-//	return decode_block_end(cs, CBOR_MAJOR_ARRAY);
-//}
-//
-//
-//cbor_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
-//{
-//	return decode_block_start(cs, CBOR_MAJOR_MAP, false, len);
-//}
-//
-//
-//cbor_err_t cbor_decode_map_end(struct cbor_stream *cs)
-//{
-//	return decode_block_end(cs, CBOR_MAJOR_MAP);
-//}
+static cbor_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type, bool indef, uint64_t *len)
+{
+	struct cbor_item item;
+	cbor_err_t err;
+
+	if ((err = predecode_check(cs, &item, type)) != CBOR_ERR_OK)
+		return err;
+
+	if (item.indefinite != indef)
+		return error(cs, CBOR_ERR_INDEF, NULL);
+
+	if (!item.indefinite)
+		*len = item.u64;
+
+	return push_block(cs, item.type, item.indefinite, item.u64);
+}
+
+
+/*
+ * TODO Make the checks work.
+ */
+static cbor_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
+{
+	struct block *block;
+
+	if (stack_is_empty(&cs->blocks))
+		return error(cs, CBOR_ERR_OPER, "Cannot end block, there's no block open.");
+
+	block = stack_pop(&cs->blocks);
+
+	//if (block->hdr.major != type)
+	//	return error(cs, CBOR_ERR_OPER, NULL);
+
+	if (block->indefinite)
+		return decode_break(cs);
+
+	//if (block->num_items != block->hdr.u64)
+	//	return error(cs, CBOR_ERR_OPER, NULL);
+	
+	return CBOR_ERR_OK;
+}
+
+
+cbor_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
+{
+	return decode_block_start(cs, CBOR_TYPE_ARRAY, false, len);
+}
+
+
+cbor_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
+{
+	uint64_t tmp;
+	return decode_block_start(cs, CBOR_TYPE_ARRAY, true, &tmp);
+}
+
+
+cbor_err_t cbor_decode_array_end(struct cbor_stream *cs)
+{
+	return decode_block_end(cs, CBOR_TYPE_ARRAY);
+}
+
+
+cbor_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
+{
+	return decode_block_start(cs, CBOR_TYPE_MAP, false, len);
+}
+
+
+cbor_err_t cbor_decode_map_end(struct cbor_stream *cs)
+{
+	return decode_block_end(cs, CBOR_TYPE_MAP);
+}
 
 
 static cbor_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stream,

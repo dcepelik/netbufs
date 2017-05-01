@@ -1,6 +1,12 @@
+#include "debug.h"
 #include "benchmark.h"
 #include "strbuf.h"
 #include "util.h"
+
+/*
+ * TODO The resulting string in the strbuf is copied into a memory stream;
+ *	this is wasteful. Give nb_buf a printf()-like APIs.
+ */
 
 
 static size_t print_ipv4(struct strbuf *sb, ipv4_t *ip)
@@ -171,7 +177,7 @@ static void print_rte_attr(struct strbuf *sb, struct rte_attr *attr)
 		print_attr_other(sb, attr);
 		break;
 	default:
-		die("Unsupported attribute type.\n");
+		assert(0);
 	}
 }
 
@@ -237,7 +243,7 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 	strbuf_printf(sb, " on %s", rte->ifname);
 
 	/* [uplink ... from ...] */
-	strbuf_puts(sb, " [uplink ");
+	strbuf_printf(sb, " [%s ", rte->uplink_from_valid ? "uplink" : "static1");
 	print_tm(sb, &rte->uplink);
 	if (rte->uplink_from_valid) {
 		strbuf_puts(sb, " from ");
@@ -256,12 +262,12 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 	print_attr_type(sb, rte);
 
 	/* all other attributes */
-	for (i = 0; i < rte->num_attrs; i++)
+	for (i = 0; i < array_size(rte->attrs); i++)
 		print_rte_attr(sb, &rte->attrs[i]);
 }
 
 
-void serialize_bird(struct rt *rt)
+void serialize_bird(struct rt *rt, struct nb_buf *buf)
 {
 	struct rte rte;
 	struct strbuf sb;
@@ -273,11 +279,5 @@ void serialize_bird(struct rt *rt)
 	for (i = 0; i < array_size(rt->entries); i++)
 		print_rte(&sb, &rt->entries[i]);
 
-	fprintf(stderr, strbuf_get_string(&sb));
-}
-
-
-struct rt *deserialize_bird(struct nb_buf *buf)
-{
-	return NULL;
+	nb_buf_write(buf, (byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
 }

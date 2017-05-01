@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 
-#define BUFSIZE	117	/* make sure buffer isn't boundary-aligned with buf's internal buffer */
+#define BUFSIZE	111	/* make sure buffer isn't boundary-aligned with buf's internal buffer */
 
 
 int main(int argc, char *argv[])
