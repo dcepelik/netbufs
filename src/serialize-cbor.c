@@ -112,6 +112,7 @@ void serialize_rte(struct cbor_stream *cs, struct rte *rte)
 		cbor_encode_uint64(cs, rte->as_no);
 	cbor_encode_uint32(cs, rte->src);
 
+	cbor_encode_int32(cs, rte->type);
 	cbor_encode_array_begin(cs, array_size(rte->attrs));
 	for (i = 0; i < array_size(rte->attrs); i++)
 		serialize_rte_attr(cs, &rte->attrs[i]);

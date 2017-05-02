@@ -130,6 +130,7 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 		cbor_decode_uint32(cs, &rte->as_no);
 	cbor_decode_uint32(cs, &rte->src);
 
+	cbor_decode_int32(cs, (int32_t *)&rte->type);
 	cbor_decode_array_begin(cs, &nitems);
 	rte->attrs = array_new(nitems, sizeof(*rte->attrs));
 	for (i = 0; i < nitems; i++) {
