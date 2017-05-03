@@ -15,7 +15,7 @@ nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 }
 
 
-struct nb_node *push_node(struct netbuf *nb, size_t offset, size_t size, enum nb_type type, char *name)
+static struct nb_node *push_node(struct netbuf *nb, size_t offset, size_t size, enum nb_type type, char *name)
 {
 	struct nb_node *node;
 	size_t len;
@@ -33,7 +33,7 @@ struct nb_node *push_node(struct netbuf *nb, size_t offset, size_t size, enum nb
 }
 
 
-struct nb_node *search_node(struct netbuf *nb, char *name)
+static struct nb_node *search_node(struct netbuf *nb, char *name)
 {
 	size_t i;
 
@@ -57,6 +57,12 @@ void nb_bind_bool(struct netbuf *nb, size_t offset, char *name)
 }
 
 
+void nb_bind_int32(struct netbuf *nb, size_t offset, char *name)
+{
+	push_node(nb, offset, 4, NB_TYPE_INT32, name);
+}
+
+
 void nb_bind_struct(struct netbuf *nb, size_t offset, size_t size, char *name)
 {
 	push_node(nb, offset, size, NB_TYPE_STRUCT, name);
@@ -72,7 +78,7 @@ void nb_bind_array(struct netbuf *nb, size_t offset, char *name, char *item_name
 }
 
 
-void send_array(struct netbuf *nb, struct nb_node *node, byte_t *ptr)
+static void send_array(struct netbuf *nb, struct nb_node *node, byte_t *ptr)
 {
 	size_t i;
 	struct nb_node *item_node;
@@ -80,21 +86,25 @@ void send_array(struct netbuf *nb, struct nb_node *node, byte_t *ptr)
 	item_node = search_node(nb, node->item_name);
 	assert(item_node != NULL);
 
-	for (i = 0; i < array_size(ptr); i++) {
+	cbor_encode_array_begin_indef(nb->cs);
+	for (i = 0; i < array_size(ptr); i++)
 		nb_send(nb, ptr + i * item_node->size, node->item_name);
-	}
+	cbor_encode_array_end(nb->cs);
 }
 
 
-void send_struct(struct netbuf *nb, struct nb_node *strct, byte_t *ptr)
+static void send_struct(struct netbuf *nb, struct nb_node *strct, byte_t *ptr)
 {
 	size_t i;
+
+	cbor_encode_map_begin_indef(nb->cs);
 	for (i = 0; i < array_size(nb->nodes); i++) {
 		if (strncmp(strct->name, nb->nodes[i].name, strlen(strct->name)) == 0) {
 			if (&nb->nodes[i] != strct)
 				nb_send(nb, ptr, nb->nodes[i].name);
 		}
 	}
+	cbor_encode_map_end(nb->cs);
 }
 
 
@@ -107,6 +117,7 @@ void nb_send(struct netbuf *nb, void *ptr, char *name)
 	assert(node != NULL);
 
 	bptr = (byte_t *)ptr + node->offset;
+	cbor_encode_text(nb->cs, (byte_t *)name, strlen(name));
 
 	switch (node->type) {
 	case NB_TYPE_STRING:
@@ -114,6 +125,9 @@ void nb_send(struct netbuf *nb, void *ptr, char *name)
 		break;
 	case NB_TYPE_BOOL:
 		cbor_encode_sval(nb->cs, *bptr ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
+		break;
+	case NB_TYPE_INT32:
+		cbor_encode_int32(nb->cs, *(int32_t *)bptr);
 		break;
 	case NB_TYPE_ARRAY:
 		send_array(nb, node, bptr);
