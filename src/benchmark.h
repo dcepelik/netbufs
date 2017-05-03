@@ -158,4 +158,7 @@ struct rt *deserialize_bird(struct nb_buf *buf);
 void serialize_cbor(struct rt *rt, struct nb_buf *buf);
 struct rt *deserialize_cbor(struct nb_buf *buf);
 
+void serialize_netbufs(struct rt *rt, struct nb_buf *buf);
+//struct rt *deserialize_cbor(struct nb_buf *buf);
+
 #endif
