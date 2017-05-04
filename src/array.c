@@ -1,6 +1,8 @@
 #include "array.h"
+#include "internal.h"
 #include "memory.h"
 #include "util.h"
+#include <assert.h>
 
 
 struct array_header
@@ -78,4 +80,11 @@ void array_reset(void *arr)
 void array_delete(void *arr)
 {
 	free(array_get_header(arr));
+}
+
+void *array_last(void *arr)
+{
+	struct array_header *hdr = array_get_header(arr);
+	assert(hdr->num_items > 0);
+	return ((byte_t *)arr) + (hdr->num_items - 1) * hdr->item_size;
 }

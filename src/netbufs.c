@@ -5,43 +5,104 @@
 #include "netbufs.h"
 #include "strbuf.h"
 #include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 
 
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 {
-	nb->nodes = array_new(4, sizeof(*nb->nodes));
 	nb->cs = cbor_stream_new(buf);
+	nb->root_ns.type = NB_TYPE_NS;
+	nb->root_ns.children = array_new(2, sizeof(*nb->root_ns.children));
+
 	return NB_ERR_OK;
+}
+
+
+static struct nb_node *node_find(struct nb_node *nodes, char *part, size_t len)
+{
+	size_t j;
+
+	for (j = 0; j < array_size(nodes); j++) {
+		if (strlen(nodes[j].part) == len && strncmp(nodes[j].part, part, len) == 0)
+			return &nodes[j];
+	}
+	return NULL;
+}
+
+
+/*
+ * TODO introduce some (basic) hashing to avoid comparing strings this much
+ */
+static struct nb_node *node_new(struct netbuf *nb, char *name, bool create)
+{
+	struct nb_node *parent = &nb->root_ns;
+	struct nb_node *new_parent;
+	char *part;
+	bool end;
+	size_t i;
+
+	part = name;
+	while (part[0] != '\0') {
+		for (i = 0; part[i] != '\0' && part[i] != '/'; i++) ;
+		end = (part[i] == '\0');
+
+		if (i == 0) {
+			/* TODO two "//" in a row in the part, error */
+			assert(false);
+		}
+
+		new_parent = node_find(parent->children, part, i);
+		if (!new_parent) {
+			if (!create)
+				return NULL;
+
+			parent->children = array_push(parent->children, 1);
+			new_parent = array_last(parent->children);
+			new_parent->name = name;
+			new_parent->part = strndup(part, i);
+			new_parent->type = NB_TYPE_NS;
+			new_parent->children = array_new(2, sizeof(*new_parent->children));
+		}
+
+		parent = new_parent;
+
+		if (end)
+			return parent;
+		part = part + (i + 1);
+	}
+
+	return NULL;
 }
 
 
 static struct nb_node *push_node(struct netbuf *nb, size_t offset, size_t size, enum nb_type type, char *name)
 {
 	struct nb_node *node;
-	size_t len;
 
-	len = array_size(nb->nodes);
-	nb->nodes = array_push(nb->nodes, 1);
+	node = node_new(nb, name, true);
+	assert(node != NULL);
 
-	node = &nb->nodes[len];
 	node->type = type;
 	node->name = name;
 	node->offset = offset;
 	node->size = size;
-
 	return node;
 }
 
 
 static struct nb_node *search_node(struct netbuf *nb, char *name)
 {
-	size_t i;
+	return node_new(nb, name, false);
+}
 
-	for (i = 0; i < array_size(nb->nodes); i++)
-		if (strcmp(nb->nodes[i].name, name) == 0)
-			return &nb->nodes[i];
 
+static struct nb_node *children_of(struct netbuf *nb, char *name)
+{
+	struct nb_node *parent;
+	parent = node_new(nb, name, false);
+	if (parent)
+		return parent->children;
 	return NULL;
 }
 
@@ -126,29 +187,20 @@ static char *get_ns_name(char *name)
 
 static void send_union(struct netbuf *nb, struct nb_node *unn, byte_t *ptr, int32_t switch_val)
 {
-	struct nb_node *target_node;
-	char *nsname;
+	struct nb_node *members;
 	byte_t *bptr;
 	size_t i;
-	size_t ord;
-	size_t len;
 
 	assert(switch_val >= 0);
-	nsname = get_ns_name(unn->name);
-	len = strlen(nsname);
+	members = children_of(nb, unn->name);
+	assert(members != NULL);
 
-	for (i = 0, ord = 0; i < array_size(nb->nodes); i++) {
-		if (nb->nodes[i].name != unn->name && strncmp(nsname, nb->nodes[i].name, len) == 0) {
-			if (&nb->nodes[i] == unn || strchr(nb->nodes[i].name + len, '/') != NULL)
-				continue;
-
-			if (ord == switch_val) {
-				bptr = ptr + nb->nodes[i].offset;
-				DEBUG_EXPR("%i", *((int32_t *)bptr));
-				nb_send(nb, bptr, nb->nodes[i].name);
-				break;
-			}
-			ord++;
+	/* TODO loop is pointless */
+	for (i = 0; i < array_size(members); i++) {
+		if (i == switch_val) {
+			bptr = ptr + members[i].offset;
+			nb_send(nb, bptr, members[i].name);
+			break;
 		}
 	}
 }
@@ -156,38 +208,33 @@ static void send_union(struct netbuf *nb, struct nb_node *unn, byte_t *ptr, int3
 
 static void send_struct(struct netbuf *nb, struct nb_node *strct, byte_t *ptr)
 {
+	struct nb_node *members;
 	byte_t *bptr;
 	char *nsname;
 	int32_t switch_val;
 	size_t i;
 	size_t len;
 
-	nsname = get_ns_name(strct->name);
-	len = strlen(nsname);
+	members = children_of(nb, strct->name);
+	assert(members != NULL);
 
 	cbor_encode_map_begin_indef(nb->cs);
-	for (i = 0; i < array_size(nb->nodes); i++) {
-		if (strncmp(nsname, nb->nodes[i].name, len) == 0) {
-			/* avoid loops when struct name ends in '/', only send direct children of this struct */
-			if (&nb->nodes[i] == strct || strchr(nb->nodes[i].name + len, '/') != NULL)
-				continue;
+	for (i = 0; i < array_size(members); i++) {
+		assert(members[i].offset >= 0);
+		bptr = ptr + members[i].offset;
 
-			assert(nb->nodes[i].offset >= 0);
-			bptr = ptr + nb->nodes[i].offset;
-
-			/* TODO This conditional is a dirty hack, get rid of it */
-			if (nb->nodes[i].type != NB_TYPE_UNION) {
-				nb_send(nb, bptr, nb->nodes[i].name);
-			}
-			else {
-				struct nb_node *switch_node;
-				switch_node = search_node(nb, nb->nodes[i].switch_name);
-				/* assert(switch_node is a sibling in this struct) */
-				/* assert(switch_node's type is NB_TYPE_INT32) */
-				
-				switch_val = *((int32_t *)(ptr + switch_node->offset));
-				send_union(nb, &nb->nodes[i], bptr, switch_val);
-			}
+		/* TODO This conditional is a dirty hack, get rid of it */
+		if (members[i].type != NB_TYPE_UNION) {
+			nb_send(nb, bptr, members[i].name);
+		}
+		else {
+			struct nb_node *switch_node;
+			switch_node = search_node(nb, members[i].switch_name);
+			/* assert(switch_node is a sibling in this struct) */
+			/* assert(switch_node's type is NB_TYPE_INT32) */
+			
+			switch_val = *((int32_t *)(ptr + switch_node->offset));
+			send_union(nb, &members[i], bptr, switch_val);
 		}
 	}
 	cbor_encode_map_end(nb->cs);

@@ -16,22 +16,25 @@ enum nb_type
 	NB_TYPE_ARRAY,
 	NB_TYPE_STRUCT,
 	NB_TYPE_UNION,
+	NB_TYPE_NS,
 };
 
 struct nb_node
 {
 	char *name;
+	char *part;
 	enum nb_type type;
-	size_t offset;
-	void *item_name;
-	void *switch_name;
-	size_t size;		/* TODO what's this precisely? */
+	size_t offset;		/* offset within a struct or union */
+	void *item_name;	/* arrays only: the name of the contained type */
+	void *switch_name;	/* TODO */
+	size_t size;		/* struct size */
+	struct nb_node *children;
 };
 
 struct netbuf
 {
 	struct cbor_stream *cs;
-	struct nb_node *nodes;
+	struct nb_node root_ns;	/* TODO maybe I could get rid of this */
 };
 
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf);
