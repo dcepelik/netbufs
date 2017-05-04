@@ -15,6 +15,7 @@ enum nb_type
 	NB_TYPE_UINT32,
 	NB_TYPE_ARRAY,
 	NB_TYPE_STRUCT,
+	NB_TYPE_UNION,
 };
 
 struct nb_node
@@ -23,6 +24,7 @@ struct nb_node
 	enum nb_type type;
 	size_t offset;
 	void *item_name;
+	void *switch_name;
 	size_t size;		/* TODO what's this precisely? */
 };
 
@@ -41,6 +43,7 @@ void nb_bind_int32(struct netbuf *nb, size_t offset, char *name);
 void nb_bind_uint32(struct netbuf *nb, size_t offset, char *name);
 void nb_bind_struct(struct netbuf *nb, size_t offset, size_t size, char *name);
 void nb_bind_array(struct netbuf *nb, size_t offset, char *name, char *item_name);
+void nb_bind_union(struct netbuf *nb, size_t offset, size_t size, char *name, char *switch_name);
 
 void nb_send(struct netbuf *nb, void *displace, char *name);
 

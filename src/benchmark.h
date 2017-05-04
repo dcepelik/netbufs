@@ -83,9 +83,9 @@ struct kvp
  */
 enum rte_attr_type
 {
-	RTE_ATTR_TYPE_BGP_AS_PATH = 1,
-	RTE_ATTR_TYPE_BGP_ORIGIN,
+	RTE_ATTR_TYPE_BGP_ORIGIN = 0,
 	RTE_ATTR_TYPE_BGP_NEXT_HOP,
+	RTE_ATTR_TYPE_BGP_AS_PATH,
 	RTE_ATTR_TYPE_BGP_LOCAL_PREF,
 	RTE_ATTR_TYPE_BGP_COMMUNITY,
 	RTE_ATTR_TYPE_BGP_AGGREGATOR,
@@ -101,9 +101,9 @@ struct rte_attr
 	bool tflag;						/* [t] flag on this attr? */
 
 	union {
-		int *bgp_as_path;			/* BGP.as_path */
-		enum bgp_origin bgp_origin;	/* BGP.orogin */
+		enum bgp_origin bgp_origin;	/* BGP.origin */
 		ipv4_t bgp_next_hop;		/* BGP.next_hop */
+		int *bgp_as_path;			/* BGP.as_path */
 		uint32_t bgp_local_pref;	/* BGP.local_pref */
 		struct bgp_cflag *cflags;	/* BGP.community */
 		struct bgp_aggr aggr;		/* BGP.aggregator */

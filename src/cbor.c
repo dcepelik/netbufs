@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BYTES_DUMP_MAXLEN	32
+#define BYTES_DUMP_MAXLEN	64
 
 
 struct isbuf {
