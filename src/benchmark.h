@@ -2,13 +2,12 @@
 #define SERIALIZE_H
 
 #include "array.h"
-#include "memory.h"
 #include "buf.h"
+#include "internal.h"
+#include "memory.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <time.h>
-
-typedef uint32_t ipv4_t;
 
 static inline void ipv4_init(ipv4_t *ip)
 {

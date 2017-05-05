@@ -6,6 +6,9 @@
 #include "stack.h"
 #include "strbuf.h"
 #include <stdlib.h>
+#include <stdint.h>
+
+typedef uint32_t ipv4_t;
 
 #define CBOR_BLOCK_STACK_INIT_SIZE	4
 

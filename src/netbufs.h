@@ -1,53 +1,40 @@
-#include "buf.h"
+/*
+ * TODO Sending items without keys (do we need it?)
+ */
+
+#ifndef NETBUFS_H
+#define NETBUFS_H
+
 #include "error.h"
-#include <stdlib.h>
+#include "internal.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-#ifndef NETBUF_H
-#define NETBUF_H
+struct netbuf;
 
-struct ns;
+nb_err_t nb_init(struct netbuf *nb);
 
-enum nb_type
-{
-	NB_TYPE_STRING = 1,
-	NB_TYPE_BOOL,
-	NB_TYPE_INT32,
-	NB_TYPE_UINT32,
-	NB_TYPE_ARRAY,
-	NB_TYPE_STRUCT,
-	NB_TYPE_UNION,
-	NB_TYPE_NS,
-};
+nb_err_t nb_send_u8(struct netbuf *nb, int key, uint8_t u8);
+nb_err_t nb_send_u16(struct netbuf *nb, int key, uint16_t u16);
+nb_err_t nb_send_u32(struct netbuf *nb, int key, uint32_t u32);
+nb_err_t nb_send_u64(struct netbuf *nb, int key, uint64_t u64);
+nb_err_t nb_send_uint(struct netbuf *nb, int key, unsigned int u);
 
-struct nb_node
-{
-	char *name;
-	char *part;
-	enum nb_type type;
-	size_t offset;		/* offset within a struct or union */
-	void *item_name;	/* arrays only: the name of the contained type */
-	void *switch_name;	/* TODO */
-	size_t size;		/* struct size */
-	struct nb_node *children;
-};
+nb_err_t nb_send_i8(struct netbuf *nb, int key, int8_t i8);
+nb_err_t nb_send_i16(struct netbuf *nb, int key, int16_t i16);
+nb_err_t nb_send_i32(struct netbuf *nb, int key, int32_t i32);
+nb_err_t nb_send_i64(struct netbuf *nb, int key, int64_t i64);
+nb_err_t nb_send_int(struct netbuf *nb, int key, int i);
 
-struct netbuf
-{
-	struct cbor_stream *cs;
-	struct nb_node root_ns;	/* TODO maybe I could get rid of this */
-};
+nb_err_t nb_send_bool(struct netbuf *nb, int key, bool b);
+nb_err_t nb_send_string(struct netbuf *nb, int key, char *str);
 
-nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf);
-//void nb_free(struct netbuf *nb);
+nb_err_t nb_array_begin(struct netbuf *nb, int key, uint64_t nitems);
+nb_err_t nb_array_end(struct netbuf *nb);
 
-void nb_bind_string(struct netbuf *nb, size_t offset, char *name);
-void nb_bind_bool(struct netbuf *nb, size_t offset, char *name);
-void nb_bind_int32(struct netbuf *nb, size_t offset, char *name);
-void nb_bind_uint32(struct netbuf *nb, size_t offset, char *name);
-void nb_bind_struct(struct netbuf *nb, size_t offset, size_t size, char *name);
-void nb_bind_array(struct netbuf *nb, size_t offset, char *name, char *item_name);
-void nb_bind_union(struct netbuf *nb, size_t offset, size_t size, char *name, char *switch_name);
+nb_err_t nb_map_begin(struct netbuf *nb, int key, uint64_t npairs);
+nb_err_t nb_map_end(struct netbuf *nb);
 
-void nb_send(struct netbuf *nb, void *displace, char *name);
+nb_err_t nb_send_ipv4(struct netbuf *nb, int key, ipv4_t ip);
 
 #endif

@@ -5,7 +5,7 @@ OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o bu
 BENCHMARK_OBJS=serialize-bird.o deserialize-bird.o parser.o\
 	serialize-cbor.o deserialize-cbor.o\
 	serialize-netbufs.o
-TESTS=test-stream test-adhoc test-array test-netbufs
+TESTS=test-stream test-adhoc test-array
 BINS=cbordump benchmark
 
 CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable

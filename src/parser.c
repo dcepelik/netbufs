@@ -27,7 +27,7 @@ void parser_init(struct parser *p, struct nb_buf *buf)
 }
 
 
-static void error(struct parser *p, char *fmt, ...)
+static void parse_error(struct parser *p, char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -98,7 +98,7 @@ static void match(struct parser *p, char *str)
 	for (i = 0; str[i] != '\0'; i++) {
 		c = parser_getc(p);
 		if (c == BUF_EOF || c != str[i])
-			error(p, "unexpected '%c', '%c' was expected\n",
+			parse_error(p, "unexpected '%c', '%c' was expected\n",
 				c, str[i]);
 	}
 }
@@ -158,7 +158,7 @@ static void parse_u32(struct parser *p, uint32_t *n)
 	num_digits = parser_try_parse_int(p, n);
 
 	if (!num_digits)
-		error(p, "integer was expected, got '%c'\n",
+		parse_error(p, "integer was expected, got '%c'\n",
 			parser_cur(p));
 }
 
@@ -195,7 +195,7 @@ static char *parser_accum(struct parser *p, int (*predicate)(int c))
 {
 	char *word = parser_try_accum(p, predicate);
 	if (word == NULL)
-		error(p, "string was expected\n");
+		parse_error(p, "string was expected\n");
 	return word;
 }
 
@@ -299,7 +299,7 @@ static struct rte_attr *parse_attr_type(struct parser *p, struct rte *rte)
 		else if (strcmp(word, "static") == 0)
 			rte->type |= RTE_TYPE_STATIC;
 		else
-			error(p, "Unknown value of Type attribute: %s\n", word);
+			parse_error(p, "Unknown value of Type attribute: %s\n", word);
 	}
 
 	match_eol(p);
@@ -322,7 +322,7 @@ static struct rte_attr *parse_attr_bgp_origin(struct parser *p, struct rte *rte)
 	else if (strcmp(origin, "Incomplete") == 0)
 		attr->bgp_origin = BGP_ORIGIN_INCOMPLETE;
 	else
-		error(p, "unexpected '%s', 'IGP' or 'Incomplete' expected\n",
+		parse_error(p, "unexpected '%s', 'IGP' or 'Incomplete' expected\n",
 			origin);
 
 	match_eol(p);
@@ -494,7 +494,7 @@ static void parse_rte_attrs(struct parser *p, struct rte *rte)
 			attr = parse_attr_other(p, key, rte);
 
 		if (!attr && tflag)
-			error(p, "[t]-flag on required attribute unsupported\n");
+			parse_error(p, "[t]-flag on required attribute unsupported\n");
 
 		if (attr)
 			attr->tflag = tflag;
@@ -530,7 +530,7 @@ static void parse_as_name(struct parser *p, struct rte *rte)
 		rte->src = RTE_SRC_WHO_KNOWS;  
 		break;
 	default:
-		error(p, "Unknown AS number suffix: '%c'\n", c);
+		parse_error(p, "Unknown AS number suffix: '%c'\n", c);
 	}
 }
 

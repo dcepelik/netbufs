@@ -1,66 +1,74 @@
-#include "benchmark.h"
-#include "debug.h"
-#include "netbufs.h"
-
-
-union remove_this
+void send_time(struct netbuf *nb, int key, struct tm *tm)
 {
-	enum bgp_origin bgp_origin;	/* BGP.origin */
-	ipv4_t bgp_next_hop;		/* BGP.next_hop */
-	int *bgp_as_path;			/* BGP.as_path */
-	uint32_t bgp_local_pref;	/* BGP.local_pref */
-	struct bgp_cflag *cflags;	/* BGP.community */
-	struct bgp_aggr aggr;		/* BGP.aggregator */
-	struct kvp other_attr;		/* other attributes */
-};
+	nb_map_begin(nb, key, 3);
+	nb_send_int(nb, BIRD_ORG_TIME_HOUR, tm->tm_hour);
+	nb_send_int(nb, BIRD_ORG_TIME_MIN, tm->tm_min);
+	nb_send_int(nb, BIRD_ORG_TIME_SEC, tm->tm_sec);
+	nb_map_end(nb);
+}
+
+
+void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
+{
+	send_i32(nb, BIRD_RTE_ATTR_TYPE, attr->type);
+	send_bool(nb, BIRD_RTE_ATTR_TFLAG, attr->tflag);
+
+	switch (attr->type) {
+	case RTE_ATTR_TYPE_BGP_ORIGIN:
+		nb_send_i32(nb, BIRD_RTE_ATTR_BGP_ORIGIN, attr->bgp_origin);
+		break;
+	case RTE_ATTR_TYPE_BGP_NEXT_HOP:
+		nb_send_ipv4(nb, BIRD_RTE_ATTR_BGP_NEXT_HOP, attr->bgp_next_hop);
+		break;
+	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
+		nb_send_u32(nb, BIRD_RTE_ATTR_TYPE_BGP_LOCAL_PREF, attr->bgp_local_pref);
+		break;
+	default:
+		/* ignore the attr */
+		break;
+	}
+}
+
+
+void send_rte(struct netbuf *nb, struct rte *rte)
+{
+	size_t i;
+
+	nb_send_ipv4(nb, BIRD_RTE_NETADDR, rte->netaddr);
+	nb_send_u32(nb, BIRD_RTE_NETMASK, rte->netmask);
+	nb_send_ipv4(nb, BIRD_RTE_GWADDR, rte->gwaddr);
+	nb_send_string(nb, BIRD_RTE_IFNAME, rte->ifname);
+	send_time(nb, BIRD_RTE_UPTIME, rte->uptime);
+
+	if (rte->uplink_from_valid)
+		nb_send_ipv4(nb, BIRD_RTE_UPLINK_FROM, rte->uplink_from);
+	
+	nb_send_i32(nb, BIRD_RTE_TYPE, rte->type);
+
+	if (rte->as_no_valid)
+		nb_send_u32(nb, BIRD_RTE_AS_NO, rte->as_no);
+	
+	nb_send_i32(nb, BIRD_RTE_SRC, rte->src);
+
+	for (i = 0; i < array_size(rte->attrs); i++)
+		send_rte_attr(netbuf, &rte->attrs[i]);
+}
+
+
+void send_rt(struct netbuf *nb, struct rt *rt)
+{
+	size_t i;
+
+	nb_send_string(nb, BIRD_RT_VERSION_STR, rt->version_str);
+	for (i = 0; i < array_size(rt->entries); i++)
+		send_rte(nb, &rt->entries[i])
+}
 
 
 void serialize_netbufs(struct rt *rt, struct nb_buf *buf)
 {
 	struct netbuf nb;
-	struct rt *rt0 = NULL;
-	struct rte *rte0 = NULL;
-	struct rte_attr *attr0 = NULL;
-	union remove_this *rem0 = NULL;
-	struct tm *tm0 = NULL;
-
-	DEBUG_EXPR("%p", (void *)&rt->entries[3].attrs[0].bgp_origin);
-
-	nb_init(&nb, buf);
-
-	nb_bind_struct(&nb, 0, sizeof(struct rt), "bird.org/rt");
-	nb_bind_string(&nb, (size_t)&rt0->version_str, "bird.org/rt/version_str");
-	nb_bind_array(&nb, (size_t)&rt0->entries, "bird.org/rt/entries", "bird.org/rte");
-
-	nb_bind_struct(&nb, 0, sizeof(struct rte), "bird.org/rte");
-	nb_bind_uint32(&nb, (size_t)&rte0->netaddr, "bird.org/rte/netaddr");
-	nb_bind_uint32(&nb, (size_t)&rte0->netmask, "bird.org/rte/netmask");
-	nb_bind_uint32(&nb, (size_t)&rte0->gwaddr, "bird.org/rte/gwaddr");
-	nb_bind_string(&nb, (size_t)&rte0->ifname, "bird.org/rte/ifname");
-	nb_bind_bool(&nb, (size_t)&rte0->uplink_from_valid, "bird.org/rte/uplink_from_valid");
-	nb_bind_array(&nb, (size_t)&rte0->attrs, "bird.org/rte/attrs", "bird.org/rte_attr");
-	nb_bind_int32(&nb, (size_t)&rte0->type, "bird.org/rte/type");
-	nb_bind_bool(&nb, (size_t)&rte0->as_no_valid, "bird.org/rte/as_no_valid");
-	nb_bind_uint32(&nb, (size_t)&rte0->as_no, "bird.org/rte/as_no");
-	nb_bind_int32(&nb, (size_t)&rte0->src, "bird.org/rte/src");
-
-	nb_bind_struct(&nb, (size_t)&rte0->uplink, sizeof(struct tm), "bird.org/rte/uplink");
-	nb_bind_int32(&nb, (size_t)&tm0->tm_hour, "bird.org/rte/uplink/hour");
-	nb_bind_int32(&nb, (size_t)&tm0->tm_min, "bird.org/rte/uplink/min");
-	nb_bind_int32(&nb, (size_t)&tm0->tm_sec, "bird.org/rte/uplink/sec");
-
-	nb_bind_struct(&nb, 0, sizeof(struct rte_attr), "bird.org/rte_attr");
-	nb_bind_int32(&nb, (size_t)&attr0->type, "bird.org/rte_attr/type");
-	nb_bind_bool(&nb, (size_t)&attr0->tflag, "bird.org/rte_attr/tflag");
-	nb_bind_union(&nb, (size_t)&attr0->bgp_origin, -1, "bird.org/rte_attr/anon_union", "bird.org/rte_attr/type");
-
-	nb_bind_int32(&nb, (size_t)&rem0->bgp_origin, "bird.org/rte_attr/anon_union/bgp_origin");
-	nb_bind_uint32(&nb, (size_t)&rem0->bgp_next_hop, "bird.org/rte_attr/anon_union/bgp_next_hop");
-	nb_bind_int32(&nb, 0, "bird.org/attrs/bgp/as_path/crumb");
-	nb_bind_array(&nb, (size_t)&rem0->bgp_as_path, "bird.org/rte_attr/anon_union/bgp_as_path", "bird.org/attrs/bgp/as_path/crumb");
-	nb_bind_uint32(&nb, (size_t)&rem0->bgp_local_pref, "bird.org/rte_attr/anon_union/bgp_local_pref");
-
-	//nb_bind_struct(&nb, (size_t)&rem0->cflags, sizeof(struct bgp_cflag), "bird.org/rte_attr/anon_union/bgp_cflags");
-
-	nb_send(&nb, rt, "bird.org/rt");
+	netbuf_init(&nb, buf);
+	send_rt(&nb, rt);
+	netbuf_free(&nb);
 }
