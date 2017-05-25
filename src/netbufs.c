@@ -52,7 +52,7 @@ void nb_array_begin(struct netbuf *nb, int key)
 
 void nb_array_end(struct netbuf *nb)
 {
-	cbor_encode_array_begin_indef(nb->cs);
+	cbor_encode_array_end(nb->cs);
 }
 
 

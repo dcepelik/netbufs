@@ -1,6 +1,8 @@
 /*
  * decode:
  * CBOR decoder
+ *
+ * TODO Get rid of all recursion, or limit allowed nesting of maps and arrays.
  */
 
 #include "debug.h"

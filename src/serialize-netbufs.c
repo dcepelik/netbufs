@@ -1,42 +1,53 @@
 #include "benchmark.h"
 #include "netbufs.h"
 
+/*
+ * TODO Table generation
+ * TODO "Autofixed" types
+ */
 
-enum netbufs_key
+enum bird_nb_key
 {
-	BIRD_RTE_ATTR_TYPE,
-	BIRD_RTE_ATTR_TFLAG,
+	BIRD_AS_NO,
+	BIRD_IPV4,
+	BIRD_RTE_AS_NO,
+	BIRD_RTE_ATTR_BGP_AGGREGATOR,
+	BIRD_RTE_ATTR_BGP_AS_PATH,
+	BIRD_RTE_ATTR_BGP_COMMUNITY,
+	BIRD_RTE_ATTR_BGP_LOCAL_PREF,
 	BIRD_RTE_ATTR_BGP_NEXT_HOP,
 	BIRD_RTE_ATTR_BGP_ORIGIN,
-	BIRD_RTE_ATTR_BGP_LOCAL_PREF,
-	BIRD_RTE_NETADDR,
-	BIRD_RTE_NETMASK,
+	BIRD_RTE_ATTR_TFLAG,
+	BIRD_RTE_ATTR_TYPE,
 	BIRD_RTE_GWADDR,
 	BIRD_RTE_IFNAME,
-	BIRD_RTE_UPTIME,
-	BIRD_RTE_UPLINK_FROM,
-	BIRD_RTE_TYPE,
-	BIRD_RTE_AS_NO,
+	BIRD_RTE_NETADDR,
+	BIRD_RTE_NETMASK,
 	BIRD_RTE_SRC,
+	BIRD_RTE_TYPE,
+	BIRD_RTE_UPLINK_FROM,
+	BIRD_RTE_UPTIME,
 	BIRD_RT_VERSION_STR,
-	BIRD_ORG_TIME_HOUR,
-	BIRD_ORG_TIME_MIN,
-	BIRD_ORG_TIME_SEC,
+	BIRD_TIME_HOUR,
+	BIRD_TIME_MIN,
+	BIRD_TIME_SEC,
 };
 
 
-void send_time(struct netbuf *nb, int key, struct tm *tm)
+static void send_time(struct netbuf *nb, int key, struct tm *tm)
 {
-	nb_map_begin(nb, key);
-	nb_send_int(nb, BIRD_ORG_TIME_HOUR, tm->tm_hour);
-	nb_send_int(nb, BIRD_ORG_TIME_MIN, tm->tm_min);
-	nb_send_int(nb, BIRD_ORG_TIME_SEC, tm->tm_sec);
-	nb_map_end(nb);
+	nb_array_begin(nb, key);
+	nb_send_int(nb, BIRD_TIME_HOUR, tm->tm_hour);
+	nb_send_int(nb, BIRD_TIME_MIN, tm->tm_min);
+	nb_send_int(nb, BIRD_TIME_SEC, tm->tm_sec);
+	nb_array_end(nb);
 }
 
 
-void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
+static void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 {
+	size_t i;
+
 	nb_send_uint(nb, BIRD_RTE_ATTR_TYPE, attr->type);
 	nb_send_bool(nb, BIRD_RTE_ATTR_TFLAG, attr->tflag);
 
@@ -50,6 +61,22 @@ void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
 		nb_send_uint(nb, BIRD_RTE_ATTR_BGP_LOCAL_PREF, attr->bgp_local_pref);
 		break;
+	case RTE_ATTR_TYPE_BGP_AS_PATH:
+		nb_array_begin(nb, BIRD_RTE_ATTR_BGP_AS_PATH);
+		for (i = 0; i < array_size(attr->bgp_as_path); i++)
+			nb_send_uint(nb, BIRD_AS_NO, attr->bgp_as_path[i]);
+		nb_array_end(nb);
+		break;
+	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
+		nb_map_begin(nb, BIRD_RTE_ATTR_BGP_AGGREGATOR);
+		nb_send_uint(nb, BIRD_AS_NO, attr->aggr.as_no);
+		nb_send_ipv4(nb, BIRD_IPV4, attr->aggr.ip);
+		nb_map_end(nb);
+		break;
+	case RTE_ATTR_TYPE_BGP_COMMUNITY:
+		nb_array_begin(nb, BIRD_RTE_ATTR_BGP_COMMUNITY);
+		nb_array_end(nb);
+		break;
 	default:
 		/* ignore the attr */
 		break;
@@ -57,7 +84,7 @@ void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 }
 
 
-void send_rte(struct netbuf *nb, struct rte *rte)
+static void send_rte(struct netbuf *nb, struct rte *rte)
 {
 	size_t i;
 
@@ -82,7 +109,7 @@ void send_rte(struct netbuf *nb, struct rte *rte)
 }
 
 
-void send_rt(struct netbuf *nb, struct rt *rt)
+static void send_rt(struct netbuf *nb, struct rt *rt)
 {
 	size_t i;
 

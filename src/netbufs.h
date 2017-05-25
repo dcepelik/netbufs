@@ -1,7 +1,3 @@
-/*
- * TODO Sending items without keys (do we need it?)
- */
-
 #ifndef NETBUFS_H
 #define NETBUFS_H
 

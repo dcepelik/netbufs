@@ -1,17 +1,28 @@
 .PHONY: all clean metrics tests
 
-LIB=libcbor.a
-OBJS=cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o netbufs.o
-BENCHMARK_OBJS=serialize-bird.o deserialize-bird.o parser.o\
+LIB = libcbor.a
+OBJS = cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o netbufs.o
+BENCHMARK_OBJS = serialize-bird.o deserialize-bird.o parser.o\
 	serialize-cbor.o deserialize-cbor.o\
 	serialize-netbufs.o
-TESTS=test-stream test-adhoc test-array
-BINS=cbordump benchmark
+TESTS = test-stream test-adhoc test-array
+BINS = cbordump benchmark
 
-CFLAGS+=-c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable
-LDFLAGS+=-Wall
+CFLAGS += -c -std=gnu11 -Wall -Werror --pedantic -ggdb3 -DDEBUG -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable
+LDFLAGS += -Wall
+
+COMMON_HEADERS = memory.h internal.h error.h util.h
+SRCS = $(wildcard *.c)
 
 all: $(LIB) $(TESTS) $(BINS)
+
+%.d: %.c
+	gcc -MM -o $@ $<; sed 's/:/ $@:/' $@ > $@.tmp; mv $@.tmp $@
+
+%.o: %.c %.d
+	$(CC) $(CFLAGS) -o $@ $<
+
+include $(SRCS:.c=.d)
 
 $(LIB): $(OBJS)
 	ar rcs $(LIB) $(OBJS)
@@ -34,11 +45,8 @@ cbordump: cbordump.o $(OBJS)
 benchmark: benchmark.o $(OBJS) $(BENCHMARK_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
-%.o: %.c %.h
-	$(CC) $(CFLAGS) -o $@ $<
-
 clean:
-	rm -f -- $(LIB) *.o $(TESTS) $(BINS) vgcore.*
+	rm -f -- $(LIB) *.o *.d $(TESTS) $(BINS) vgcore.*
 
 metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc

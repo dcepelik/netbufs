@@ -1,9 +1,10 @@
 /*
  * cbordump:
- * CBOR stream manipulation utility
+ * CBOR stream introspection tool
  */
 
 #include "cbor.h"
+#include "debug.h"
 #include "internal.h"
 
 #include <assert.h>
@@ -137,6 +138,7 @@ int main(int argc, char *argv[])
 	if (!passthru) {
 		if ((err = cbor_stream_dump(cs_in, stdout)) != CBOR_ERR_OK) {
 			fprintf(stderr, "%s: error: %s\n", argv0, cbor_stream_strerror(cs_in));
+			DEBUG_EXPR("%i", err);
 			return 2;
 		}
 		putchar('\n');
