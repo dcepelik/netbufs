@@ -1,4 +1,4 @@
-.PHONY: clean all
+.PHONY: all clean metrics
 
 ROOT_DIR = ..
 SRC_DIR = $(ROOT_DIR)/src
@@ -52,3 +52,9 @@ include $(DEPS) $(BENCH_DEPS)
 
 clean:
 	rm -f -- $(BINS) $(OBJS) $(BENCH_OBJS) $(DEPS) $(BENCH_DEPS)
+
+metrics:
+	for src_dir in $(SRC_DIR) $(BENCH_SRC_DIR) $(ROOT_DIR); do \
+		echo $$src_dir:; \
+		find $$src_dir -name "*.c" -or -name "*.h" | xargs cat | wc -cl; \
+	done
