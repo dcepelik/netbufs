@@ -1,0 +1,34 @@
+\input opmac
+
+\margins/1 a4 (3, 3, 3, 3)cm
+\typosize [13/15]
+\activettchar@
+
+\tit Network Buffers Internals
+
+\chap Code Organization
+
+\sec Project Layout
+
+Project's files are located in a simple directory structure:
+
+\bigskip
+\centerline{
+	\table{l|l}{
+		@benchmark@ & benchmark sources and sample data\cr
+		@build@ & Make environment\cr
+		@doc@ & the docs\cr
+		@netbufs@ & main (netbufs') sources directory\cr
+		@tests@ & test script and data\cr
+	}
+}
+\bigskip
+\caption/t Location of various files
+
+\sec Building
+
+There's a single Makefile in @build@. Therfore, run @make@ inside @build@.
+
+\secc Make Targets
+
+\bye

@@ -13,7 +13,7 @@ LDFLAGS += -Wall
 COMMON_HEADERS = memory.h internal.h error.h util.h
 SRCS = $(wildcard *.c)
 
-all: $(LIB) $(TESTS) $(BINS)
+all: $(TESTS) $(BINS)
 
 %.d: %.c
 	gcc -MM -o $@ $<; sed 's/:/ $@:/' $@ > $@.tmp; mv $@.tmp $@
