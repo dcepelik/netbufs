@@ -1,0 +1,115 @@
+\input opmac
+
+\margins/1 a4 (3, 3, 3, 3)cm
+\typosize [13/15]
+\activettchar|
+
+\def\nb{|netbufs|}
+
+\def\hnote#1#2{
+	\medskip
+	\hrule
+	\medskip
+	\par\noindent
+	{\bf #1}
+	\noindent
+	\par\noindent#2
+	\medskip
+	\hrule
+	\medskip
+}
+
+\def\img#1#2{
+	\bigskip
+    \centerline{
+		\inspic{#1}
+    }
+	\caption/f #2
+	\bigskip
+}
+
+\tit Using Network Buffers
+
+\nonum\notoc\sec Contents
+\maketoc
+
+\sec What's this?
+
+\hnote{TL;DR}{%
+	\nb\ provide serialization and deserialization features to your application.
+	They try to be as flexible as possible without compromising performance too
+	much and to be easy to use and reliable.
+}
+
+\noindent
+Imagine that you have data you need to send over the network or write to a
+file\fnote{Or exchange with the rest of the world in any other way.}, and you
+need to choose some format for your data, which would ideally be:
+
+\begitems\style -
+	* simple to use,
+	* fast to read and write,
+	* compact, and
+	* out of the way.
+\enditems
+
+\noindent
+You'll likely devise multiple solutions with varying degree of satisfaction:
+
+{\bf Fixed scheme.} The simplest solution would be to serialize all the data
+you have in some fixed order without any metadata. Sure enough, this will be
+quite compact, encoding and decoding is super fast$\dots$ but terribly fragile.
+
+\img{images/fixed.pdf}{Meteorological data encoded in a fixed binary scheme.}
+
+If you start sending\fnote{`Sending', `writing' and `encoding' are all synonyms
+in this guide, just as `receiving', `reading' and `decoding' are.} new data and
+don't update the reciever to decode it, it will break. You have to always send
+all values (even when they are unset), otherwise it will break, too.
+
+\noindent
+{\bf JSON.} These problems are often relevant, so you may want to
+switch to JSON or similar scheme. That certainly fixes the problem, but it also
+introduces new ones: the scheme is far from efficient, both in terms of time
+and size, mainly because of all the string keys you send.
+
+Also, you may find that the API of most JSON decoders won't really be very
+helpful as you try do deserialize your data and you'll either want to write your
+own deserialization routines, or at least a lot of boilerplate code.
+
+\bigskip
+\begtt
+reading: {
+    wind: {
+        speed: 2,
+        gust_speed: 11,
+        direction: "NNW",
+    }, ...
+}
+\endtt
+\caption/f The same data encoded in JSON.
+\bigskip
+
+\noindent
+{\bf CBOR.} So it would be better to use a binary scheme after all,
+which would be as flexible as JSON, but efficient. Luckily for us, there's
+CBOR, which does exactly that.
+
+So you'll find yourself a decent implementation of CBOR, but the API
+still doesn't fit your needs! Furthemore, you still have to write all the keys,
+and those strings still have a hold on your performance.
+
+\img{images/cbor.pdf}{The same data encoded in CBOR (collapsed strings).}
+
+\noindent
+{\bf Network Buffers.} So you'll add smart string de-duplication, a nice API
+that fits common usage patterns, you'll make it run fast and write a lot of
+tests and documentation. Congratulations, you have just discovered \nb!
+
+TODO Add figure (netbuf encoding)
+
+\sec Basic Usage
+\sec Examples
+\sec API Documentation
+
+\bye
