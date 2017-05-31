@@ -103,6 +103,9 @@ static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 				return NB_ERR_EOF;
 		}
 
+		//DEBUG_EXPR("%lu", buf->pos);
+		//DEBUG_EXPR("%lu", buf->len);
+
 		ncpy = MIN(avail, nbytes);
 		memcpy(bytes, buf->buf + buf->pos, ncpy);
 		bytes += ncpy;
@@ -285,7 +288,13 @@ static void nb_buf_file_close(struct nb_buf *buf)
 
 static void nb_buf_file_fill(struct nb_buf *buf)
 {
-	buf->len = read(buf->fd, buf->buf, buf->bufsize);
+	int retval;
+
+	retval = read(buf->fd, buf->buf, buf->bufsize);
+	buf->len = MAX(retval, 0);
+
+	/* TODO handle error  if retval < 0 */
+
 	buf->eof = (buf->len == 0);
 	TEMP_ASSERT(buf->len >= 0);
 }

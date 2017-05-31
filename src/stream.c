@@ -68,7 +68,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 
 	strbuf_init(&cs->err_buf, 24); /* TODO change API, what if this fails? */
 
-	cs->fail_on_error = true;
+	cs->fail_on_error = false;
 
 	return cs;
 }

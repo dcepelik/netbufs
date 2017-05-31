@@ -1,4 +1,6 @@
 *.a
+*.d
 test-*
 !test-*.c
 cbordump
+benchmark

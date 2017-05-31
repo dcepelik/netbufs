@@ -27,7 +27,7 @@ setup_test_files() {
 	fi
 
 	if [ ! -d $IO_DIR ]; then
-		mkdir $IO_RAND_FILES
+		mkdir $IO_DIR
 		for size in $IO_RAND_FILES; do
 			testfile=$IO_DIR/$size.random
 			dd if=/dev/urandom of=$testfile bs=$size count=1
