@@ -1,6 +1,5 @@
 .PHONY: all clean metrics tests
 
-LIB = libcbor.a
 OBJS = cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o netbufs.o
 BENCHMARK_OBJS = serialize-bird.o deserialize-bird.o parser.o\
 	serialize-cbor.o deserialize-cbor.o\
@@ -24,9 +23,6 @@ all: $(LIB) $(TESTS) $(BINS)
 
 include $(SRCS:.c=.d)
 
-$(LIB): $(OBJS)
-	ar rcs $(LIB) $(OBJS)
-
 test-stream: test-stream.o $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
@@ -46,7 +42,7 @@ benchmark: benchmark.o $(OBJS) $(BENCHMARK_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 clean:
-	rm -f -- $(LIB) *.o *.d $(TESTS) $(BINS) vgcore.*
+	rm -f -- *.o *.d $(TESTS) $(BINS) vgcore.*
 
 metrics:
 	find . -name "*.c" -or -name "*.h" | xargs cat | wc -lc
