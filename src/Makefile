@@ -4,7 +4,7 @@ LIB = libcbor.a
 OBJS = cbor.o encode.o decode.o buf.o util.o memory.o stack.o strbuf.o stream.o buf.o array.o netbufs.o
 BENCHMARK_OBJS = serialize-bird.o deserialize-bird.o parser.o\
 	serialize-cbor.o deserialize-cbor.o\
-	serialize-netbufs.o
+	serialize-netbufs.o deserialize-netbufs.o
 TESTS = test-stream test-adhoc test-array
 BINS = cbordump benchmark
 

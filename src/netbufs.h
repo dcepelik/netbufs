@@ -19,6 +19,8 @@ void nb_send_uint(struct netbuf *nb, int key, uint64_t u64);
 void nb_send_bool(struct netbuf *nb, int key, bool b);
 void nb_send_string(struct netbuf *nb, int key, char *str);
 
+nb_err_t nb_recv_u32(struct netbuf *nb, int key, uint32_t *i64);
+
 void nb_array_begin(struct netbuf *nb, int key);
 void nb_array_end(struct netbuf *nb);
 
@@ -26,5 +28,10 @@ void nb_map_begin(struct netbuf *nb, int key);
 void nb_map_end(struct netbuf *nb);
 
 void nb_send_ipv4(struct netbuf *nb, int key, ipv4_t ip);
+nb_err_t nb_recv_ipv4(struct netbuf *nb, int key, ipv4_t *ip);
+nb_err_t nb_recv_string(struct netbuf *nb, int key, char **str);
+
+void nb_begin_group(struct netbuf *nb, int key);
+bool nb_end_group(struct netbuf *nb);
 
 #endif

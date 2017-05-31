@@ -39,7 +39,7 @@ enum rte_src
 {
 	RTE_SRC_INTERNAL,
 	RTE_SRC_EXTERNAL,
-	RTE_SRC_U, /* TODO Ask MM */
+	RTE_SRC_U,			/* TODO Ask MM about this value */
 	RTE_SRC_WHO_KNOWS,
 };
 
@@ -158,6 +158,6 @@ void serialize_cbor(struct rt *rt, struct nb_buf *buf);
 struct rt *deserialize_cbor(struct nb_buf *buf);
 
 void serialize_netbufs(struct rt *rt, struct nb_buf *buf);
-//struct rt *deserialize_cbor(struct nb_buf *buf);
+struct rt *deserialize_netbufs(struct nb_buf *buf);
 
 #endif

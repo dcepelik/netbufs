@@ -30,6 +30,13 @@ void nb_send_int(struct netbuf *nb, int key, int64_t i64)
 }
 
 
+nb_err_t nb_recv_u32(struct netbuf *nb, int key, uint32_t *u32)
+{
+	u32 = 0;
+	return NB_ERR_OK;
+}
+
+
 void nb_map_begin(struct netbuf *nb, int key)
 {
 	nb_send_key(nb, key);
@@ -73,4 +80,31 @@ void nb_send_string(struct netbuf *nb, int key, char *str)
 void nb_send_ipv4(struct netbuf *nb, int key, ipv4_t ip)
 {
 	nb_send_uint(nb, key, ip);
+}
+
+
+void nb_begin_group(struct netbuf *nb, int key)
+{
+	(void) nb;
+	(void) key;
+}
+
+
+bool nb_end_group(struct netbuf *nb)
+{
+	return true;
+}
+
+
+nb_err_t nb_recv_ipv4(struct netbuf *nb, int key, ipv4_t *ip)
+{
+	nb_recv_u32(nb, key, (uint32_t *)ip);
+	return NB_ERR_OK;
+}
+
+
+nb_err_t nb_recv_string(struct netbuf *nb, int key, char **str)
+{
+	*str = NULL;
+	return NB_ERR_OK;
 }
