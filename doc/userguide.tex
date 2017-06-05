@@ -65,7 +65,7 @@ quite compact, encoding and decoding is super fast$\dots$ but terribly fragile.
 If you start sending\fnote{`Sending', `writing' and `encoding' are all synonyms
 in this guide, just as `receiving', `reading' and `decoding' are.} new data and
 don't update the reciever to decode it, it will break. You have to always send
-all values (even when they are unset), otherwise it will break, too.
+all values (even when they are ``unset'' or ``empty''), otherwise it will break, too.
 
 \noindent
 {\bf JSON.} These problems are often relevant, so you may want to
@@ -104,7 +104,7 @@ and those strings still have a hold on your performance.
 \noindent
 {\bf Network Buffers.} So you'll add smart string de-duplication, a nice API
 that fits common usage patterns, you'll make it run fast and write a lot of
-tests and documentation. Congratulations, you have just discovered \nb!
+tests and documentation. Congratulations, you have just invented \nb!
 
 TODO Add figure (netbuf encoding)
 

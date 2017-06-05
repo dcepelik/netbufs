@@ -12,6 +12,8 @@ CBOR_NUM_RANDFILES=20
 CBOR_RFC_TESTS_URI=https://raw.githubusercontent.com/cbor/test-vectors/master/appendix_a.json
 CBOR_RFC_TESTS_JSON=rfc-tests.json
 
+CBORDUMP=../build/cbordump
+
 IO_DIR=io
 IO_RAND_FILES="1 1k 8k 1M 16M"
 
@@ -117,12 +119,12 @@ pass() {
 }
 
 cbordump_retval() {
-	../src/cbordump -h -i $1 2>/dev/null >/dev/null
+	$CBORDUMP -h -i $1 2>/dev/null >/dev/null
 	return $?
 }
 
 cbordump_vg() {
-	vg_errs=$(valgrind ../src/cbordump -h -i $1 2>&1 | tail -n1 | cut -d ' ' -f4,10)
+	vg_errs=$(valgrind $CBORDUMP -h -i $1 2>&1 | tail -n1 | cut -d ' ' -f4,10)
 
 	if [ "$vg_errs" != "0 0" ]; then
 		valgrind_error $test
@@ -149,7 +151,7 @@ run_cbor_positive_tests() {
 		out_json=$test/out.json
 		out_test=$test/out.test
 
-		../src/cbordump -h -i $in > $out_test
+		$CBORDUMP -h -i $in > $out_test
 
 		if [ $? -ne 0 ]; then
 			runtime_error $test
@@ -202,7 +204,7 @@ run_cbor_negative_tests() {
 run_io_buf_echo_tests() {
 	for test in $IO_DIR/*; do
 		out=$test.out
-		../src/test-stream $test $out
+		../build/test-stream $test $out
 
 		if ! diff -q $test $out >/dev/null; then
 			diff_error $test
@@ -218,6 +220,8 @@ run_io_buf_echo_tests() {
 num_skipped=0
 num_errs=0
 num_ok=0
+
+make --directory=../build all
 
 setup_test_files
 run_cbor_positive_tests

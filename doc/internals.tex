@@ -4,6 +4,8 @@
 \typosize [13/15]
 \activettchar@
 
+\def\nb{@netbufs@}
+
 \tit Network Buffers Internals
 
 \chap Code Organization
@@ -14,7 +16,7 @@ Project's files are located in a simple directory structure:
 
 \bigskip
 \centerline{
-	\table{l|l}{
+	\table{r|l}{
 		@benchmark@ & benchmark sources and sample data\cr
 		@build@ & Make environment\cr
 		@doc@ & the docs\cr
@@ -30,5 +32,25 @@ Project's files are located in a simple directory structure:
 There's a single Makefile in @build@. Therfore, run @make@ inside @build@.
 
 \secc Make Targets
+
+\sec Modules
+
+Source code of \nb\ is decomposed into at least the modules listed in table
+TODO. Module consist of a @module.c@ file optionally accompanied by
+a corresponding @module.h@ file.
+
+\bigskip
+\centerline{
+	\table{r|l}{
+		@array@ & generic growing array implementation \cr
+		@cbordump@ & CBOR stream introspection utility \cr
+		@decode@ & CBOR decoder \cr
+		@encode@ & CBOR encoder \cr
+		@memory@ & memory management \cr
+		@netbufs@ & the \nb\ protocol \cr
+		@stack@ & generic stack implementation \cr
+		@strbuf@ & growing string buffer \cr
+	}
+}
 
 \bye

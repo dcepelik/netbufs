@@ -3,10 +3,6 @@
 
 #include "error.h"
 
-/*
- * TODO buf module should be separated from libcbor, don't return nb_err_t.
- */
-
 #include "cbor.h"
 #include <stdbool.h>
 #include <stdlib.h>

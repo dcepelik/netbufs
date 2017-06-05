@@ -10,17 +10,19 @@
 
 static void send_time(struct netbuf *nb, int key, struct tm *tm)
 {
-	nb_array_begin(nb, key);
+	nb_send_group_begin(nb, BIRD_TIME);
 	nb_send_int(nb, BIRD_TIME_HOUR, tm->tm_hour);
 	nb_send_int(nb, BIRD_TIME_MIN, tm->tm_min);
 	nb_send_int(nb, BIRD_TIME_SEC, tm->tm_sec);
-	nb_array_end(nb);
+	nb_send_group_end(nb);
 }
 
 
 static void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 {
 	size_t i;
+
+	nb_send_group_begin(nb, BIRD_RTE_ATTR);
 
 	nb_send_uint(nb, BIRD_RTE_ATTR_TYPE, attr->type);
 	nb_send_bool(nb, BIRD_RTE_ATTR_TFLAG, attr->tflag);
@@ -36,10 +38,10 @@ static void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 		nb_send_uint(nb, BIRD_RTE_ATTR_BGP_LOCAL_PREF, attr->bgp_local_pref);
 		break;
 	case RTE_ATTR_TYPE_BGP_AS_PATH:
-		nb_array_begin(nb, BIRD_RTE_ATTR_BGP_AS_PATH);
+		nb_send_array_begin(nb, BIRD_RTE_ATTR_BGP_AS_PATH, array_size(attr->bgp_as_path));
 		for (i = 0; i < array_size(attr->bgp_as_path); i++)
 			nb_send_uint(nb, BIRD_AS_NO, attr->bgp_as_path[i]);
-		nb_array_end(nb);
+		nb_send_array_end(nb);
 		break;
 	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
 		nb_map_begin(nb, BIRD_RTE_ATTR_BGP_AGGREGATOR);
@@ -48,13 +50,15 @@ static void send_rte_attr(struct netbuf *nb, struct rte_attr *attr)
 		nb_map_end(nb);
 		break;
 	case RTE_ATTR_TYPE_BGP_COMMUNITY:
-		nb_array_begin(nb, BIRD_RTE_ATTR_BGP_COMMUNITY);
-		nb_array_end(nb);
+		nb_send_array_begin(nb, BIRD_RTE_ATTR_BGP_COMMUNITY, 0);
+		nb_send_array_end(nb);
 		break;
 	default:
 		/* ignore the attr */
 		break;
 	}
+
+	nb_send_group_end(nb);
 }
 
 
@@ -62,6 +66,7 @@ static void send_rte(struct netbuf *nb, struct rte *rte)
 {
 	size_t i;
 
+	nb_send_group_begin(nb, BIRD_RTE);
 	nb_send_ipv4(nb, BIRD_RTE_NETADDR, rte->netaddr);
 	nb_send_uint(nb, BIRD_RTE_NETMASK, rte->netmask);
 	nb_send_ipv4(nb, BIRD_RTE_GWADDR, rte->gwaddr);
@@ -78,8 +83,12 @@ static void send_rte(struct netbuf *nb, struct rte *rte)
 	
 	nb_send_uint(nb, BIRD_RTE_SRC, rte->src);
 
+	nb_send_array_begin(nb, BIRD_RTE_ATTRS, array_size(rte->attrs));
 	for (i = 0; i < array_size(rte->attrs); i++)
 		send_rte_attr(nb, &rte->attrs[i]);
+	nb_send_array_end(nb);
+
+	nb_send_group_end(nb);
 }
 
 
@@ -87,9 +96,15 @@ static void send_rt(struct netbuf *nb, struct rt *rt)
 {
 	size_t i;
 
+	nb_send_group_begin(nb, BIRD_RT);
 	nb_send_string(nb, BIRD_RT_VERSION_STR, rt->version_str);
+
+	nb_send_array_begin(nb, BIRD_RTES, array_size(rt->entries));
 	for (i = 0; i < array_size(rt->entries); i++)
 		send_rte(nb, &rt->entries[i]);
+	nb_send_array_end(nb);
+
+	nb_send_group_end(nb);
 }
 
 

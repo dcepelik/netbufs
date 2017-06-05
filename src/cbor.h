@@ -163,6 +163,7 @@ cbor_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *val);
 cbor_err_t cbor_encode_array_begin(struct cbor_stream *cs, uint64_t len);
 cbor_err_t cbor_encode_array_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_array_end(struct cbor_stream *cs);
+
 cbor_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len);
 cbor_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_decode_array_end(struct cbor_stream *cs);
@@ -170,18 +171,21 @@ cbor_err_t cbor_decode_array_end(struct cbor_stream *cs);
 cbor_err_t cbor_encode_map_begin(struct cbor_stream *cs, size_t len);
 cbor_err_t cbor_encode_map_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_map_end(struct cbor_stream *cs);
+
 cbor_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len);
 cbor_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
 cbor_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len);
 cbor_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
+
 cbor_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **bytes, size_t *len);
 
 /* TODO don't ask for length, assume 0-terminated strings */
 cbor_err_t cbor_encode_text(struct cbor_stream *cs, byte_t *str, size_t len);
 cbor_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
 cbor_err_t cbor_encode_text_end(struct cbor_stream *cs);
+
 /* TODO I'm given the string, so I don't really need the length most of the time */
 cbor_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len);
 

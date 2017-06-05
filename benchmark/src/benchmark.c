@@ -55,12 +55,12 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	//printf("Using bird_deserialize() to load RT from '%s'\n", fn_in);
+	printf("Using bird_deserialize() to load RT from '%s'\n", fn_in);
 
 	rt = deserialize_bird(in);
 
-	//printf("RT loaded with %lu entries\n", array_size(rt->entries));
-	//printf("Transferring data using method '%s'\n", method);
+	printf("RT loaded with %lu entries\n", array_size(rt->entries));
+	printf("Transferring data using method '%s'\n", method);
 
 	start = clock();
 	if (strcmp(method, "bird") == 0) {
@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
 		rt2 = deserialize_cbor(mry);
 	}
 	else if (strcmp(method, "netbufs") == 0) {
-		serialize_netbufs(rt, out);
-		//nb_buf_flush(mry);
-		//rt2 = deserialize_cbor(mry);
+		serialize_netbufs(rt, mry);
+		nb_buf_flush(mry);
+		rt2 = deserialize_netbufs(mry);
 	}
 	else {
 		fprintf(stderr, "%s: unknown method: '%s'\n", argv0, method);
@@ -85,8 +85,8 @@ int main(int argc, char *argv[])
 	}
 	end = clock();
 
-	//printf("Using bird_serialize() to write RT back to '%s'\n", fn_out);
-	//serialize_bird(rt2, out);
+	printf("Using bird_serialize() to write RT back to '%s'\n", fn_out);
+	serialize_bird(rt2, out);
 	nb_buf_flush(out);
 
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
