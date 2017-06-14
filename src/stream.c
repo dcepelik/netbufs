@@ -8,7 +8,7 @@
 #include <assert.h>
 
 
-cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
+nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 {
 	va_list args;
 
@@ -19,27 +19,27 @@ cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...)
 	va_end(args);
 
 	if (cs->fail_on_error) {
-		die("Error: %s\n", cs->err_buf.str);
+		die("CBOR Error %i: %s\n", err, cs->err_buf.str);
 	}
 
 	return err;
 }
 
 
-cbor_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len)
+nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len)
 {
 	struct block *block;
 
 	block = stack_push(&cs->blocks);
 	if (!block)
-		return error(cs, CBOR_ERR_NOMEM, "No memory to allocate new nesting block.");
+		return error(cs, NB_ERR_NOMEM, "No memory to allocate new nesting block.");
 
 	block->type = type;
 	block->indefinite = indefinite;
 	block->len = len;
 	block->num_items = 0;
 
-	return CBOR_ERR_OK;
+	return NB_ERR_OK;
 }
 
 
@@ -56,7 +56,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 
 	cs = nb_malloc(sizeof(*cs));
 	cs->buf = buf;
-	cs->err = CBOR_ERR_OK;
+	cs->err = NB_ERR_OK;
 
 	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
 		free(cs);
@@ -77,7 +77,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 void cbor_stream_delete(struct cbor_stream *cs)
 {
 	strbuf_free(&cs->err_buf);
-	nb_free(cs);
+	xfree(cs);
 }
 
 

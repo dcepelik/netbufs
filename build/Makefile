@@ -55,7 +55,7 @@ deps/benchmark/%.deps: $(BENCH_SRC_DIR)/%.c
 include $(DEPS) $(BENCH_DEPS)
 
 clean:
-	rm -f -- $(BINS) $(OBJS) $(BENCH_OBJS) $(DEPS) $(BENCH_DEPS)
+	rm -f -- $(BINS) $(OBJS) $(BENCH_OBJS) $(DEPS) $(BENCH_DEPS) vgcore.*
 
 metrics:
 	for src_dir in $(SRC_DIR) $(BENCH_SRC_DIR) $(ROOT_DIR); do \

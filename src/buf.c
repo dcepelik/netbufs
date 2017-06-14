@@ -45,7 +45,7 @@ void nb_buf_set_write_filter(struct nb_buf *buf, filter_t *filter)
 
 void nb_buf_free(struct nb_buf *buf)
 {
-	nb_free(buf->buf);
+	xfree(buf->buf);
 }
 
 
@@ -310,7 +310,7 @@ static void nb_buf_file_flush(struct nb_buf *buf)
 
 static void nb_buf_memory_close(struct nb_buf *buf)
 {
-	nb_free(buf->memory);
+	xfree(buf->memory);
 }
 
 
@@ -359,7 +359,7 @@ struct nb_buf *nb_buf_new(void)
 void nb_buf_delete(struct nb_buf *buf)
 {
 	nb_buf_free(buf);
-	nb_free(buf);
+	xfree(buf);
 }
 
 

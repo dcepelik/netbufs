@@ -21,7 +21,7 @@ static inline void ipv4_set_byte(ipv4_t *ip, size_t i, byte_t b)
 	ip_ptr[i] = b;
 }
 
-static inline byte_t ipv4_get_byte(ipv4_t *ip, size_t i)
+static byte_t ipv4_get_byte(ipv4_t *ip, size_t i)
 {
 	assert(i >= 0 && i <= 3);
 	byte_t *ip_ptr = (byte_t *)ip;

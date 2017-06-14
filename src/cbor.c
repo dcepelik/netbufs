@@ -297,17 +297,17 @@ void cbor_item_dump(struct cbor_item *item, FILE *file)
 }
 
 
-cbor_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
+nb_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 {
 	struct isbuf isbuf;
 	struct cbor_item item;
-	cbor_err_t err = CBOR_ERR_OK;
+	nb_err_t err = NB_ERR_OK;
 	size_t i = 0;
 
 	isbuf_init(&isbuf);
 
 	while (!nb_buf_is_eof(cs->buf)) {
-		if ((err = cbor_decode_item(cs, &item)) != CBOR_ERR_OK)
+		if ((err = cbor_decode_item(cs, &item)) != NB_ERR_OK)
 			break;
 
 		if (i > 0)

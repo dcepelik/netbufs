@@ -70,7 +70,7 @@ struct cbor_stream
 {
 	struct nb_buf *buf;
 	struct stack blocks;
-	cbor_err_t err;
+	nb_err_t err;
 	struct strbuf err_buf;
 
 	/* TODO various encoding/decoding options to come as needed */
@@ -87,8 +87,8 @@ static inline bool major_allows_indefinite(enum major major)
 }
 
 
-cbor_err_t error(struct cbor_stream *cs, cbor_err_t err, char *str, ...);
-cbor_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len);
+nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...);
+nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len);
 struct block *top_block(struct cbor_stream *cs);
 
 #endif

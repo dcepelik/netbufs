@@ -234,7 +234,7 @@ void arraysnmaps_test_encode(struct cbor_stream *cs)
 }
 
 
-typedef cbor_err_t (action_t)(struct cbor_stream *cs);
+typedef nb_err_t (action_t)(struct cbor_stream *cs);
 
 
 void nesting_test_encode(struct cbor_stream *cs)
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
 {
 	struct nb_buf *out;
 	struct cbor_stream *cs;
-	cbor_err_t err;
+	nb_err_t err;
 	int mode;
 	int oflags;
 
@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
 	//nesting_test_encode(cs);
 	arraysnmaps_test_encode(cs);
 
-	if (cs->err != CBOR_ERR_OK) {
+	if (cs->err != NB_ERR_OK) {
 		fprintf(stderr, "Error while encoding the stream: %s\n",
 			cbor_stream_strerror(cs));
 		return EXIT_FAILURE;

@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	struct cbor_stream *cs_in;
 	struct cbor_stream *cs_out;
 	struct cbor_item item;
-	cbor_err_t err;
+	nb_err_t err;
 	char *argv0;
 	int c;
 	int digit_optind;
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 	if (hex_input)
 		nb_buf_set_read_filter(nb_buf_in, nb_buf_hex_read_filter);
 
-	if (err != CBOR_ERR_OK) {
+	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: cannot open input file\n", argv0);
 		return EXIT_FAILURE;
 	}
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 	else
 		err = nb_buf_open_stdout(nb_buf_out);
 	
-	if (err != CBOR_ERR_OK) {
+	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: cannot open output file\n", argv0);
 		return EXIT_FAILURE;
 	}
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 		nb_buf_set_write_filter(nb_buf_out, nb_buf_hex_write_filter);
 
 	if (!passthru) {
-		if ((err = cbor_stream_dump(cs_in, stdout)) != CBOR_ERR_OK) {
+		if ((err = cbor_stream_dump(cs_in, stdout)) != NB_ERR_OK) {
 			fprintf(stderr, "%s: error: %s\n", argv0, cbor_stream_strerror(cs_in));
 			DEBUG_EXPR("%i", err);
 			return 2;
@@ -145,13 +145,13 @@ int main(int argc, char *argv[])
 	}
 	else {
 		while (!nb_buf_is_eof(nb_buf_in)) {
-			if ((err = cbor_decode_item(cs_in, &item)) != CBOR_ERR_OK) {
+			if ((err = cbor_decode_item(cs_in, &item)) != NB_ERR_OK) {
 				fprintf(stderr, "Error decoding item: %s\n",
 					cbor_stream_strerror(cs_in));
 				return 2;
 			}
 
-			if ((err = cbor_encode_item(cs_out, &item)) != CBOR_ERR_OK) {
+			if ((err = cbor_encode_item(cs_out, &item)) != NB_ERR_OK) {
 				fprintf(stderr, "Error encoding item: %s\n",
 					cbor_stream_strerror(cs_out));
 				return 2;

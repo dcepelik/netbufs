@@ -15,7 +15,7 @@ void *nb_realloc(void *ptr, size_t size)
 }
 
 
-void nb_free(void *ptr)
+void xfree(void *ptr)
 {
 	free(ptr);
 }

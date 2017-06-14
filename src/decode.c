@@ -401,13 +401,8 @@ static nb_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 	if (block->type != type)
 		return error(cs, NB_ERR_OPER, NULL);
 
-	if (block->indefinite) {
+	if (block->indefinite)
 		return decode_break(cs);
-		DEBUG_MSG("indefinite end");
-	}
-	else {
-		DEBUG_MSG("definite end");
-	}
 
 	//if (block->num_items != block->hdr.u64)
 	//	return error(cs, NB_ERR_OPER, NULL);
