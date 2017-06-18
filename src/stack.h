@@ -18,5 +18,6 @@ void *stack_push(struct stack *stack);
 void *stack_pop(struct stack *stack);
 void *stack_top(struct stack *stack);
 bool stack_is_empty(struct stack *stack);
+void stack_free(struct stack *stack);
 
 #endif

@@ -5,13 +5,46 @@
 #include <string.h>
 
 
+struct nb_group
+{
+	/* TODO this may better be replaced by a hash-table or a sparse array */
+	struct cbor_item **items;	/* unprocessed data items */
+};
+
+
+static bool init_group(struct nb_group *grp)
+{
+	if ((grp->items = calloc(32, sizeof(struct nb_item *))) == NULL) /* TODO array size */
+		return false;
+
+	return true;
+}
+
+
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 {
-	nb->cs = cbor_stream_new(buf);
-	if (!nb->cs)
-		return NB_ERR_NOMEM;
+	struct nb_group *top_group;
+
+	if ((nb->cs = cbor_stream_new(buf)) == NULL)
+		goto out_cs;
+
+	if (!stack_init(&nb->groups, 2, sizeof(struct nb_group)))
+		goto out_stack;
+
+	if ((top_group = stack_push(&nb->groups)) == NULL)
+		goto out_push_top;
+
+	if (!init_group(top_group))
+		goto out_push_top;
 
 	return NB_ERR_OK;
+
+out_push_top:
+	stack_free(&nb->groups);
+out_stack:
+	cbor_stream_delete(nb->cs);
+out_cs:
+	return NB_ERR_NOMEM;
 }
 
 

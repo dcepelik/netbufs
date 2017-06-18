@@ -77,6 +77,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 void cbor_stream_delete(struct cbor_stream *cs)
 {
 	strbuf_free(&cs->err_buf);
+	stack_free(&cs->blocks);
 	xfree(cs);
 }
 

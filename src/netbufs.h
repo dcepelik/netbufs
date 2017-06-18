@@ -14,7 +14,7 @@ typedef uint64_t nb_key_t;
 struct netbuf
 {
 	struct cbor_stream *cs;
-	struct cbor_item **items;	/* unprocessed data items */
+	struct stack groups;
 };
 
 

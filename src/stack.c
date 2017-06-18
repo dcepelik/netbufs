@@ -58,3 +58,9 @@ bool stack_is_empty(struct stack *stack)
 {
 	return (stack->num_items == 0);
 }
+
+
+void stack_free(struct stack *stack)
+{
+	free(stack->items);
+}
