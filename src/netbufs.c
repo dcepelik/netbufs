@@ -5,46 +5,14 @@
 #include <string.h>
 
 
-struct nb_group
-{
-	/* TODO this may better be replaced by a hash-table or a sparse array */
-	struct cbor_item **items;	/* unprocessed data items */
-};
-
-
-static bool init_group(struct nb_group *grp)
-{
-	if ((grp->items = calloc(32, sizeof(struct nb_item *))) == NULL) /* TODO array size */
-		return false;
-
-	return true;
-}
-
-
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 {
-	struct nb_group *top_group;
-
 	if ((nb->cs = cbor_stream_new(buf)) == NULL)
-		goto out_cs;
+		return NB_ERR_NOMEM;
 
-	if (!stack_init(&nb->groups, 2, sizeof(struct nb_group)))
-		goto out_stack;
-
-	if ((top_group = stack_push(&nb->groups)) == NULL)
-		goto out_push_top;
-
-	if (!init_group(top_group))
-		goto out_push_top;
+	nb->cur_key_valid = false;
 
 	return NB_ERR_OK;
-
-out_push_top:
-	stack_free(&nb->groups);
-out_stack:
-	cbor_stream_delete(nb->cs);
-out_cs:
-	return NB_ERR_NOMEM;
 }
 
 
@@ -151,89 +119,67 @@ nb_err_t nb_send_group_end(struct netbuf *nb)
 }
 
 
-static nb_err_t recv_item(struct netbuf *nb, nb_key_t key, struct cbor_item *item)
+static nb_err_t peek_key(struct netbuf *nb, nb_key_t *key)
 {
-	uint64_t tag_no;
 	nb_err_t err;
 
-	if ((err = cbor_decode_tag(nb->cs, &tag_no)) != NB_ERR_OK)
-		return err;
+	if (!nb->cur_key_valid) {
+		if ((err = cbor_decode_tag(nb->cs, &nb->cur_key)) != NB_ERR_OK)
+			return err;
+		nb->cur_key_valid = true;
+	}
 
-	TEMP_ASSERT(tag_no == key);
+	assert(nb->cur_key_valid);
 
-	err = cbor_decode_item(nb->cs, item);
-	assert(item->type != CBOR_TYPE_TAG);
+	*key = nb->cur_key;
+	return NB_ERR_OK;
+}
+
+
+/* TODO this has to fail for read-across-group */
+static nb_err_t recv_key(struct netbuf *nb, nb_key_t *key)
+{
+	nb_err_t err;
+	err = peek_key(nb, key);
+	nb->cur_key_valid = false;
 	return err;
 }
 
 
-static uint64_t recv_uint(struct netbuf *nb, nb_key_t key, uint64_t max, nb_err_t *err)
+static nb_err_t seek_item(struct netbuf *nb, nb_key_t key)
 {
-	struct cbor_item item;
+	nb_key_t cur_key;
+	nb_err_t err;
 
-	if ((*err = recv_item(nb, key, &item)) != NB_ERR_OK)
-		return 0;
+	while ((err = recv_key(nb, &cur_key)) == NB_ERR_OK)
+		if (cur_key == key)
+			break;
 
-	if (item.type != CBOR_TYPE_UINT) {
-		*err = NB_ERR_ITEM; /* TODO this error? */
-		return 0;
-	}
-
-	if (item.u64 > max) {
-		*err = NB_ERR_RANGE;
-		return 0;
-	}
-
-	return item.u64;
-}
-
-
-static int64_t recv_int(struct netbuf *nb, nb_key_t key, int64_t min, int64_t max, nb_err_t *err)
-{
-	struct cbor_item item;
-	int64_t i64;
-
-	if ((*err = recv_item(nb, key, &item)) != NB_ERR_OK)
-		return 0;
-
-	if (item.type == CBOR_TYPE_INT) {
-		i64 = item.i64;
-	}
-	else if (item.type == CBOR_TYPE_UINT) {
-		if (item.u64 > INT64_MAX) {
-			*err = NB_ERR_RANGE;
-			return 0;
-		}
-
-		i64 = (int64_t)item.u64;
-	}
-	else {
-		*err = NB_ERR_ITEM;
-		return 0;
-	}
-
-	if (i64 >= min && i64 <= max)
-		return i64;
-
-	*err = NB_ERR_RANGE;
-	return 0;
+	return err;
 }
 
 
 nb_err_t nb_recv_bool(struct netbuf *nb, nb_key_t key, bool *b)
 {
 	nb_err_t err;
-	struct cbor_item item;
-	if ((err = recv_item(nb, key, &item)) == NB_ERR_OK)
-		*b = (item.sval == CBOR_SVAL_TRUE);
-	return err;
+	enum cbor_sval sval;
+
+	if ((err = seek_item(nb, key)) != NB_ERR_OK)
+		return err;
+
+	if ((err = cbor_decode_sval(nb->cs, &sval)) != NB_ERR_OK)
+		return err;
+
+	*b = (sval == CBOR_SVAL_TRUE);
+	return NB_ERR_OK;
 }
 
 
 nb_err_t nb_recv_u32(struct netbuf *nb, nb_key_t key, uint32_t *u32)
 {
 	nb_err_t err;
-	*u32 = (uint32_t)recv_uint(nb, key, UINT32_MAX, &err);
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		return cbor_decode_uint32(nb->cs, u32);
 	return err;
 }
 
@@ -241,82 +187,65 @@ nb_err_t nb_recv_u32(struct netbuf *nb, nb_key_t key, uint32_t *u32)
 nb_err_t nb_recv_i32(struct netbuf *nb, nb_key_t key, int32_t *i32)
 {
 	nb_err_t err;
-	*i32 = (int32_t)recv_int(nb, key, INT32_MIN, INT32_MAX, &err);
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		return cbor_decode_int32(nb->cs, i32);
 	return err;
 }
 
 
 nb_err_t nb_recv_string(struct netbuf *nb, nb_key_t key, char **str)
 {
-	struct cbor_item item;
 	nb_err_t err;
-	
-	if ((err = recv_item(nb, key, &item)) == NB_ERR_OK)
-		*str = item.str;
+	size_t foo;
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		cbor_decode_text(nb->cs, (byte_t **)str, &foo);
 	return err;
 }
 
 
 nb_err_t nb_recv_array_begin(struct netbuf *nb, nb_key_t key, size_t *size)
 {
-	uint64_t tag_no;
 	nb_err_t err;
-
-	if ((err = cbor_decode_tag(nb->cs, &tag_no)) != NB_ERR_OK)
-		return err;
-
-	TEMP_ASSERT(tag_no == key);
-	return cbor_decode_array_begin(nb->cs, size);
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		return cbor_decode_array_begin(nb->cs, size);
+	return err;
 }
 
 
 nb_err_t nb_recv_array_end(struct netbuf *nb)
 {
+	/* TODO take care of extra items */
 	return cbor_decode_array_end(nb->cs);
 }
 
+
 nb_err_t nb_recv_map_begin(struct netbuf *nb, nb_key_t key, size_t *size)
 {
-	uint64_t tag_no;
 	nb_err_t err;
-
-	if ((err = cbor_decode_tag(nb->cs, &tag_no)) != NB_ERR_OK)
-		return err;
-
-	TEMP_ASSERT(tag_no == key);
-	return cbor_decode_map_begin(nb->cs, size);
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		return cbor_decode_map_begin(nb->cs, size);
+	return err;
 }
 
 
 nb_err_t nb_recv_map_end(struct netbuf *nb)
 {
+	/* TODO take care of extra items */
 	return cbor_decode_map_end(nb->cs);
 }
 
 
-/*
- * TODO This has to work in a very different way.
- */
 nb_err_t nb_recv_group_begin(struct netbuf *nb, nb_key_t key)
 {
-	uint64_t tag_no;
 	nb_err_t err;
-
-	if ((err = cbor_decode_tag(nb->cs, &tag_no)) != NB_ERR_OK)
-		return err;
-
-	TEMP_ASSERT(tag_no == key);
-	err = cbor_decode_array_begin_indef(nb->cs);
-	assert(top_block(nb->cs)->indefinite);
+	if ((err = seek_item(nb, key)) == NB_ERR_OK)
+		return cbor_decode_array_begin_indef(nb->cs);
 	return err;
 }
 
 
-/*
- * TODO This too has to be expanded.
- */
 nb_err_t nb_recv_group_end(struct netbuf *nb)
 {
-	assert(top_block(nb->cs)->indefinite);
+	/* TODO skip extra items */
 	return cbor_decode_array_end(nb->cs);
 }

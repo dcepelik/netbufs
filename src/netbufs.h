@@ -14,7 +14,8 @@ typedef uint64_t nb_key_t;
 struct netbuf
 {
 	struct cbor_stream *cs;
-	struct stack groups;
+	nb_key_t cur_key;
+	bool cur_key_valid;
 };
 
 
