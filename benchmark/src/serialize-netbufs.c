@@ -85,13 +85,13 @@ static void send_rte(struct netbuf *nb, struct rte *rte)
 	nb_send_string(nb, BIRD_RTE_IFNAME, rte->ifname);
 	send_time(nb, BIRD_RTE_UPTIME, &rte->uplink);
 
-	//if (rte->uplink_from_valid)
-		//send_ipv4(nb, BIRD_RTE_UPLINK_FROM, rte->uplink_from);
+	if (rte->uplink_from_valid)
+		send_ipv4(nb, BIRD_RTE_UPLINK_FROM, rte->uplink_from);
 	
 	nb_send_int(nb, BIRD_RTE_TYPE, rte->type);
 
-	//if (rte->as_no_valid)
-		//nb_send_uint(nb, BIRD_RTE_AS_NO, rte->as_no);
+	if (rte->as_no_valid)
+		nb_send_uint(nb, BIRD_RTE_AS_NO, rte->as_no);
 	
 	nb_send_int(nb, BIRD_RTE_SRC, rte->src);
 
@@ -124,6 +124,7 @@ void serialize_netbufs(struct rt *rt, struct nb_buf *buf)
 {
 	struct netbuf nb;
 	nb_init(&nb, buf);
+	nb_bind(&nb, "bird.org/rte", BIRD_RTE);
 	send_rt(&nb, rt);
 	nb_free(&nb);
 }

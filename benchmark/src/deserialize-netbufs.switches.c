@@ -3,8 +3,6 @@
 #include "netbufs.h"
 #include "serialize-netbufs.h"
 
-#define checked(x)	assert((x) == NB_ERR_OK);
-
 
 static nb_err_t recv_ipv4(struct netbuf *nb, int key, ipv4_t *ip)
 {
@@ -82,10 +80,6 @@ static bool recv_rte(struct netbuf *nb, struct rte *rte)
 {
 	size_t i;
 	size_t num_attrs;
-	nb_key_t key;
-
-	rte->as_no_valid = false;
-	rte->uplink_from_valid = false;
 
 	nb_recv_group_begin(nb, BIRD_RTE);
 	recv_ipv4(nb, BIRD_RTE_NETADDR, &rte->netaddr);
@@ -93,21 +87,7 @@ static bool recv_rte(struct netbuf *nb, struct rte *rte)
 	recv_ipv4(nb, BIRD_RTE_GWADDR, &rte->gwaddr);
 	nb_recv_string(nb, BIRD_RTE_IFNAME, &rte->ifname);
 	recv_time(nb, BIRD_RTE_UPTIME, &rte->uplink);
-
-	nb_peek(nb, &key);
-	rte->uplink_from_valid = (key == BIRD_RTE_UPLINK_FROM);
-
-	if (rte->uplink_from_valid)
-		recv_ipv4(nb, BIRD_RTE_UPLINK_FROM, &rte->uplink_from);
-
 	nb_recv_i32(nb, BIRD_RTE_TYPE, (int32_t *)&rte->type);
-
-	nb_peek(nb, &key);
-	rte->as_no_valid = (key == BIRD_RTE_AS_NO);
-
-	if (rte->as_no_valid)
-		nb_recv_u32(nb, BIRD_RTE_AS_NO, &rte->as_no);
-
 	nb_recv_i32(nb, BIRD_RTE_SRC, (int32_t *)&rte->src);
 
 	nb_recv_array_begin(nb, BIRD_RTE_ATTRS, &num_attrs);
@@ -117,6 +97,9 @@ static bool recv_rte(struct netbuf *nb, struct rte *rte)
 		recv_rte_attr(nb, &rte->attrs[i]);
 	}
 	nb_recv_array_end(nb);
+
+	rte->as_no_valid = false;
+	rte->uplink_from_valid = false;
 
 	return nb_recv_group_end(nb);
 }
@@ -142,7 +125,7 @@ static bool recv_rt(struct netbuf *nb, struct rt *rt)
 }
 
 
-struct rt *deserialize_netbufs(struct nb_buf *buf)
+struct rt *deserialize_netbufs_generic(struct nb_buf *buf)
 {
 	struct netbuf nb;
 	struct rt *rt;
