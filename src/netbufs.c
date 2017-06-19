@@ -22,6 +22,17 @@ void nb_free(struct netbuf *nb)
 }
 
 
+static nb_err_t send_keypair(struct netbuf *nb, char *name, int key)
+{
+}
+
+
+nb_err_t nb_bind(struct netbuf *nb, char *name, int key)
+{
+	return send_keypair(nb, name, key);
+}
+
+
 static inline nb_err_t send_key(struct netbuf *nb, nb_key_t key)
 {
 	return cbor_encode_tag(nb->cs, key);

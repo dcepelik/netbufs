@@ -22,6 +22,8 @@ struct netbuf
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf);
 void nb_free(struct netbuf *nb);
 
+nb_err_t nb_bind(struct netbuf *nb, char *name, int key);
+
 nb_err_t nb_send_bool(struct netbuf *nb, nb_key_t key, bool b);
 
 nb_err_t nb_send_int(struct netbuf *nb, nb_key_t key, int64_t i64);
