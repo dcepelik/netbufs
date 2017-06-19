@@ -124,7 +124,42 @@ void serialize_netbufs(struct rt *rt, struct nb_buf *buf)
 {
 	struct netbuf nb;
 	nb_init(&nb, buf);
-	nb_bind(&nb, "bird.org/rte", BIRD_RTE);
+
+	nb_bind(&nb, "BIRD_AS_NO", BIRD_AS_NO);
+	nb_bind(&nb, "BIRD_IPV4", BIRD_IPV4);
+	nb_bind(&nb, "BIRD_RT", BIRD_RT);
+	nb_bind(&nb, "BIRD_RTE", BIRD_RTE);
+	nb_bind(&nb, "BIRD_RTES", BIRD_RTES);
+	nb_bind(&nb, "BIRD_RTE_AS_NO", BIRD_RTE_AS_NO);
+	nb_bind(&nb, "BIRD_RTE_ATTR", BIRD_RTE_ATTR);
+	nb_bind(&nb, "BIRD_RTE_ATTRS", BIRD_RTE_ATTRS);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_AGGREGATOR", BIRD_RTE_ATTR_BGP_AGGREGATOR);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_AS_PATH", BIRD_RTE_ATTR_BGP_AS_PATH);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_COMMUNITY", BIRD_RTE_ATTR_BGP_COMMUNITY);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_LOCAL_PREF", BIRD_RTE_ATTR_BGP_LOCAL_PREF);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_NEXT_HOP", BIRD_RTE_ATTR_BGP_NEXT_HOP);
+	nb_bind(&nb, "BIRD_RTE_ATTR_BGP_ORIGIN", BIRD_RTE_ATTR_BGP_ORIGIN);
+	nb_bind(&nb, "BIRD_RTE_ATTR_TFLAG", BIRD_RTE_ATTR_TFLAG);
+	nb_bind(&nb, "BIRD_RTE_ATTR_TYPE", BIRD_RTE_ATTR_TYPE);
+	nb_bind(&nb, "BIRD_RTE_ATTR_OTHER_KEY", BIRD_RTE_ATTR_OTHER_KEY);
+	nb_bind(&nb, "BIRD_RTE_ATTR_OTHER_VALUE", BIRD_RTE_ATTR_OTHER_VALUE);
+	nb_bind(&nb, "BIRD_RTE_GWADDR", BIRD_RTE_GWADDR);
+	nb_bind(&nb, "BIRD_RTE_IFNAME", BIRD_RTE_IFNAME);
+	nb_bind(&nb, "BIRD_RTE_NETADDR", BIRD_RTE_NETADDR);
+	nb_bind(&nb, "BIRD_RTE_NETMASK", BIRD_RTE_NETMASK);
+	nb_bind(&nb, "BIRD_RTE_SRC", BIRD_RTE_SRC);
+	nb_bind(&nb, "BIRD_RTE_TYPE", BIRD_RTE_TYPE);
+	nb_bind(&nb, "BIRD_RTE_UPLINK_FROM", BIRD_RTE_UPLINK_FROM);
+	nb_bind(&nb, "BIRD_RTE_UPTIME", BIRD_RTE_UPTIME);
+	nb_bind(&nb, "BIRD_RT_VERSION_STR", BIRD_RT_VERSION_STR);
+	nb_bind(&nb, "BIRD_TIME", BIRD_TIME);
+	nb_bind(&nb, "BIRD_TIME_HOUR", BIRD_TIME_HOUR);
+	nb_bind(&nb, "BIRD_TIME_MIN", BIRD_TIME_MIN);
+	nb_bind(&nb, "BIRD_TIME_SEC", BIRD_TIME_SEC);
+	nb_bind(&nb, "NB_KEY", NB_KEY);
+	nb_bind(&nb, "NB_KEY_NAME", NB_KEY_NAME);
+	nb_bind(&nb, "NB_KEY_ID", NB_KEY_ID);
+
 	send_rt(&nb, rt);
 	nb_free(&nb);
 }
