@@ -4,8 +4,15 @@
 #include <assert.h>
 #include <string.h>
 
-/* remove this include */
-#include "../benchmark/src/serialize-netbufs.h"
+/*
+ * These are built-in ikeys used by the netbufs protocol.
+ */
+enum nb_builtin
+{
+	NB_BUILTIN_KEY,
+	NB_BUILTIN_KEY_NAME,
+	NB_BUILTIN_KEY_ID,
+};
 
 
 nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
@@ -18,8 +25,7 @@ nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 	nb->names = calloc(64, sizeof(*nb->names));
 	nb->ikey = calloc(64, sizeof(*nb->ikey));
 	nb->ekey = calloc(64, sizeof(*nb->ekey));
-	nb->ikey_max = 0;
-	nb->disable_keys = true;
+	nb->ikey_max = 3;
 
 	return NB_ERR_OK;
 }
@@ -33,9 +39,9 @@ void nb_free(struct netbuf *nb)
 
 static nb_err_t send_keypair(struct netbuf *nb, char *name, int key)
 {
-	nb_send_group_begin(nb, NB_KEY);
-	nb_send_string(nb, NB_KEY_NAME, name);
-	nb_send_uint(nb, NB_KEY_ID, key);
+	nb_send_group_begin(nb, NB_BUILTIN_KEY);
+	nb_send_string(nb, NB_BUILTIN_KEY_NAME, name);
+	nb_send_uint(nb, NB_BUILTIN_KEY_ID, key);
 	return nb_send_group_end(nb);
 }
 
@@ -54,13 +60,13 @@ static inline bool known_ekey(struct netbuf *nb, int ekey)
 }
 
 
-static inline bool known_ikey(struct netbuf *nb, nb_err_t ikey)
+static inline bool known_ikey(struct netbuf *nb, nb_key_t ikey)
 {
 	return known_ekey(nb, nb->ekey[ikey]);
 }
 
 
-static inline nb_err_t introduce_ikey(struct netbuf *nb, int ekey)
+static inline nb_err_t send_ikey(struct netbuf *nb, int ekey)
 {
 	nb_key_t ikey;
 	nb_err_t err;
@@ -73,10 +79,16 @@ static inline nb_err_t introduce_ikey(struct netbuf *nb, int ekey)
 	nb->ikey[ekey] = ikey;
 	nb->ekey[ikey] = ekey;
 
-	nb_send_group_begin(nb, NB_KEY);
-	nb_send_string(nb, NB_KEY_NAME, (char *)nb->names[ekey]);
-	nb_send_uint(nb, NB_KEY_ID, ikey);
-	return nb_send_group_end(nb);
+	/* TODO self-host? */
+	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY);
+	cbor_encode_array_begin_indef(nb->cs);
+	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY_NAME);
+	cbor_encode_text(nb->cs, (byte_t *)nb->names[ekey], strlen(nb->names[ekey]));
+	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY_ID);
+	cbor_encode_uint64(nb->cs, ikey);
+	cbor_encode_array_end(nb->cs);
+
+	return NB_ERR_OK;
 }
 
 
@@ -88,15 +100,24 @@ static inline nb_err_t recv_ikey(struct netbuf *nb)
 	bool found;
 	nb_err_t err;
 
-	assert(nb->cur_key == NB_KEY);
+	nb_key_t tag;
+	size_t name_len;
 
-	nb_recv_group_begin(nb, NB_KEY);
-	nb_recv_string(nb, NB_KEY_NAME, &name);
-	nb_recv_u64(nb, NB_KEY_ID, &ikey);
+	assert(nb->cur_key == NB_BUILTIN_KEY);
 
-	if ((err = nb_recv_group_end(nb)) != NB_ERR_OK)
-		return err;
+	/* TODO self-host? */
+	cbor_decode_array_begin_indef(nb->cs);
+	cbor_decode_tag(nb->cs, &tag);
+	assert(tag == NB_BUILTIN_KEY_NAME);
+	cbor_decode_text(nb->cs, (byte_t **)&name, &name_len);
+	cbor_decode_tag(nb->cs, &tag);
+	assert(tag == NB_BUILTIN_KEY_ID);
+	cbor_decode_uint64(nb->cs, &ikey);
+	cbor_decode_array_end(nb->cs);
 
+	nb->cur_key_valid = false;
+
+	found = false;
 	for (ekey = 0; ekey < 64; ekey++) {
 		if (nb->names[ekey] && strcmp(nb->names[ekey], name) == 0) {
 			found = true;
@@ -120,7 +141,7 @@ static inline nb_err_t send_key(struct netbuf *nb, int ekey)
 	int ikey;
 
 	if (!known_ekey(nb, ekey))
-		if ((err = introduce_ikey(nb, ekey)) != NB_ERR_OK)
+		if ((err = send_ikey(nb, ekey)) != NB_ERR_OK)
 			return err;
 
 	ikey = nb->ikey[ekey];
@@ -219,7 +240,7 @@ nb_err_t nb_send_group_end(struct netbuf *nb)
 }
 
 
-static nb_err_t peek_key(struct netbuf *nb, nb_key_t *key)
+static nb_err_t peek_key(struct netbuf *nb, nb_key_t *ikey)
 {
 	nb_err_t err;
 
@@ -231,14 +252,11 @@ again:
 	}
 
 	assert(nb->cur_key_valid);
-
-	*key = nb->cur_key;
+	*ikey = nb->cur_key;
 
 	/* TODO this may not be the best place to do this (but it works) */
-	if (!nb->disable_keys && *key == NB_KEY) {
-		nb->disable_keys = true;
+	if (*ikey == NB_BUILTIN_KEY) {
 		recv_ikey(nb);
-		nb->disable_keys = false;
 		goto again;
 	}
 
@@ -256,18 +274,19 @@ static nb_err_t recv_key(struct netbuf *nb, nb_key_t *key)
 }
 
 
-static nb_err_t seek_item(struct netbuf *nb, int key)
+static nb_err_t seek_item(struct netbuf *nb, int ekey)
 {
 	nb_key_t cur_key;
 	nb_err_t err;
 	struct cbor_item foo;
 
 	while ((err = recv_key(nb, &cur_key)) == NB_ERR_OK) {
-		if (cur_key == key)
-			break;
-
-		if (!known_ikey(nb, cur_key))
+		if (!known_ikey(nb, cur_key)) {
+			DEBUG_PRINTF("Skipping an item, ekey=%i", ekey);
 			cbor_decode_item(nb->cs, &foo);
+		}
+		else if (nb->ekey[cur_key] == ekey)
+			break;
 	}
 
 	return err;
@@ -286,7 +305,10 @@ nb_err_t nb_recv_item(struct netbuf *nb, nb_key_t *key, struct cbor_item *item)
 
 nb_err_t nb_peek(struct netbuf *nb, nb_key_t *key)
 {
-	return peek_key(nb, key);
+	nb_err_t err;
+	if ((err = peek_key(nb, key)) == NB_ERR_OK)
+		*key = nb->ekey[nb->cur_key];
+	return err;
 }
 
 

@@ -1,6 +1,6 @@
 /*
  * TODO This should be linked with the die()-ing version of memory allocators.
- *	(we're not checking for NULL return values from _new() functions).
+ *      (we're not checking for NULL return values from _new() functions).
  */
 #include "buf.h"
 #include "benchmark.h"
@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
 		rt2 = deserialize_cbor(mry);
 	}
 	else if (strcmp(method, "netbufs") == 0) {
-		serialize_netbufs(rt, out);
-		nb_buf_flush(out);
-		//rt2 = deserialize_netbufs(mry);
+		serialize_netbufs(rt, mry);
+		nb_buf_flush(mry);
+		rt2 = deserialize_netbufs(mry);
 	}
 	else {
 		fprintf(stderr, "%s: unknown method: '%s'\n", argv0, method);
@@ -86,8 +86,8 @@ int main(int argc, char *argv[])
 	end = clock();
 
 	printf("Using bird_serialize() to write RT back to '%s'\n", fn_out);
-	//serialize_bird(rt2, out);
-	//nb_buf_flush(out);
+	serialize_bird(rt2, out);
+	nb_buf_flush(out);
 
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("%.3f\n", cpu_time_used);

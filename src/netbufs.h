@@ -20,7 +20,6 @@ struct netbuf
 	nb_key_t *ikey;			/* ekey to ikey map */
 	int *ekey;				/* ikey to ekey map */
 	int ikey_max;			/* ikey counter */
-	bool disable_keys;		/* peek_key recursion breaker */
 };
 
 

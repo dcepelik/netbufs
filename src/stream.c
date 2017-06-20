@@ -18,6 +18,8 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
 	va_end(args);
 
+	assert(err == NB_ERR_OK);
+
 	if (cs->fail_on_error) {
 		die("CBOR Error %i: %s\n", err, cs->err_buf.str);
 	}

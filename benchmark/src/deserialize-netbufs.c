@@ -127,10 +127,13 @@ static bool recv_rt(struct netbuf *nb, struct rt *rt)
 	uint64_t num_rtes;
 	size_t i;
 	bool b;
+	nb_err_t err;
 
 	nb_recv_group_begin(nb, BIRD_RT);
 	nb_recv_string(nb, BIRD_RT_VERSION_STR, &rt->version_str);
-	nb_recv_array_begin(nb, BIRD_RTES, &num_rtes);
+	err = nb_recv_array_begin(nb, BIRD_RTES, &num_rtes);
+	DEBUG_EXPR("%i", err);
+	checked(err);
 	rt->entries = array_new(num_rtes, sizeof(*rt->entries));
 	for (i = 0; i < num_rtes; i++) {
 		rt->entries = array_push(rt->entries, 1);
@@ -149,6 +152,8 @@ struct rt *deserialize_netbufs(struct nb_buf *buf)
 
 	nb_init(&nb, buf);
 	nb.cs->fail_on_error = true;
+
+	nb_setup(&nb);
 
 	rt = nb_malloc(sizeof(*rt));
 	recv_rt(&nb, rt);

@@ -3,7 +3,7 @@
 
 enum bird_nb_key
 {
-	BIRD_AS_NO,
+	BIRD_AS_NO = 16,
 	BIRD_IPV4,
 	BIRD_RT,
 	BIRD_RTE,
@@ -34,9 +34,9 @@ enum bird_nb_key
 	BIRD_TIME_HOUR,
 	BIRD_TIME_MIN,
 	BIRD_TIME_SEC,
-	NB_KEY,
-	NB_KEY_NAME,
-	NB_KEY_ID,
 };
+
+
+void nb_setup(struct netbuf *nb);
 
 #endif
