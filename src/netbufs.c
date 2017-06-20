@@ -10,8 +10,6 @@
 enum nb_builtin
 {
 	NB_BUILTIN_KEY,
-	NB_BUILTIN_KEY_NAME,
-	NB_BUILTIN_KEY_ID,
 };
 
 
@@ -34,15 +32,6 @@ nb_err_t nb_init(struct netbuf *nb, struct nb_buf *buf)
 void nb_free(struct netbuf *nb)
 {
 	cbor_stream_delete(nb->cs);
-}
-
-
-static nb_err_t send_keypair(struct netbuf *nb, char *name, int key)
-{
-	nb_send_group_begin(nb, NB_BUILTIN_KEY);
-	nb_send_string(nb, NB_BUILTIN_KEY_NAME, name);
-	nb_send_uint(nb, NB_BUILTIN_KEY_ID, key);
-	return nb_send_group_end(nb);
 }
 
 
@@ -81,10 +70,8 @@ static inline nb_err_t send_ikey(struct netbuf *nb, int ekey)
 
 	/* TODO self-host? */
 	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY);
-	cbor_encode_array_begin_indef(nb->cs);
-	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY_NAME);
+	cbor_encode_array_begin(nb->cs, 2);
 	cbor_encode_text(nb->cs, (byte_t *)nb->names[ekey], strlen(nb->names[ekey]));
-	cbor_encode_tag(nb->cs, NB_BUILTIN_KEY_ID);
 	cbor_encode_uint64(nb->cs, ikey);
 	cbor_encode_array_end(nb->cs);
 
@@ -100,18 +87,15 @@ static inline nb_err_t recv_ikey(struct netbuf *nb)
 	bool found;
 	nb_err_t err;
 
-	nb_key_t tag;
+	/* TODO remove */
 	size_t name_len;
+	size_t array_size;
 
 	assert(nb->cur_key == NB_BUILTIN_KEY);
 
 	/* TODO self-host? */
-	cbor_decode_array_begin_indef(nb->cs);
-	cbor_decode_tag(nb->cs, &tag);
-	assert(tag == NB_BUILTIN_KEY_NAME);
+	cbor_decode_array_begin(nb->cs, &array_size);
 	cbor_decode_text(nb->cs, (byte_t **)&name, &name_len);
-	cbor_decode_tag(nb->cs, &tag);
-	assert(tag == NB_BUILTIN_KEY_ID);
 	cbor_decode_uint64(nb->cs, &ikey);
 	cbor_decode_array_end(nb->cs);
 
@@ -160,38 +144,41 @@ static inline nb_err_t send_item(struct netbuf *nb, int key, struct cbor_item it
 
 nb_err_t nb_send_bool(struct netbuf *nb, int key, bool b)
 {
-	return send_item(nb, key, (struct cbor_item) {
-		.type = CBOR_TYPE_SVAL,
-		.sval = b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE
-	});
+	nb_err_t err;
+	if ((err = send_key(nb, key)) == NB_ERR_OK)
+		return cbor_encode_sval(nb->cs, b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
+	return err;
 }
 
 
 nb_err_t nb_send_int(struct netbuf *nb, int key, int64_t i64)
 {
-	return send_item(nb, key, (struct cbor_item) {
-		.type = CBOR_TYPE_INT,
-		.i64 = i64
-	});
+	nb_err_t err;
+	if ((err = send_key(nb, key)) == NB_ERR_OK)
+		return cbor_encode_int64(nb->cs, i64);
+	return err;
 }
 
 
 nb_err_t nb_send_uint(struct netbuf *nb, int key, uint64_t u64)
 {
-	return send_item(nb, key, (struct cbor_item) {
-		.type = CBOR_TYPE_UINT,
-		.u64 = u64
-	});
+	nb_err_t err;
+	if ((err = send_key(nb, key)) == NB_ERR_OK)
+		return cbor_encode_int64(nb->cs, u64);
+	return err;
 }
 
 
 nb_err_t nb_send_string(struct netbuf *nb, int key, char *str)
 {
-	return send_item(nb, key, (struct cbor_item) {
-		.type = CBOR_TYPE_TEXT,
-		.len = str != NULL ? strlen(str) : 0,
-		.str = str
-	});
+	nb_err_t err;
+
+	if (!str)
+		str = "";
+
+	if ((err = send_key(nb, key)) == NB_ERR_OK)
+		return cbor_encode_text(nb->cs, (byte_t *)str, strlen(str));
+	return err;
 }
 
 
@@ -281,10 +268,8 @@ static nb_err_t seek_item(struct netbuf *nb, int ekey)
 	struct cbor_item foo;
 
 	while ((err = recv_key(nb, &cur_key)) == NB_ERR_OK) {
-		if (!known_ikey(nb, cur_key)) {
-			DEBUG_PRINTF("Skipping an item, ekey=%i", ekey);
+		if (!known_ikey(nb, cur_key))
 			cbor_decode_item(nb->cs, &foo);
-		}
 		else if (nb->ekey[cur_key] == ekey)
 			break;
 	}

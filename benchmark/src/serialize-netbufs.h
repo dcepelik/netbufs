@@ -34,6 +34,7 @@ enum bird_nb_key
 	BIRD_TIME_HOUR,
 	BIRD_TIME_MIN,
 	BIRD_TIME_SEC,
+	TEST_KEY,
 };
 
 

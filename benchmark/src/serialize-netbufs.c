@@ -166,4 +166,3 @@ void nb_setup(struct netbuf *nb)
 	nb_bind(nb, "BIRD_TIME_MIN", BIRD_TIME_MIN);
 	nb_bind(nb, "BIRD_TIME_SEC", BIRD_TIME_SEC);
 }
-
