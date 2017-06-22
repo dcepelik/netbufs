@@ -1,5 +1,10 @@
-#ifndef SERIALIZE_H
-#define SERIALIZE_H
+/*
+ * benchmark:
+ * Data structures and routines for benchmarking purposes
+ */
+
+#ifndef BENCHMARK_H
+#define BENCHMARK_H
 
 #include "array.h"
 #include "buf.h"
@@ -69,7 +74,7 @@ struct bgp_aggr
 };
 
 /*
- * Key-value pair for other route attributes (unknown to Bird)
+ * key-value pair for other route attributes
  */
 struct kvp
 {
@@ -78,7 +83,7 @@ struct kvp
 };
 
 /*
- * Type of a route attribute.
+ * type of a route attribute
  */
 enum rte_attr_type
 {
@@ -92,7 +97,7 @@ enum rte_attr_type
 };
 
 /*
- * Routing table attribute
+ * routing table attribute
  */
 struct rte_attr
 {

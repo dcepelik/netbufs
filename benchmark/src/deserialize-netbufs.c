@@ -1,163 +1,320 @@
-#include "benchmark.h"
-#include "debug.h"
 #include "netbufs.h"
-#include "serialize-netbufs.h"
+#include "benchmark.h"
 
-#define checked(x)	assert((x) == NB_ERR_OK);
-
-
-static nb_err_t recv_ipv4(struct netbuf *nb, int key, ipv4_t *ip)
+enum bird_org_rt
 {
-	return nb_recv_u32(nb, key, ip);
+	BIRD_ORG_RT,
+	BIRD_ORG_RT_ROUTES,
+	BIRD_ORG_RT_VERSION,
+};
+
+enum bird_org_rte
+{
+	BIRD_ORG_RTE,
+	BIRD_ORG_RTE_AS_NO,
+	BIRD_ORG_RTE_ATTRS,
+	BIRD_ORG_RTE_GWADDR,
+	BIRD_ORG_RTE_IFNAME,
+	BIRD_ORG_RTE_NETADDR,
+	BIRD_ORG_RTE_NETMASK,
+	BIRD_ORG_RTE_SRC,
+	BIRD_ORG_RTE_TYPE,
+	BIRD_ORG_RTE_UPLINK_FROM,
+	BIRD_ORG_RTE_UPLINK,
+};
+
+enum bird_org_rta
+{
+	BIRD_ORG_RTA,
+	BIRD_ORG_RTA_TFLAG,
+	BIRD_ORG_RTA_BGP_AGGR,
+	BIRD_ORG_RTA_BGP_AGGR_IP,
+	BIRD_ORG_RTA_BGP_AGGR_AS_NO,
+	BIRD_ORG_RTA_BGP_AS_PATH,
+	BIRD_ORG_RTA_BGP_COMMUNITY,
+	BIRD_ORG_RTA_BGP_CFLAG,
+	BIRD_ORG_RTA_BGP_CFLAG_FLAG,
+	BIRD_ORG_RTA_BGP_CFLAG_AS_NO,
+	BIRD_ORG_RTA_BGP_LOCAL_PREF,
+	BIRD_ORG_RTA_BGP_NEXT_HOP,
+	BIRD_ORG_RTA_BGP_ORIGIN,
+	BIRD_ORG_RTA_OTHER,
+	BIRD_ORG_RTA_OTHER_KEY,
+	BIRD_ORG_RTA_OTHER_VALUE,
+};
+
+enum bird_org_time
+{
+	BIRD_ORG_TIME,
+	BIRD_ORG_TIME_HOUR,
+	BIRD_ORG_TIME_MIN,
+	BIRD_ORG_TIME_SEC,
+};
+
+
+static void setup_ids(struct nb *nb)
+{
+	struct nb_group *rt;
+	struct nb_group *rte;
+	struct nb_group *rta;
+	struct nb_group *rta_other;
+	struct nb_group *time;
+
+	rt = nb_group(nb, BIRD_ORG_RT, "bird.org/rt");
+	nb_bind(rt, BIRD_ORG_RT_ROUTES, "./routes", true);
+	nb_bind(rt, BIRD_ORG_RT_VERSION, "./version", true);
+
+	rte = nb_group(nb, BIRD_ORG_RTE, "bird.org/rte");
+	nb_bind(rte, BIRD_ORG_RTE_AS_NO, "./as_no", false);
+	nb_bind(rte, BIRD_ORG_RTE_ATTRS, "./attrs", true);
+	nb_bind(rte, BIRD_ORG_RTE_GWADDR, "./gwaddr", true);
+	nb_bind(rte, BIRD_ORG_RTE_IFNAME, "./ifname", false);
+	nb_bind(rte, BIRD_ORG_RTE_NETADDR, "./netaddr", true);
+	nb_bind(rte, BIRD_ORG_RTE_NETMASK, "./netmask", true);
+	nb_bind(rte, BIRD_ORG_RTE_SRC, "./src", true);
+	nb_bind(rte, BIRD_ORG_RTE_TYPE, "./type", true);
+	nb_bind(rte, BIRD_ORG_RTE_UPLINK_FROM, "./uplink_from", false);
+	nb_bind(rte, BIRD_ORG_RTE_UPLINK, "./uplink", false);
+
+	rta = nb_group(nb, BIRD_ORG_RTA, "bird.org/rta");
+	nb_bind(rta, BIRD_ORG_RTA_TFLAG, "./tflag", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_AGGR, "./bgp_aggr", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_AS_PATH, "./bgp_as_path", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_COMMUNITY, "./bgp_community", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_LOCAL_PREF, "./bgp_local_pref", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_NEXT_HOP, "./bgp_next_hop", false);
+	nb_bind(rta, BIRD_ORG_RTA_BGP_ORIGIN, "./bgp_origin", false);
+	nb_bind(rta, BIRD_ORG_RTA_OTHER, "./other", false);
+
+	rta_other = nb_group(nb, BIRD_ORG_RTA_OTHER, "bird.org/rta_other");
+	nb_bind(rta_other, BIRD_ORG_RTA_OTHER_KEY, "./key", true);
+	nb_bind(rta_other, BIRD_ORG_RTA_OTHER_VALUE, "./value", true);
+
+	time = nb_group(nb, BIRD_ORG_TIME, "bird.org/time");
+	nb_bind(time, BIRD_ORG_TIME_HOUR, "./hour", true);
+	nb_bind(time, BIRD_ORG_TIME_MIN, "./min", true);
+	nb_bind(time, BIRD_ORG_TIME_SEC, "./sec", true);
 }
 
 
-static bool recv_time(struct netbuf *nb, int key, struct tm *tm)
+static nb_err_t recv_ipv4(struct nb *nb, ipv4_t *ip)
 {
-	nb_recv_group_begin(nb, key);
-	nb_recv_i32(nb, BIRD_TIME_HOUR, &tm->tm_hour);
-	nb_recv_i32(nb, BIRD_TIME_MIN, &tm->tm_min);
-	nb_recv_i32(nb, BIRD_TIME_SEC, &tm->tm_sec);
-	return nb_recv_group_end(nb);
+	return nb_recv_u32(nb, ip);
 }
 
 
-static bool recv_rte_attr(struct netbuf *nb, struct rte_attr *attr)
+static nb_err_t recv_time(struct nb *nb, struct tm *tm)
 {
-	size_t as_path_len;
-	size_t bgp_community_len;
-	size_t i;
-	size_t foo;
+	nb_lid_t id;
 
-	nb_recv_group_begin(nb, BIRD_RTE_ATTR);
-
-	nb_recv_i32(nb, BIRD_RTE_ATTR_TYPE, (int *)&attr->type);
-	nb_recv_bool(nb, BIRD_RTE_ATTR_TFLAG, &attr->tflag);
-
-	switch (attr->type) {
-	case RTE_ATTR_TYPE_BGP_ORIGIN:
-		nb_recv_u32(nb, BIRD_RTE_ATTR_BGP_ORIGIN, &attr->bgp_origin);
-		break;
-	case RTE_ATTR_TYPE_BGP_NEXT_HOP:
-		recv_ipv4(nb, BIRD_RTE_ATTR_BGP_NEXT_HOP, &attr->bgp_next_hop);
-		break;
-	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
-		nb_recv_i32(nb, BIRD_RTE_ATTR_BGP_LOCAL_PREF, (int *)&attr->bgp_local_pref);
-		break;
-	case RTE_ATTR_TYPE_BGP_AS_PATH:
-		nb_recv_array_begin(nb, BIRD_RTE_ATTR_BGP_AS_PATH, &as_path_len);
-		attr->bgp_as_path = array_new(as_path_len, sizeof(*attr->bgp_as_path));
-		for (i = 0; i < as_path_len; i++) {
-			attr->bgp_as_path = array_push(attr->bgp_as_path, 1);
-			nb_recv_i32(nb, BIRD_AS_NO, &attr->bgp_as_path[i]);
+	nb_recv_group(nb, BIRD_ORG_TIME);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+			case BIRD_ORG_TIME_HOUR:
+				nb_recv_i32(nb, &tm->tm_hour);
+				break;
+			case BIRD_ORG_TIME_MIN:
+				nb_recv_i32(nb, &tm->tm_min);
+				break;
+			case BIRD_ORG_TIME_SEC:
+				nb_recv_i32(nb, &tm->tm_sec);
+				break;
 		}
-		nb_recv_array_end(nb);
-		break;
-	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
-		nb_recv_map_begin(nb, BIRD_RTE_ATTR_BGP_AGGREGATOR, &foo);
-		nb_recv_u32(nb, BIRD_AS_NO, &attr->aggr.as_no);
-		recv_ipv4(nb, BIRD_IPV4, &attr->aggr.ip);
-		nb_recv_map_end(nb); /* TODO send/recv intermix */
-		break;
-	case RTE_ATTR_TYPE_BGP_COMMUNITY:
-		nb_recv_array_begin(nb, BIRD_RTE_ATTR_BGP_COMMUNITY, &bgp_community_len);
-		attr->cflags = array_new(1, sizeof(*attr->cflags));
-		nb_recv_array_end(nb);
-		break;
-	case RTE_ATTR_TYPE_OTHER:
-		nb_recv_string(nb, BIRD_RTE_ATTR_OTHER_KEY, &attr->other_attr.key);
-		nb_recv_string(nb, BIRD_RTE_ATTR_OTHER_VALUE, &attr->other_attr.value);
-		break;
-	default:
-		/* ignore the attr */
-		assert(false);
-		break;
 	}
+	return nb_recv_group_end(nb);	
+}
 
+
+static nb_err_t recv_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
+{
+	nb_lid_t id;
+
+	nb_recv_group(nb, BIRD_ORG_RTA_BGP_CFLAG);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RTA_BGP_CFLAG_FLAG:
+			nb_recv_u32(nb, &cflag->flag);
+			break;
+		case BIRD_ORG_RTA_BGP_CFLAG_AS_NO:
+			nb_recv_u32(nb, &cflag->as_no);
+			break;
+		}
+	}
 	return nb_recv_group_end(nb);
 }
 
 
-static bool recv_rte(struct netbuf *nb, struct rte *rte)
+static nb_err_t recv_bgp_aggr(struct nb *nb, struct rte_attr *attr)
 {
-	size_t i;
-	size_t num_attrs;
-	nb_key_t key;
+	nb_lid_t id;
 
-	rte->as_no_valid = false;
-	rte->uplink_from_valid = false;
-
-	nb_recv_group_begin(nb, BIRD_RTE);
-	recv_ipv4(nb, BIRD_RTE_NETADDR, &rte->netaddr);
-	nb_recv_u32(nb, BIRD_RTE_NETMASK, &rte->netmask);
-	recv_ipv4(nb, BIRD_RTE_GWADDR, &rte->gwaddr);
-	nb_recv_string(nb, BIRD_RTE_IFNAME, &rte->ifname);
-	recv_time(nb, BIRD_RTE_UPTIME, &rte->uplink);
-
-	nb_peek(nb, &key);
-	rte->uplink_from_valid = (key == BIRD_RTE_UPLINK_FROM);
-
-	if (rte->uplink_from_valid)
-		recv_ipv4(nb, BIRD_RTE_UPLINK_FROM, &rte->uplink_from);
-
-	nb_recv_i32(nb, BIRD_RTE_TYPE, (int32_t *)&rte->type);
-
-	nb_peek(nb, &key);
-	rte->as_no_valid = (key == BIRD_RTE_AS_NO);
-
-	if (rte->as_no_valid)
-		nb_recv_u32(nb, BIRD_RTE_AS_NO, &rte->as_no);
-
-	nb_recv_i32(nb, BIRD_RTE_SRC, (int32_t *)&rte->src);
-
-	nb_recv_array_begin(nb, BIRD_RTE_ATTRS, &num_attrs);
-	rte->attrs = array_new(num_attrs, sizeof(*rte->attrs));
-	for (i = 0; i < num_attrs; i++) {
-		rte->attrs = array_push(rte->attrs, 1);
-		recv_rte_attr(nb, &rte->attrs[i]);
+	nb_recv_group(nb, BIRD_ORG_RTA_BGP_AGGR);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RTA_BGP_AGGR_IP:
+			recv_ipv4(nb, &attr->aggr.ip);
+			break;
+		case BIRD_ORG_RTA_BGP_AGGR_AS_NO:
+			nb_recv_u32(nb, &attr->aggr.as_no);
+			break;
+		}
 	}
-	nb_recv_array_end(nb);
-
 	return nb_recv_group_end(nb);
 }
 
 
-static bool recv_rt(struct netbuf *nb, struct rt *rt)
+static nb_err_t recv_rta_other(struct nb *nb, struct rte_attr *attr)
 {
-	uint64_t num_rtes;
-	size_t i;
-	bool b;
-	nb_err_t err;
+	nb_lid_t id;
 
-	nb_recv_group_begin(nb, BIRD_RT);
-	nb_recv_string(nb, BIRD_RT_VERSION_STR, &rt->version_str);
-	err = nb_recv_array_begin(nb, BIRD_RTES, &num_rtes);
-	DEBUG_EXPR("%i", err);
-	checked(err);
-	rt->entries = array_new(num_rtes, sizeof(*rt->entries));
-	for (i = 0; i < num_rtes; i++) {
-		rt->entries = array_push(rt->entries, 1);
-		recv_rte(nb, &rt->entries[i]);
+	nb_recv_group(nb, BIRD_ORG_RTA_OTHER);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RTA_OTHER_KEY:
+			nb_recv_string(nb, &attr->other_attr.key);
+			break;
+		case BIRD_ORG_RTA_OTHER_VALUE:
+			nb_recv_string(nb, &attr->other_attr.value);
+			break;
+		}
 	}
-	nb_recv_array_end(nb);
+	return nb_recv_group_end(nb);
+}
 
+
+static nb_err_t recv_rta(struct nb *nb, struct rte_attr *attr)
+{
+	nb_lid_t id;
+	size_t i;
+
+	nb_recv_group(nb, BIRD_ORG_RTA);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RTA_TFLAG:
+			nb_recv_bool(nb, &attr->tflag);
+			break;
+		case BIRD_ORG_RTA_BGP_AGGR:
+			attr->type = RTE_ATTR_TYPE_BGP_AGGREGATOR;
+			recv_bgp_aggr(nb, attr);
+			break;
+		case BIRD_ORG_RTA_BGP_AS_PATH:
+			attr->type = RTE_ATTR_TYPE_BGP_AS_PATH;
+			nb_recv_array(nb, &attr->bgp_as_path);
+			for (i = 0; i < array_size(attr->bgp_as_path); i++)
+				nb_recv_i32(nb, &attr->bgp_as_path[i]);
+			nb_recv_array_end(nb);
+			break;
+		case BIRD_ORG_RTA_BGP_COMMUNITY:
+			attr->type = RTE_ATTR_TYPE_BGP_COMMUNITY;
+			nb_recv_array(nb, &attr->cflags);
+			for (i = 0; i < array_size(attr->cflags); i++)
+				recv_bgp_cflag(nb, &attr->cflags[i]);
+			nb_recv_array_end(nb);
+			break;
+		case BIRD_ORG_RTA_BGP_LOCAL_PREF:
+			attr->type = RTE_ATTR_TYPE_BGP_LOCAL_PREF;
+			nb_recv_u32(nb, &attr->bgp_local_pref);
+			break;
+		case BIRD_ORG_RTA_BGP_NEXT_HOP:
+			attr->type = RTE_ATTR_TYPE_BGP_NEXT_HOP;
+			recv_ipv4(nb, &attr->bgp_next_hop);
+			break;
+		case BIRD_ORG_RTA_BGP_ORIGIN:
+			attr->type = RTE_ATTR_TYPE_BGP_ORIGIN;
+			nb_recv_i32(nb, (int32_t *)&attr->bgp_origin);
+			break;
+		case BIRD_ORG_RTA_OTHER:
+			attr->type = RTE_ATTR_TYPE_OTHER;
+			recv_rta_other(nb, attr);
+			break;
+		}
+	}
+	return nb_recv_group_end(nb);
+}
+
+
+static nb_err_t recv_rte(struct nb *nb, struct rte *rte)
+{
+	nb_lid_t id;
+	size_t i;
+
+	nb_recv_group(nb, BIRD_ORG_RTE);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RTE_NETADDR:
+			recv_ipv4(nb, &rte->netaddr);
+			break;
+		case BIRD_ORG_RTE_NETMASK:
+			nb_recv_u32(nb, &rte->netmask);
+			break;
+		case BIRD_ORG_RTE_GWADDR:
+			recv_ipv4(nb, &rte->gwaddr);
+			break;
+		case BIRD_ORG_RTE_IFNAME:
+			nb_recv_string(nb, &rte->ifname);
+			break;
+		case BIRD_ORG_RTE_UPLINK:
+			recv_time(nb, &rte->uplink);
+			break;
+		case BIRD_ORG_RTE_UPLINK_FROM:
+			recv_ipv4(nb, &rte->uplink_from);
+			break;
+		case BIRD_ORG_RTE_TYPE:
+			nb_recv_i32(nb, (int32_t *)&rte->type);
+			break;
+		case BIRD_ORG_RTE_SRC:
+			nb_recv_i32(nb, (int32_t *)&rte->src);
+			break;
+		case BIRD_ORG_RTE_AS_NO:
+			nb_recv_u32(nb, &rte->as_no);
+			break;
+		case BIRD_ORG_RTE_ATTRS:
+			nb_recv_array(nb, &rte->attrs);
+			for (i = 0; i < array_size(rte->attrs); i++)
+				recv_rta(nb, &rte->attrs[i]);
+			nb_recv_array_end(nb);
+			break;
+		}
+	}
+	return nb_recv_group_end(nb);
+}
+
+
+static nb_err_t recv_rt(struct nb *nb, struct rt *rt)
+{
+	nb_lid_t id;
+	size_t i;
+
+	nb_recv_group(nb, BIRD_ORG_RT);
+	while (nb_recv_id(nb, &id)) {
+		switch (id) {
+		case BIRD_ORG_RT_VERSION:
+			nb_recv_string(nb, &rt->version_str);
+			break;
+
+		case BIRD_ORG_RT_ROUTES:
+			nb_recv_array(nb, &rt->entries);
+			for (i = 0; i < array_size(rt->entries); i++)
+				recv_rte(nb, &rt->entries[i]);
+			nb_recv_array_end(nb);
+			break;
+		}
+	}
 	return nb_recv_group_end(nb);
 }
 
 
 struct rt *deserialize_netbufs(struct nb_buf *buf)
 {
-	struct netbuf nb;
+	struct nb nb;
 	struct rt *rt;
 
 	nb_init(&nb, buf);
-	nb.cs->fail_on_error = true;
-
-	nb_setup(&nb);
+	setup_ids(&nb);
 
 	rt = nb_malloc(sizeof(*rt));
 	recv_rt(&nb, rt);
+
 	nb_free(&nb);
-	
 	return rt;
 }
