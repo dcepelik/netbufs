@@ -3,9 +3,9 @@
 #include "netbufs.h"
 
 
-static nb_err_t recv_ipv4(struct nb *nb, ipv4_t *ip)
+static void recv_ipv4(struct nb *nb, ipv4_t *ip)
 {
-	return nb_recv_u32(nb, ip);
+	nb_recv_u32(nb, ip);
 }
 
 

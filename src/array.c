@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "util.h"
 #include <assert.h>
+#include "debug.h"
 
 
 struct array_header
@@ -48,6 +49,12 @@ void *array_new(size_t init_capacity, size_t item_size)
 }
 
 
+void *array_new_size(size_t num_items, size_t item_size)
+{
+	return array_push(array_new(num_items, item_size), num_items);
+}
+
+
 void *array_push(void *arr, size_t num_items)
 {
 	struct array_header *header;
@@ -62,6 +69,20 @@ void *array_push(void *arr, size_t num_items)
 
 	header->num_items += num_items;
 	return arr;
+}
+
+
+void *array_ensure_index(void *arr, size_t index)
+{
+	struct array_header *hdr = array_get_header(arr);
+	size_t nitems_after;
+
+	nitems_after = index + 1;
+	hdr->num_items = nitems_after;
+
+	if (hdr->capacity >= nitems_after)
+		return arr;
+	return resize(arr, MAX(2 * hdr->capacity, nitems_after), hdr->item_size);
 }
 
 
@@ -81,6 +102,7 @@ void array_delete(void *arr)
 {
 	free(array_get_header(arr));
 }
+
 
 void *array_last(void *arr)
 {

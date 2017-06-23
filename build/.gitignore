@@ -1,5 +1,5 @@
 *.deps
 *.o
 benchmark
-cbordump
+nbdiag
 test-*
