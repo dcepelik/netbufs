@@ -13,9 +13,9 @@ static nb_err_t send_time(struct nb *nb, int id, struct tm *tm)
 }
 
 
-static nb_err_t send_ipv4(struct nb *nb, nb_lid_t id, ipv4_t ip)
+static void send_ipv4(struct nb *nb, nb_lid_t id, ipv4_t ip)
 {
-	return nb_send_u32(nb, id, ip);
+	nb_send_u32(nb, id, ip);
 }
 
 
