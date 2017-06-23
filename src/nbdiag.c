@@ -1,23 +1,25 @@
 /*
- * cbordump:
- * CBOR stream introspection tool
+ * nbdiag:
+ * Diagnostics utility for CBOR-encoded netbuf messages
  *
  * This utility shall be linked with the die()-ing memory wrappers.
  */
 
 #include "cbor.h"
+#include "diag.h"
 #include "debug.h"
 #include "internal.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <getopt.h>
 
 
 static struct option longopts[] = {
@@ -54,19 +56,11 @@ int main(int argc, char *argv[])
 	nb_err_t err;
 
 	bool roundtrip = false;
-	bool hex_input = false;
-	bool hex_output = false;
 	
 	argv0 = basename(argv[0]);
 
 	while ((c = getopt_long(argc, argv, "hHi:o:p", longopts, &option_index)) != -1) {
 		switch (c) {
-		case 'h':
-			hex_input = true;
-			break;
-		case 'H':
-			hex_output = true;
-			break;
 		case 'o':
 			fname_out = optarg;
 			break;
@@ -94,7 +88,8 @@ int main(int argc, char *argv[])
 		err = nb_buf_open_stdin(nb_buf_in);
 
 	if (err != NB_ERR_OK) {
-		fprintf(stderr, "%s: cannot open input file '%s'\n", argv0, fname_in);
+		fprintf(stderr, "%s: Cannot open input file '%s': %s\n", argv0, fname_in,
+			strerror(errno));
 		return EXIT_FAILURE;
 	}
 
@@ -104,32 +99,21 @@ int main(int argc, char *argv[])
 		err = nb_buf_open_stdout(nb_buf_out);
 	
 	if (err != NB_ERR_OK) {
-		fprintf(stderr, "%s: cannot open output file '%s'\n", argv0, fname_out);
+		fprintf(stderr, "%s: Cannot open output file '%s': %s\n", argv0, fname_out,
+			strerror(errno));
 		return EXIT_FAILURE;
 	}
 
 	if (!roundtrip) {
 		if ((err = cbor_stream_dump(cbor_in, stdout)) != NB_ERR_OK) {
-			fprintf(stderr, "%s: error: %s\n", argv0, cbor_stream_strerror(cbor_in));
-			DEBUG_EXPR("%i", err);
+			fprintf(stderr, "%s: CBOR decoding error %i: %s\n", argv0, err,
+				cbor_stream_strerror(cbor_in));
 			return 2;
 		}
 		putchar('\n');
 	}
 	else {
-		while (!nb_buf_is_eof(nb_buf_in)) {
-			if ((err = cbor_decode_item(cbor_in, &item)) != NB_ERR_OK) {
-				fprintf(stderr, "Error decoding item: %s\n",
-					cbor_stream_strerror(cbor_in));
-				return 2;
-			}
-
-			if ((err = cbor_encode_item(cbor_out, &item)) != NB_ERR_OK) {
-				fprintf(stderr, "Error encoding item: %s\n",
-					cbor_stream_strerror(cbor_out));
-				return 2;
-			}
-		}
+		TEMP_ASSERT(false);
 	}
 
 	nb_buf_close(nb_buf_in);
