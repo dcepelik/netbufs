@@ -205,6 +205,12 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 }
 
 
+nb_err_t cbor_decode_header(struct cbor_stream *cs, struct cbor_item *item)
+{
+	return predecode(cs, item);
+}
+
+
 static inline nb_err_t predecode_check(struct cbor_stream *cs, struct cbor_item *item, enum cbor_type type)
 {
 	nb_err_t err;

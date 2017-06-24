@@ -99,6 +99,9 @@ struct cbor_pair
  * Encoding/decoding primitives
  */
 
+/* TODO valid fields in item when using decode_header -> manual */
+nb_err_t cbor_decode_header(struct cbor_stream *cs, struct cbor_item *item);
+
 nb_err_t cbor_encode_uint8(struct cbor_stream *cs, uint8_t val);
 nb_err_t cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
 

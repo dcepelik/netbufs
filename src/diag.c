@@ -80,31 +80,6 @@ static void isbuf_decrease(struct isbuf *isbuf)
 }
 
 
-static bool is_simple_item(struct cbor_item *item)
-{
-	size_t i;
-	bool all_simple = true;
-
-	switch (item->type)
-	{
-		case CBOR_TYPE_ARRAY:
-			for (i = 0; i < item->len; i++)
-				all_simple &= is_simple_item(&item->items[i]);
-			return all_simple && item->len <= 4;
-
-		case CBOR_TYPE_MAP:
-			return item->len == 0;
-
-		case CBOR_TYPE_BYTES:
-		case CBOR_TYPE_TEXT:
-			return item->len < 8;
-
-		default:
-			return true;
-	}
-}
-
-
 static void dump_char_printable(struct isbuf *isbuf, char c)
 {
 	switch (c) {
@@ -157,74 +132,6 @@ static void dump_bytes(struct isbuf *isbuf, byte_t *bytes, size_t len)
 }
 
 
-static void dump_item(struct isbuf *isbuf, struct cbor_item *item);
-
-
-static void dump_map(struct isbuf *isbuf, struct cbor_item *map)
-{
-	size_t i;
-
-	if (is_simple_item(map)) {
-		isbuf_printf(isbuf, "{");
-		for (i = 0; i < map->len; i++) {
-			if (i > 0)
-				isbuf_printf(isbuf, ", ");
-
-			dump_item(isbuf, &map->pairs[i].key);
-			isbuf_printf(isbuf, ": ");
-			dump_item(isbuf, &map->pairs[i].value);
-		}
-		isbuf_printf(isbuf, "}");
-	}
-	else {
-		isbuf_printfln(isbuf, "{");
-		isbuf_increase(isbuf);
-
-		for (i = 0; i < map->len; i++) {
-			if (i > 0)
-				isbuf_printfln(isbuf, ",");
-
-			dump_item(isbuf, &map->pairs[i].key);
-			isbuf_printf(isbuf, ": ");
-			dump_item(isbuf, &map->pairs[i].value);
-		}
-
-		isbuf_printfln(isbuf, "");
-		isbuf_decrease(isbuf);
-		isbuf_printf(isbuf, "}");
-	}
-}
-
-
-static void dump_array(struct isbuf *isbuf, struct cbor_item *array)
-{
-	size_t i;
-
-	if (is_simple_item(array)) {
-		isbuf_printf(isbuf, "[");
-		for (i = 0; i < array->len; i++) {
-			if (i > 0)
-				isbuf_printf(isbuf, ", ");
-			dump_item(isbuf, &array->items[i]);
-		}
-		isbuf_printf(isbuf, "]");
-	}
-	else {
-		isbuf_printfln(isbuf, "[");
-		isbuf_increase(isbuf);
-
-		for (i = 0; i < array->len; i++) {
-			if (i > 0)
-				isbuf_printfln(isbuf, ",");
-			dump_item(isbuf, &array->items[i]);
-		}
-		isbuf_printfln(isbuf, "");
-		isbuf_decrease(isbuf);
-		isbuf_printf(isbuf, "]");
-	}
-}
-
-
 static void dump_sval(struct isbuf *isbuf, struct cbor_item *sval)
 {
 	switch (sval->u64) {
@@ -246,15 +153,78 @@ static void dump_sval(struct isbuf *isbuf, struct cbor_item *sval)
 }
 
 
-static void dump_tag(struct isbuf *isbuf, struct cbor_item *tag)
+static void dump_item(struct cbor_stream *cs, struct isbuf *isbuf,
+	struct cbor_item *item);
+
+
+static void dump_array(struct cbor_stream *cs, struct isbuf *isbuf,
+	struct cbor_item *arr)
 {
-	isbuf_printf(isbuf, "%u(", tag->u64);
-	dump_item(isbuf, tag->tagged_item);
-	isbuf_printf(isbuf, ")");
+	struct cbor_item item;
+	size_t i = 0;
+	nb_err_t err = NB_ERR_OK;
+
+	isbuf_printf(isbuf, "[");
+	isbuf_increase(isbuf);
+
+	while ((!arr->indefinite && i < arr->u64) || (arr->indefinite && err == NB_ERR_OK)) {
+		if (i == 0)
+			isbuf_printfln(isbuf, "");
+		else
+			isbuf_printfln(isbuf, ",");
+
+		if ((err = cbor_decode_header(cs, &item)) == NB_ERR_OK)
+			dump_item(cs, isbuf, &item);
+		i++;
+	}
+
+	if (i > 0)
+		isbuf_printfln(isbuf, "");
+	isbuf_decrease(isbuf);
+	isbuf_printf(isbuf, "]");
 }
 
 
-static void dump_item(struct isbuf *isbuf, struct cbor_item *item)
+static void dump_map_sequential(struct cbor_stream *cs, struct isbuf *isbuf,
+	struct cbor_item *map)
+{
+	struct cbor_item item;
+	size_t i;
+	bool is_key;
+	nb_err_t err = NB_ERR_OK;
+
+	isbuf_printfln(isbuf, "{");
+	isbuf_increase(isbuf);
+
+	is_key = true;
+	while ((!map->indefinite && i < map->len) || err == NB_ERR_OK) {
+		if (i > 0)
+			isbuf_printfln(isbuf, ",");
+
+		cbor_decode_header(cs, &item);
+
+		if (is_key) {
+			dump_item(cs, isbuf, &item);
+			isbuf_printfln(isbuf, ":");
+		}
+		else {
+			isbuf_increase(isbuf);
+			dump_item(cs, isbuf, &item);
+			isbuf_decrease(isbuf);
+		}
+
+		is_key = !is_key;
+		i++;
+	}
+
+	isbuf_printfln(isbuf, "");
+	isbuf_decrease(isbuf);
+	isbuf_printf(isbuf, "}");
+}
+
+
+static void dump_item(struct cbor_stream *cs, struct isbuf *isbuf,
+	struct cbor_item *item)
 {
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
@@ -264,19 +234,19 @@ static void dump_item(struct isbuf *isbuf, struct cbor_item *item)
 		isbuf_printf(isbuf, "%li", item->i64);
 		break;
 	case CBOR_TYPE_BYTES:
-		dump_bytes(isbuf, item->bytes, item->len);
+		//dump_bytes(isbuf, item->bytes, item->len);
 		break;
 	case CBOR_TYPE_TEXT:
-		dump_text(isbuf, item->str, item->len);
+		//dump_text(isbuf, item->str, item->len);
 		break;
 	case CBOR_TYPE_ARRAY:
-		dump_array(isbuf, item);
+		dump_array(cs, isbuf, item);
 		break;
 	case CBOR_TYPE_MAP:
-		dump_map(isbuf, item);
+		//dump_map_sequential(cs, isbuf, item);
 		break;
 	case CBOR_TYPE_TAG:
-		dump_tag(isbuf, item);
+		/* TODO print tags somehow */
 		break;
 	case CBOR_TYPE_SVAL:
 		dump_sval(isbuf, item);
@@ -287,39 +257,25 @@ static void dump_item(struct isbuf *isbuf, struct cbor_item *item)
 }
 
 
-void cbor_item_dump(struct cbor_item *item, FILE *file)
-{
-	struct isbuf isbuf;
-
-	isbuf_init(&isbuf);
-	dump_item(&isbuf, item);
-	fputs(strbuf_get_string(&isbuf.strbuf), file);
-	isbuf_free(&isbuf);
-}
-
-
 nb_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
 {
 	struct isbuf isbuf;
 	struct cbor_item item;
-	nb_err_t err = NB_ERR_OK;
-	size_t i = 0;
+	nb_err_t err;
+	size_t i;
 
 	isbuf_init(&isbuf);
 
-	while (!nb_buf_is_eof(cs->buf)) {
-		if ((err = cbor_decode_item(cs, &item)) != NB_ERR_OK)
+	for (i = 0; !nb_buf_is_eof(cs->buf); i++) {
+		if ((err = cbor_decode_header(cs, &item)) != NB_ERR_OK)
 			break;
 
 		if (i > 0)
 			isbuf_printfln(&isbuf, ",");
-
-		dump_item(&isbuf, &item);
-		i++;
+		dump_item(cs, &isbuf, &item);
 	}
 
 	fputs(strbuf_get_string(&isbuf.strbuf), file);
 	isbuf_free(&isbuf);
 	return err;
 }
-
