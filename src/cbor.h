@@ -21,6 +21,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 
 char *cbor_stream_strerror(struct cbor_stream *cs);
+bool cbor_block_stack_empty(struct cbor_stream *cs);
 
 /*
  * CBOR Simple Values
@@ -154,6 +155,10 @@ nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len);
 nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
+nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
+	byte_t **bytes, size_t *len);
+nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len);
+
 nb_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len);
 nb_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
@@ -176,5 +181,9 @@ nb_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len);
 
 nb_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item);
 nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item);
+
+/* TODO valid fields in item when using peek_item -> manual */
+nb_err_t cbor_peek_item(struct cbor_stream *cs, struct cbor_item *item);
+nb_err_t cbor_skip_header(struct cbor_stream *cs);
 
 #endif

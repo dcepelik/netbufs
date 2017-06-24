@@ -18,8 +18,6 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
 	va_end(args);
 
-	assert(err == NB_ERR_OK);
-
 	if (cs->fail_on_error) {
 		die("CBOR Error %i: %s\n", err, cs->err_buf.str);
 	}
@@ -59,14 +57,15 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 	cs = nb_malloc(sizeof(*cs));
 	cs->buf = buf;
 	cs->err = NB_ERR_OK;
+	cs->peeking = false;
 
 	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
 		free(cs);
 		return NULL;
 	}
 
-	 /* bottom stack block: avoids corner-cases */
-	push_block(cs, -1, true, 0);
+	/* bottom stack block: avoids corner-cases */
+	//push_block(cs, -1, true, 0);
 
 	strbuf_init(&cs->err_buf, 24); /* TODO change API, what if this fails? */
 
@@ -87,4 +86,10 @@ void cbor_stream_delete(struct cbor_stream *cs)
 char *cbor_stream_strerror(struct cbor_stream *cs)
 {
 	return strbuf_get_string(&cs->err_buf);
+}
+
+
+bool cbor_block_stack_empty(struct cbor_stream *cs)
+{
+	return stack_is_empty(&cs->blocks);
 }
