@@ -100,7 +100,7 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 	}
 
 	if (minor == CBOR_MINOR_BREAK)
-		return NB_ERR_BREAK;
+		return cs->err = NB_ERR_BREAK; /* TODO is this a hack? */
 
 	/* leverage decode_u64 to read the appropriate amount of data */
 	decode_u64(cs, (enum lbits)minor, &u64);
@@ -132,6 +132,15 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	bool indefinite = false;
 	uint64_t u64;
 	nb_err_t err;
+
+	/* TODO hacky hacky */
+	if (cs->peeking) {
+		*item = cs->peek; /* TODO avoid the copy */
+		cs->peeking = false;
+		err = cs->err;
+		cs->err = NB_ERR_OK;
+		return err;
+	}
 
 	struct block *block;
 
@@ -205,13 +214,26 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 }
 
 
-nb_err_t cbor_decode_header(struct cbor_stream *cs, struct cbor_item *item)
+nb_err_t cbor_peek_item(struct cbor_stream *cs, struct cbor_item *item)
 {
-	return predecode(cs, item);
+	nb_err_t err;
+
+	err = predecode(cs, &cs->peek);
+	*item = cs->peek; /* TODO avoid the copy */
+	cs->peeking = true;
+	return err;
 }
 
 
-static inline nb_err_t predecode_check(struct cbor_stream *cs, struct cbor_item *item, enum cbor_type type)
+nb_err_t cbor_skip_header(struct cbor_stream *cs)
+{
+	struct cbor_item skipped;
+	return predecode(cs, &skipped);
+}
+
+
+static inline nb_err_t predecode_check(struct cbor_stream *cs, struct cbor_item *item,
+	enum cbor_type type)
 {
 	nb_err_t err;
 

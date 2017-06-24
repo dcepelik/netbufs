@@ -108,12 +108,16 @@ int main(int argc, char *argv[])
 	if (!roundtrip) {
 		diag_init(&diag, cbor_in);
 		if ((err = diag_dump(&diag, stderr)) != NB_ERR_OK) {
-			fprintf(stderr, "%s: CBOR decoding error %i: %s\n", argv0, err,
+			fprintf(stderr, "%s: CBOR decoding error: %s\n", argv0,
 				cbor_stream_strerror(cbor_in));
 			return 2;
 		}
-		putchar('\n');
 		diag_free(&diag);
+
+		if (!cbor_block_stack_empty(cbor_in)) {
+			fprintf(stderr, "%s: warning: some blocks are still open after EOF\n", argv0);
+			return 2;
+		}
 	}
 	else {
 		TEMP_ASSERT(false);

@@ -68,10 +68,12 @@ struct block
 
 struct cbor_stream
 {
-	struct nb_buf *buf;
-	struct stack blocks;
-	nb_err_t err;
-	struct strbuf err_buf;
+	struct nb_buf *buf;		/* the buffer being read or written */
+	struct stack blocks;	/* block stack (open arrays and maps) */
+	bool peeking;			/* is peek a valid predecoded item? */
+	struct cbor_item peek;	/* item predecoded during last cbor_peek_item call */
+	nb_err_t err;			/* last error */
+	struct strbuf err_buf;	/* error string buffer */
 
 	/* TODO various encoding/decoding options to come as needed */
 	bool fail_on_error;
