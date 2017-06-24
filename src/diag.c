@@ -2,7 +2,6 @@
 #include "diag.h"
 #include "debug.h"
 #include "internal.h"
-#include "strbuf.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -13,243 +12,218 @@
 #define BYTES_DUMP_MAXLEN	64
 
 
-struct isbuf {
-	struct strbuf strbuf;
-	unsigned level;
-	bool indent_next;
-};
-
-
-static void isbuf_init(struct isbuf *isbuf)
-{
-	strbuf_init(&isbuf->strbuf, 64);
-	isbuf->level = 0;
-	isbuf->indent_next = true;
-}
-
-
-static void isbuf_free(struct isbuf *isbuf)
-{
-	strbuf_free(&isbuf->strbuf);
-}
-
-
-static void isbuf_vprintf(struct isbuf *isbuf, char *msg, va_list args)
+static void diag_vprintf(struct diag *diag, char *msg, va_list args)
 {
 	size_t i;
-	if (isbuf->indent_next) {
-		for (i = 0; i < 4 * isbuf->level; i++)
-			strbuf_putc(&isbuf->strbuf, ' ');
-		isbuf->indent_next = false;
+	if (diag->indent_next) {
+		for (i = 0; i < 4 * diag->level; i++)
+			strbuf_putc(&diag->strbuf, ' ');
+		diag->indent_next = false;
 	}
-	strbuf_vprintf_at(&isbuf->strbuf, isbuf->strbuf.len, msg, args);
+	strbuf_vprintf_at(&diag->strbuf, diag->strbuf.len, msg, args);
 }
 
 
-static void isbuf_printf(struct isbuf *isbuf, char *msg, ...)
+static void diag_printf(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	isbuf_vprintf(isbuf, msg, args);
+	diag_vprintf(diag, msg, args);
 	va_end(args);
 }
 
 
-static void isbuf_printfln(struct isbuf *isbuf, char *msg, ...)
+static void diag_printfln(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 
 	va_start(args, msg);
-	isbuf_vprintf(isbuf, msg, args);
-	strbuf_putc(&isbuf->strbuf, '\n');
-	isbuf->indent_next = true;
+	diag_vprintf(diag, msg, args);
+	strbuf_putc(&diag->strbuf, '\n');
+	diag->indent_next = true;
 	va_end(args);
 }
 
 
-static void isbuf_increase(struct isbuf *isbuf)
+static void diag_increase(struct diag *diag)
 {
-	isbuf->level++;
+	diag->level++;
 }
 
 
-static void isbuf_decrease(struct isbuf *isbuf)
+static void diag_decrease(struct diag *diag)
 {
-	assert(isbuf->level > 0);
-	isbuf->level--;
+	assert(diag->level > 0);
+	diag->level--;
 }
 
 
-static void dump_char_printable(struct isbuf *isbuf, char c)
+static void dump_char_printable(struct diag *diag, char c)
 {
 	switch (c) {
 	case '\n':
-		isbuf_printf(isbuf, "\\n");
+		diag_printf(diag, "\\n");
 		return;
 	case '\t':
-		isbuf_printf(isbuf, "\\t");
+		diag_printf(diag, "\\t");
 		return;
 	case '\r':
-		isbuf_printf(isbuf, "\\r");
+		diag_printf(diag, "\\r");
 		return;
 	case '\"':
-		isbuf_printf(isbuf, "\\\"");
+		diag_printf(diag, "\\\"");
 		return;
 	case '\\':
-		isbuf_printf(isbuf, "\\\\");
+		diag_printf(diag, "\\\\");
 		return;
 	default:
-		isbuf_printf(isbuf, "%c", c);
+		diag_printf(diag, "%c", c);
 	}
 }
 
 
-static void dump_text(struct isbuf *isbuf, char *bytes, size_t len)
+static void dump_text(struct diag *diag, char *bytes, size_t len)
 {
 	size_t i;
 	size_t dump_len = MIN(len, BYTES_DUMP_MAXLEN);
 
-	isbuf_printf(isbuf, "\"");
+	diag_printf(diag, "\"");
 	for (i = 0; i < dump_len; i++)
-		dump_char_printable(isbuf, bytes[i]);
+		dump_char_printable(diag, bytes[i]);
 	if (len > dump_len)
-		isbuf_printf(isbuf, "...");
-	isbuf_printf(isbuf, "\"");
+		diag_printf(diag, "...");
+	diag_printf(diag, "\"");
 }
 
 
-static void dump_bytes(struct isbuf *isbuf, byte_t *bytes, size_t len)
+static void dump_bytes(struct diag *diag, byte_t *bytes, size_t len)
 {
 	size_t i;
 	size_t dump_len = MIN(len, BYTES_DUMP_MAXLEN);
 
-	isbuf_printf(isbuf, "h'");
+	diag_printf(diag, "h'");
 	for (i = 0; i < dump_len; i++)
-		isbuf_printf(isbuf, "%02X", bytes[i]);
+		diag_printf(diag, "%02X", bytes[i]);
 	if (len > dump_len)
-		isbuf_printf(isbuf, "...");
-	isbuf_printf(isbuf, "'");
+		diag_printf(diag, "...");
+	diag_printf(diag, "'");
 }
 
 
-static void dump_sval(struct isbuf *isbuf, struct cbor_item *sval)
+static void dump_sval(struct diag *diag, struct cbor_item *sval)
 {
 	switch (sval->u64) {
 	case CBOR_SVAL_FALSE:
-		isbuf_printf(isbuf, "false");
+		diag_printf(diag, "false");
 		break;
 	case CBOR_SVAL_TRUE:
-		isbuf_printf(isbuf, "true");
+		diag_printf(diag, "true");
 		break;
 	case CBOR_SVAL_NULL:
-		isbuf_printf(isbuf, "null");
+		diag_printf(diag, "null");
 		break;
 	case CBOR_SVAL_UNDEF:
-		isbuf_printf(isbuf, "undefined");
+		diag_printf(diag, "undefined");
 		break;
 	default:
-		isbuf_printf(isbuf, "simple(%lu)", sval->u64);
+		diag_printf(diag, "simple(%lu)", sval->u64);
 	}
 }
 
 
-static void dump_item(struct cbor_stream *cs, struct isbuf *isbuf,
-	struct cbor_item *item);
+static void dump_item(struct diag *diag, struct cbor_item *item);
 
 
-static void dump_array(struct cbor_stream *cs, struct isbuf *isbuf,
-	struct cbor_item *arr)
+static void dump_array(struct diag *diag, struct cbor_item *arr)
 {
 	struct cbor_item item;
 	size_t i = 0;
 	nb_err_t err = NB_ERR_OK;
 
-	isbuf_printf(isbuf, "[");
-	isbuf_increase(isbuf);
+	diag_printf(diag, "[");
+	diag_increase(diag);
 
 	while ((!arr->indefinite && i < arr->u64) || (arr->indefinite && err == NB_ERR_OK)) {
 		if (i == 0)
-			isbuf_printfln(isbuf, "");
+			diag_printfln(diag, "");
 		else
-			isbuf_printfln(isbuf, ",");
+			diag_printfln(diag, ",");
 
-		if ((err = cbor_decode_header(cs, &item)) == NB_ERR_OK)
-			dump_item(cs, isbuf, &item);
+		if ((err = cbor_decode_header(diag->cs, &item)) == NB_ERR_OK)
+			dump_item(diag, &item);
 		i++;
 	}
 
 	if (i > 0)
-		isbuf_printfln(isbuf, "");
-	isbuf_decrease(isbuf);
-	isbuf_printf(isbuf, "]");
+		diag_printfln(diag, "");
+	diag_decrease(diag);
+	diag_printf(diag, "]");
 }
 
 
-static void dump_map_sequential(struct cbor_stream *cs, struct isbuf *isbuf,
-	struct cbor_item *map)
+static void dump_map(struct diag *diag, struct cbor_item *map)
 {
 	struct cbor_item item;
 	size_t i;
 	bool is_key;
 	nb_err_t err = NB_ERR_OK;
 
-	isbuf_printfln(isbuf, "{");
-	isbuf_increase(isbuf);
+	diag_printfln(diag, "{");
+	diag_increase(diag);
 
 	is_key = true;
 	while ((!map->indefinite && i < map->len) || err == NB_ERR_OK) {
 		if (i > 0)
-			isbuf_printfln(isbuf, ",");
+			diag_printfln(diag, ",");
 
-		cbor_decode_header(cs, &item);
+		cbor_decode_header(diag->cs, &item);
 
 		if (is_key) {
-			dump_item(cs, isbuf, &item);
-			isbuf_printfln(isbuf, ":");
+			dump_item(diag, &item);
+			diag_printfln(diag, ":");
 		}
 		else {
-			isbuf_increase(isbuf);
-			dump_item(cs, isbuf, &item);
-			isbuf_decrease(isbuf);
+			diag_increase(diag);
+			dump_item(diag, &item);
+			diag_decrease(diag);
 		}
 
 		is_key = !is_key;
 		i++;
 	}
 
-	isbuf_printfln(isbuf, "");
-	isbuf_decrease(isbuf);
-	isbuf_printf(isbuf, "}");
+	diag_printfln(diag, "");
+	diag_decrease(diag);
+	diag_printf(diag, "}");
 }
 
 
-static void dump_item(struct cbor_stream *cs, struct isbuf *isbuf,
-	struct cbor_item *item)
+static void dump_item(struct diag *diag, struct cbor_item *item)
 {
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
-		isbuf_printf(isbuf, "%lu", item->u64);
+		diag_printf(diag, "%lu", item->u64);
 		break;
 	case CBOR_TYPE_INT:
-		isbuf_printf(isbuf, "%li", item->i64);
+		diag_printf(diag, "%li", item->i64);
 		break;
 	case CBOR_TYPE_BYTES:
-		//dump_bytes(isbuf, item->bytes, item->len);
+		//dump_bytes(diag, item->bytes, item->len);
 		break;
 	case CBOR_TYPE_TEXT:
-		//dump_text(isbuf, item->str, item->len);
+		//dump_text(diag, item->str, item->len);
 		break;
 	case CBOR_TYPE_ARRAY:
-		dump_array(cs, isbuf, item);
+		dump_array(diag, item);
 		break;
 	case CBOR_TYPE_MAP:
-		//dump_map_sequential(cs, isbuf, item);
+		//dump_map(diag, item);
 		break;
 	case CBOR_TYPE_TAG:
 		/* TODO print tags somehow */
 		break;
 	case CBOR_TYPE_SVAL:
-		dump_sval(isbuf, item);
+		dump_sval(diag, item);
 		break;
 	default:
 		break;
@@ -257,25 +231,36 @@ static void dump_item(struct cbor_stream *cs, struct isbuf *isbuf,
 }
 
 
-nb_err_t cbor_stream_dump(struct cbor_stream *cs, FILE *file)
+void diag_init(struct diag *diag, struct cbor_stream *cs)
 {
-	struct isbuf isbuf;
+	strbuf_init(&diag->strbuf, 64);
+	diag->level = 0;
+	diag->indent_next = true;
+	diag->cs = cs;
+}
+
+
+nb_err_t diag_dump(struct diag *diag, FILE *out)
+{
 	struct cbor_item item;
 	nb_err_t err;
 	size_t i;
 
-	isbuf_init(&isbuf);
-
-	for (i = 0; !nb_buf_is_eof(cs->buf); i++) {
-		if ((err = cbor_decode_header(cs, &item)) != NB_ERR_OK)
+	for (i = 0; !nb_buf_is_eof(diag->cs->buf); i++) {
+		if ((err = cbor_decode_header(diag->cs, &item)) != NB_ERR_OK)
 			break;
 
 		if (i > 0)
-			isbuf_printfln(&isbuf, ",");
-		dump_item(cs, &isbuf, &item);
+			diag_printfln(diag, ",");
+		dump_item(diag, &item);
 	}
 
-	fputs(strbuf_get_string(&isbuf.strbuf), file);
-	isbuf_free(&isbuf);
+	fputs(strbuf_get_string(&diag->strbuf), out);
 	return err;
+}
+
+
+void diag_free(struct diag *diag)
+{
+	strbuf_free(&diag->strbuf);
 }
