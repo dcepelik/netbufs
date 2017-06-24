@@ -476,7 +476,7 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 }
 
 
-static nb_err_t read_stream(struct cbor_stream *cs, struct cbor_item *stream,
+nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 	byte_t **bytes, size_t *len)
 {
 	struct cbor_item chunk;
@@ -507,10 +507,10 @@ static nb_err_t read_stream(struct cbor_stream *cs, struct cbor_item *stream,
 }
 
 
-static nb_err_t read_stream_0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len)
+nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len)
 {
 	nb_err_t err;
-	if ((err = read_stream(cs, stream, bytes, len)) == NB_ERR_OK)
+	if ((err = cbor_decode_stream(cs, stream, bytes, len)) == NB_ERR_OK)
 		(*bytes)[*len] = 0;
 	return err;
 }
@@ -522,7 +522,7 @@ nb_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **str, size_t *len)
 	nb_err_t err;
 
 	if ((err = predecode_check(cs, &item, CBOR_TYPE_BYTES)) == NB_ERR_OK)
-		return read_stream(cs, &item, str, len);
+		return cbor_decode_stream(cs, &item, str, len);
 	return err;
 }
 
@@ -533,7 +533,7 @@ nb_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len)
 	nb_err_t err;
 
 	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) == NB_ERR_OK)
-		return read_stream_0(cs, &item, str, len);
+		return cbor_decode_stream0(cs, &item, str, len);
 	return err;
 }
 
@@ -625,9 +625,9 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_FLOAT64:
 		return NB_ERR_OK;
 	case CBOR_TYPE_BYTES:
-		return read_stream(cs, item, &item->bytes, &item->len);
+		return cbor_decode_stream(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_TEXT:
-		return read_stream_0(cs, item, &item->bytes, &item->len);
+		return cbor_decode_stream0(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_ARRAY:
 		return decode_array_items(cs, item, &item->items, &item->len);
 	case CBOR_TYPE_MAP:

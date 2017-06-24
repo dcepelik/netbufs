@@ -157,6 +157,10 @@ nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len);
 nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
+nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
+	byte_t **bytes, size_t *len);
+nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len);
+
 nb_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len);
 nb_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
