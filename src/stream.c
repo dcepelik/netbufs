@@ -10,6 +10,8 @@
 
 nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 {
+	assert(err != NB_ERR_OK);
+
 	va_list args;
 
 	cs->err = err;
@@ -18,9 +20,8 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
 	va_end(args);
 
-	if (cs->fail_on_error) {
-		die("CBOR Error %i: %s\n", err, cs->err_buf.str);
-	}
+	if (cs->error_handler)
+		cs->error_handler(cs, err, cs->error_handler_arg);
 
 	return err;
 }
@@ -58,18 +59,17 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 	cs->buf = buf;
 	cs->err = NB_ERR_OK;
 	cs->peeking = false;
+	cs->error_handler = NULL; /* don't use an error handler */
+
+	strbuf_init(&cs->err_buf, 24); /* TODO change strbuf API and return error flags? */
 
 	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
-		free(cs);
-		return NULL;
+		xfree(cs);
+		return NULL; /* lift to NB_ERR_NOMEM */
 	}
-
-	/* bottom stack block: avoids corner-cases */
-	//push_block(cs, -1, true, 0);
-
-	strbuf_init(&cs->err_buf, 24); /* TODO change API, what if this fails? */
-
-	cs->fail_on_error = false;
+	
+	/* cannot fail, stack was initialized to size >= 1 */
+	assert(push_block(cs, -1, true, 0) == NB_ERR_OK);
 
 	return cs;
 }
@@ -91,5 +91,13 @@ char *cbor_stream_strerror(struct cbor_stream *cs)
 
 bool cbor_block_stack_empty(struct cbor_stream *cs)
 {
-	return stack_is_empty(&cs->blocks);
+	return top_block(cs)->type == -1;
+}
+
+
+void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t *handler,
+	void *arg)
+{
+	cs->error_handler = handler;
+	cs->error_handler_arg = arg;
 }

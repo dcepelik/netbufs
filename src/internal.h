@@ -76,7 +76,8 @@ struct cbor_stream
 	struct strbuf err_buf;	/* error string buffer */
 
 	/* TODO various encoding/decoding options to come as needed */
-	bool fail_on_error;
+	cbor_error_handler_t *error_handler;
+	void *error_handler_arg;
 };
 
 

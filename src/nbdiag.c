@@ -21,6 +21,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define EXIT_DATA_ERROR	2
+
+
+static const char *argv0;
+
 
 static struct option longopts[] = {
 	{ "output",		required_argument,	0,	'o' },
@@ -29,7 +34,7 @@ static struct option longopts[] = {
 };
 
 
-static void usage(char *argv0, int status)
+static void usage(int status)
 {
 	fprintf(stderr, "Usage: %s [OPTION]... [FILE]\n\n", argv0);
 	fprintf(stderr, "With no FILE or when FILE is -, read stdin.\n\n");
@@ -37,6 +42,16 @@ static void usage(char *argv0, int status)
 	fprintf(stderr, "\t%-20sWrite output to FILE instead of stdout\n", "-o, --output=FILE");
 	fprintf(stderr, "\t%-20sRead the data and write it back\n", "-r, --roundtrip");
 	exit(status);
+}
+
+
+static void error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
+{
+	struct diag *diag = (struct diag *)arg;
+	fputs(strbuf_get_string(&diag->strbuf), stdout); /* TODO */
+	fprintf(stderr, "\n%s: error while decoding CBOR stream: %s\n", argv0,
+		cbor_stream_strerror(cs));
+	exit(EXIT_DATA_ERROR);
 }
 
 
@@ -50,7 +65,6 @@ int main(int argc, char *argv[])
 	struct cbor_stream *cbor_out;
 	struct cbor_item item;
 	struct diag diag;
-	char *argv0;
 	int c;
 	int digit_optind;
 	int option_index;
@@ -69,9 +83,8 @@ int main(int argc, char *argv[])
 			roundtrip = true;
 			break;
 		default:
-			usage(argv0, EXIT_FAILURE);
+			usage(EXIT_FAILURE);
 		}
-
 	}
 
 	if (optind < argc)
@@ -107,11 +120,8 @@ int main(int argc, char *argv[])
 
 	if (!roundtrip) {
 		diag_init(&diag, cbor_in);
-		if ((err = diag_dump(&diag, stderr)) != NB_ERR_OK) {
-			fprintf(stderr, "%s: CBOR decoding error: %s\n", argv0,
-				cbor_stream_strerror(cbor_in));
-			return 2;
-		}
+		cbor_stream_set_error_handler(cbor_in, error_handler, &diag);
+		diag_dump(&diag, stdout);
 		diag_free(&diag);
 
 		if (!cbor_block_stack_empty(cbor_in)) {

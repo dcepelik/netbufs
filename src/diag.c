@@ -77,7 +77,7 @@ static void dump_char_printable(struct diag *diag, char c)
 		diag_printf(diag, "\\\\");
 		return;
 	default:
-		if (isprint(c))
+		if (isprint(c) || true)
 			diag_printf(diag, "%c", c);
 		else
 			diag_printf(diag, "\\x%02u", c);
@@ -158,12 +158,6 @@ static void dump_sval(struct diag *diag, struct cbor_item *sval)
 }
 
 
-static void dump_stream(struct diag *diag, struct cbor_item *item)
-{
-
-}
-
-
 static void dump_item(struct diag *diag, struct cbor_item *item);
 
 
@@ -178,24 +172,18 @@ static void dump_array(struct diag *diag, struct cbor_item *arr)
 	diag_increase(diag);
 
 	if (arr->indefinite)
-		err = cbor_decode_array_begin_indef(diag->cs);
+		cbor_decode_array_begin_indef(diag->cs);
 	else
-		err = cbor_decode_array_begin(diag->cs, &num_items);
-
-	if (err != NB_ERR_OK) {
-		DEBUG_MSG(cbor_stream_strerror(diag->cs));
-		DEBUG_EXPR("%i", err);
-		assert(false);
-	}
+		cbor_decode_array_begin(diag->cs, &num_items);
 
 	while (arr->indefinite || (!arr->indefinite && i < num_items)) {
+		if ((err = cbor_peek_item(diag->cs, &item)) != NB_ERR_OK)
+			break;
+
 		if (i == 0)
 			diag_printfln(diag, "");
 		else
 			diag_printfln(diag, ",");
-
-		if ((err = cbor_peek_item(diag->cs, &item)) != NB_ERR_OK)
-			break;
 
 		dump_item(diag, &item);
 		i++;

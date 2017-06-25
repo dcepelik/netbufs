@@ -12,7 +12,7 @@ CBOR_NUM_RANDFILES=20
 CBOR_RFC_TESTS_URI=https://raw.githubusercontent.com/cbor/test-vectors/master/appendix_a.json
 CBOR_RFC_TESTS_JSON=rfc-tests.json
 
-CBORDUMP=../build/cbordump
+NBDIAG=../build/nbdiag
 
 IO_DIR=io
 IO_RAND_FILES="1 1k 8k 1M 16M"
@@ -28,13 +28,16 @@ setup_test_files() {
 		exit 1;
 	fi
 
-	if [ ! -d $IO_DIR ]; then
-		mkdir $IO_DIR
-		for size in $IO_RAND_FILES; do
-			testfile=$IO_DIR/$size.random
-			dd if=/dev/urandom of=$testfile bs=$size count=1
-		done
+	if ! command -v xxd >/dev/null; then
+		echo "$0: xxd binary not found"
+		exit 1;
 	fi
+
+	#mkdir $IO_DIR
+	for size in $IO_RAND_FILES; do
+		testfile=$IO_DIR/$size.random
+		dd if=/dev/urandom of=$testfile bs=$size count=1
+	done
 
 	if [ ! -d $CBOR_RANDFILES_DIR ]; then
 		mkdir $CBOR_RANDFILES_DIR
@@ -46,6 +49,8 @@ setup_test_files() {
 			dd if=/dev/urandom bs=256 count=1 2>&1 | xxd -p | tr -d '\n' > $testfile
 		done
 	fi
+
+	# generate tests from RFC test suite
 
 	if [ ! -d $CBOR_RFC_DIR ]; then
 		if ! curl -o $CBOR_RFC_TESTS_JSON $CBOR_RFC_TESTS_URI; then
@@ -75,7 +80,8 @@ setup_test_files() {
 		rm $CBOR_RFC_TESTS_JSON
 	fi
 
-	# disable float tests
+	# disable some RFC tests
+
 	for i in $(seq 19 40); do
 		echo "Skip float test" > $CBOR_RFC_DIR/$i/skip
 	done
@@ -115,23 +121,23 @@ should_fail() {
 
 pass() {
 	num_ok=$(($num_ok + 1))
-	echo +
+	echo + $1
 }
 
 cbordump_retval() {
-	$CBORDUMP -h -i $1 2>/dev/null >/dev/null
+	xxd -p -r $1 | $NBDIAG 2>/dev/null >/dev/null
 	return $?
 }
 
 cbordump_vg() {
-	vg_errs=$(valgrind $CBORDUMP -h -i $1 2>&1 | tail -n1 | cut -d ' ' -f4,10)
+	vg_errs=$(xxd -p -r $1 | valgrind $NBDIAG 2>&1 | tail -n1 | cut -d ' ' -f4,10)
 
 	if [ "$vg_errs" != "0 0" ]; then
 		valgrind_error $test
 		got_err=1
 		return 1
 	else
-		pass
+		pass $test
 	fi
 }
 
@@ -151,12 +157,12 @@ run_cbor_positive_tests() {
 		out_json=$test/out.json
 		out_test=$test/out.test
 
-		$CBORDUMP -h -i $in > $out_test
+		xxd -p -r $in | $NBDIAG > $out_test
 
 		if [ $? -ne 0 ]; then
 			runtime_error $test
 		else
-			pass
+			pass $test
 
 			cbordump_vg $in
 
@@ -165,7 +171,7 @@ run_cbor_positive_tests() {
 					diff_error $test
 					diff --ignore-all-space $out $out_test | sed $'s/^/\t/g'
 				else
-					pass
+					pass $test
 				fi
 			elif [ -f $out_json ]; then
 				jq_equal=$(jq --slurpfile a $out_test --slurpfile b $out_json -n "\$a == \$b")
@@ -173,7 +179,7 @@ run_cbor_positive_tests() {
 				if [ "$jq_equal" != "true" ]; then
 					diff_error $test
 				else
-					pass
+					pass $test
 				fi
 			fi
 		fi
@@ -189,7 +195,7 @@ run_cbor_negative_tests() {
 
 		cbordump_retval $in
 		if [ $? -eq 2 ]; then
-			pass
+			pass $test
 			cbordump_vg $in
 		elif [ $? -eq 0 ]; then
 			should_fail $test
@@ -209,7 +215,7 @@ run_io_buf_echo_tests() {
 		if ! diff -q $test $out >/dev/null; then
 			diff_error $test
 		else
-			pass
+			pass $test
 		fi
 
 		rm $out

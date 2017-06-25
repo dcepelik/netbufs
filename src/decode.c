@@ -42,6 +42,16 @@ static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 }
 
 
+static inline nb_err_t read_stream(struct cbor_stream *cs, byte_t *bytes, size_t nbytes)
+{
+	nb_err_t err;
+	
+	if ((err = nb_buf_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
+		return error(cs, err,
+			err == NB_ERR_EOF ? "EOF was unexpected." : "(buffer error).");
+	return NB_ERR_OK;
+}
+
 static inline nb_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, uint64_t *u64)
 {
 	byte_t bytes[8];
@@ -58,12 +68,12 @@ static inline nb_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, uint
 
 	assert(lbits != LBITS_INDEFINITE);
 	if (lbits > LBITS_8B)
-		return error(cs, NB_ERR_PARSE, "Invalid value of "
-			"Additional Information: 0x%02X.", lbits);
+		return error(cs, NB_ERR_PARSE,
+			"Invalid value of Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
-	if ((err = nb_buf_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
-		return err;
+	if ((err = read_stream(cs, bytes, nbytes)) != NB_ERR_OK)
+		return error(cs, err, "Error occured while reading the stream.");
 
 	for (i = 0; i < nbytes; i++)
 		u64be_ptr[(8 - nbytes) + i] = bytes[i];
@@ -142,9 +152,9 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 		return err;
 	}
 
-	struct block *block;
+	top_block(cs)->num_items++;
 
-	if ((err = nb_buf_read(cs->buf, &hdr, 1)) != NB_ERR_OK)
+	if ((err = read_stream(cs, &hdr, 1)) != NB_ERR_OK)
 		return err;
 
 	major = (hdr & 0xE0) >> 5;
@@ -396,9 +406,11 @@ static nb_err_t decode_break(struct cbor_stream *cs)
 }
 
 
-static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type, bool indef, uint64_t *len)
+static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type,
+	bool indef, uint64_t *len)
 {
 	struct cbor_item item;
+	size_t block_len = 0;
 	nb_err_t err;
 
 	if ((err = predecode_check(cs, &item, type)) != NB_ERR_OK)
@@ -407,10 +419,14 @@ static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type, 
 	if (item.indefinite != indef)
 		return error(cs, NB_ERR_INDEF, NULL);
 
-	if (!item.indefinite)
+	if (!item.indefinite) {
 		*len = item.u64;
+		block_len = item.u64;
+		if (type == CBOR_TYPE_MAP)
+			block_len *= 2;
+	}
 
-	return push_block(cs, item.type, item.indefinite, item.u64);
+	return push_block(cs, item.type, item.indefinite, block_len);
 }
 
 
@@ -421,20 +437,20 @@ static nb_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 {
 	struct block *block;
 
-	if (top_block(cs)->type == -1)
+	if (cbor_block_stack_empty(cs))
 		return error(cs, NB_ERR_OPER, "Cannot end block, there's no block open.");
 
 	block = stack_pop(&cs->blocks);
-
 	if (block->type != type)
 		return error(cs, NB_ERR_OPER, NULL);
 
 	if (block->indefinite)
 		return decode_break(cs);
 
-	//if (block->num_items != block->hdr.u64)
-	//	return error(cs, NB_ERR_OPER, NULL);
-	
+	if (block->num_items != block->len)
+		return error(cs, NB_ERR_OPER, "Cannot end block, some items weren't processed.",
+			cbor_type_string(block->type));
+		
 	return NB_ERR_OK;
 }
 
@@ -488,7 +504,7 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 	if (!*bytes)
 		return error(cs, NB_ERR_NOMEM, "No memory to decode another buf chunk.");
 
-	if ((err = nb_buf_read(cs->buf, *bytes + *len, chunk->u64)) != NB_ERR_OK) {
+	if ((err = read_stream(cs, *bytes + *len, chunk->u64)) != NB_ERR_OK) {
 		free(*bytes);
 		return err;
 	}
@@ -585,7 +601,6 @@ static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr
 
 			if ((err = cbor_decode_item(cs, item)) != NB_ERR_OK)
 				break;
-
 			i++;
 		}
 
