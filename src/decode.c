@@ -7,8 +7,10 @@
  */
 
 #include "debug.h"
+#include "diag.h"
 #include "internal.h"
 #include "memory.h"
+#include "util.h"
 
 #include <assert.h>
 #include <endian.h>
@@ -46,9 +48,11 @@ static inline nb_err_t read_stream(struct cbor_stream *cs, byte_t *bytes, size_t
 {
 	nb_err_t err;
 	
+	diag_log_offset(cs->diag, nb_buf_tell(cs->buf));
 	if ((err = nb_buf_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
 		return error(cs, err,
 			err == NB_ERR_EOF ? "EOF was unexpected." : "(buffer error).");
+	diag_log_raw(cs->diag, bytes, MIN(nbytes, 4));
 	return NB_ERR_OK;
 }
 
@@ -109,8 +113,11 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 		return NB_ERR_OK;
 	}
 
-	if (minor == CBOR_MINOR_BREAK)
+	if (minor == CBOR_MINOR_BREAK) {
+		diag_log_item(cs->diag, "break");
+		diag_dump_line(cs->diag);
 		return cs->err = NB_ERR_BREAK; /* TODO is this a hack? */
+	}
 
 	/* leverage decode_u64 to read the appropriate amount of data */
 	decode_u64(cs, (enum lbits)minor, &u64);
@@ -498,7 +505,8 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 	nb_err_t err;
 
 	if (chunk->u64 > SIZE_MAX)
-		return error(cs, NB_ERR_RANGE, "Chunk is too large to be decoded by this implementation.");
+		return error(cs, NB_ERR_RANGE,
+			"Chunk is too large to be decoded by this implementation.");
 
 	*bytes = nb_realloc(*bytes, 1 + *len + chunk->u64);
 	if (!*bytes)
@@ -508,6 +516,11 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 		free(*bytes);
 		return err;
 	}
+
+	(*bytes)[*len + chunk->u64] = 0;
+	diag_dump_line(cs->diag);
+	diag_log_item(cs->diag, "chunk(len=%luB)", chunk->u64);
+	diag_log_cbor(cs->diag, "\"%s\"", (char *)*bytes + *len);
 
 	*len += chunk->u64;
 	return NB_ERR_OK;
@@ -535,6 +548,8 @@ nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 
 		if ((err = read_stream_chunk(cs, stream, &chunk, bytes, len) != NB_ERR_OK))
 			break;
+
+		diag_dump_line(cs->diag);
 	}
 
 	if (err == NB_ERR_BREAK)
@@ -545,7 +560,8 @@ nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 }
 
 
-nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len)
+nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
+	byte_t **bytes, size_t *len)
 {
 	nb_err_t err;
 	if ((err = cbor_decode_stream(cs, stream, bytes, len)) == NB_ERR_OK)
@@ -577,7 +593,7 @@ nb_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len)
 
 
 static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr,
-	struct cbor_item **items, uint64_t *nitems)
+	struct cbor_item **items, uint64_t *nitems, bool map_diag)
 {
 	struct cbor_item *item;
 	size_t size;
@@ -599,8 +615,23 @@ static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr
 		while (i < size) {
 			item = *items + i;
 
+			if (i > 0 && (!map_diag || i % 2 == 0)) {
+				diag_log_cbor(cs->diag, ",");
+				diag_dump_line(cs->diag);
+
+				if (map_diag)
+					diag_decrease(cs->diag);
+			}
+
 			if ((err = cbor_decode_item(cs, item)) != NB_ERR_OK)
 				break;
+
+			if (map_diag && i % 2 == 0) {
+				diag_log_cbor(cs->diag, ":");
+				diag_dump_line(cs->diag);
+				diag_increase(cs->diag);
+			}
+
 			i++;
 		}
 
@@ -633,7 +664,7 @@ static nb_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 		.u64 = 2 * map->u64,
 	};
 
-	if ((err = decode_array_items(cs, &arr, &items, &nitems)) != NB_ERR_OK)
+	if ((err = decode_array_items(cs, &arr, &items, &nitems, true)) != NB_ERR_OK)
 		return err;
 
 	if (nitems % 2 != 0)
@@ -655,27 +686,67 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
-	case CBOR_TYPE_INT:
+		diag_log_item(cs->diag, "uint(val=%lu)", item->u64);
+		diag_log_cbor(cs->diag, "%lu", item->u64);
+		return NB_ERR_OK;
 	case CBOR_TYPE_SVAL:
+		diag_log_item(cs->diag, "sval(val=%lu)", item->u64);
+		diag_log_sval(cs->diag, item->u64);
+		return NB_ERR_OK;
+	case CBOR_TYPE_INT:
+		diag_log_item(cs->diag, "int(val=%li)", item->i64);
+		diag_log_cbor(cs->diag, "%li", item->i64);
+		return NB_ERR_OK;
 	case CBOR_TYPE_FLOAT16:
 	case CBOR_TYPE_FLOAT32:
 	case CBOR_TYPE_FLOAT64:
 		return NB_ERR_OK;
 	case CBOR_TYPE_BYTES:
+		diag_log_item(cs->diag, "bytestream");
 		return cbor_decode_stream(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_TEXT:
+		diag_log_item(cs->diag, "text");
 		return cbor_decode_stream0(cs, item, &item->bytes, &item->len);
 	case CBOR_TYPE_ARRAY:
-		return decode_array_items(cs, item, &item->items, &item->len);
+		if (!item->indefinite)
+			diag_log_item(cs->diag, "array(nitems=%lu)", item->u64);
+		else
+			diag_log_item(cs->diag, "array(nitems=?)");
+		diag_log_cbor(cs->diag, "[");
+		diag_dump_line(cs->diag);
+		diag_increase(cs->diag);
+		err = decode_array_items(cs, item, &item->items, &item->len, false);
+		diag_decrease(cs->diag);
+		diag_dump_line(cs->diag);
+		diag_dump_line(cs->diag);
+		diag_log_cbor(cs->diag, "]");
+		return err;
 	case CBOR_TYPE_MAP:
-		return decode_map_items(cs, item, &item->pairs, &item->len);
+		if (!item->indefinite)
+			diag_log_item(cs->diag, "map(nitems=%lu)", item->u64);
+		else
+			diag_log_item(cs->diag, "map(nitems=?)");
+		diag_log_cbor(cs->diag, "{");
+		diag_dump_line(cs->diag);
+		diag_increase(cs->diag);
+		err = decode_map_items(cs, item, &item->pairs, &item->len);
+		if (!item->indefinite && item->len > 0)
+			diag_decrease(cs->diag);
+		diag_decrease(cs->diag);
+		diag_dump_line(cs->diag);
+		diag_log_cbor(cs->diag, "}");
+		return err;
 
 	case CBOR_TYPE_TAG:
-		/* TODO clean this up */
 		item->tagged_item = nb_malloc(sizeof(*item->tagged_item));
+		diag_dump_line(cs->diag);
+		diag_log_cbor(cs->diag, "%lu(", item->tag);
 		if (!item->tagged_item)
 			return NB_ERR_NOMEM;
-		return cbor_decode_item(cs, item->tagged_item);
+		err = cbor_decode_item(cs, item->tagged_item);
+		diag_dump_line(cs->diag);
+		diag_log_cbor(cs->diag, ")");
+		return err;
 
 	default:
 		return error(cs, NB_ERR_UNSUP, NULL);

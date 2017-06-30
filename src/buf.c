@@ -286,6 +286,12 @@ static void nb_buf_file_close(struct nb_buf *buf)
 	close(buf->fd);
 }
 
+static size_t nb_buf_file_tell(struct nb_buf *buf)
+{
+	return lseek(buf->fd, 0, SEEK_CUR);
+}
+
+
 static void nb_buf_file_fill(struct nb_buf *buf)
 {
 	int retval;
@@ -293,7 +299,7 @@ static void nb_buf_file_fill(struct nb_buf *buf)
 	retval = read(buf->fd, buf->buf, buf->bufsize);
 	buf->len = MAX(retval, 0);
 
-	/* TODO handle error  if retval < 0 */
+	/* TODO handle error if retval < 0 */
 
 	buf->eof = (buf->len == 0);
 	TEMP_ASSERT(buf->len >= 0);
@@ -374,6 +380,7 @@ nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int flags, int mod
 	buf->close = nb_buf_file_close;
 	buf->fill = nb_buf_file_fill;
 	buf->flush = nb_buf_file_flush;
+	buf->tell = nb_buf_file_tell;
 
 	return NB_ERR_OK;
 }
@@ -388,6 +395,7 @@ static nb_err_t open_fd(struct nb_buf *buf, int fd)
 	buf->close = NULL;
 	buf->fill = nb_buf_file_fill;
 	buf->flush = nb_buf_file_flush;
+	buf->tell = nb_buf_file_tell;
 
 	return NB_ERR_OK;
 }
@@ -444,4 +452,10 @@ bool nb_buf_is_eof(struct nb_buf *buf)
 	}
 
 	return false;
+}
+
+
+size_t nb_buf_tell(struct nb_buf *buf)
+{
+	return buf->tell(buf);
 }

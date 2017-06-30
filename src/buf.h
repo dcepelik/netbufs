@@ -13,24 +13,24 @@ typedef nb_err_t (filter_t)(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
 struct nb_buf
 {
-	byte_t *buf;	/* data buffer */
-	size_t bufsize;	/* size of the buffer */
-	size_t pos;	/* current read/write position within the buf */
-	size_t len;	/* number of valid bytes in the buffer (for reading) */
+	byte_t *buf;		/* data buffer */
+	size_t bufsize;		/* size of the buffer */
+	size_t pos;			/* current read/write position within the buf */
+	size_t len;			/* number of valid bytes in the buffer (for reading) */
 	size_t last_read_len;
-	bool dirty;	/* do we have data to be written? */
-	bool eof;	/* did we hit EOF during last filling? */
-	int ungetc;	/* character to be returned by next getc()-call */
+	bool dirty;			/* do we have data to be written? */
+	bool eof;			/* did we hit EOF during last filling? */
+	int ungetc;			/* character to be returned by next getc()-call */
 
 	union {
 		struct { /* for file streams */
 			char *filename;	/* filename of currently open file */
-			int fd;		/* file descriptor */
-			int mode;	/* file flags (@see man 3p open) */
+			int fd;			/* file descriptor */
+			int mode;		/* file flags (@see man 3p open) */
 		};
 
 		struct { /* for in-memory streams */
-			byte_t *memory;	/* the memory */
+			byte_t *memory;		/* the memory */
 			size_t memory_size;	/* memory size */
 			size_t memory_len;	/* number of valid bytes in memory */
 			size_t memory_pos;	/* position in memory (for reading/writing) */
@@ -40,6 +40,7 @@ struct nb_buf
 	void (*flush)(struct nb_buf *buf);
 	void (*fill)(struct nb_buf *buf);
 	void (*close)(struct nb_buf *buf);
+	size_t (*tell)(struct nb_buf *buf);
 
 	filter_t *read_filter;
 	filter_t *write_filter;
@@ -83,5 +84,6 @@ nb_err_t nb_buf_hex_read_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes
 nb_err_t nb_buf_hex_write_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
 
 nb_err_t nb_buf_printf(struct nb_buf *buf, char *msg, ...);
+size_t nb_buf_tell(struct nb_buf *buf);
 
 #endif

@@ -48,7 +48,7 @@ static void usage(int status)
 static void error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 {
 	struct diag *diag = (struct diag *)arg;
-	fputs(strbuf_get_string(&diag->strbuf), stdout); /* TODO */
+	//fputs(strbuf_get_string(&diag->strbuf), stdout); /* TODO */
 	fprintf(stderr, "\n%s: error while decoding CBOR stream: %s\n", argv0,
 		cbor_stream_strerror(cs));
 	exit(EXIT_DATA_ERROR);
@@ -119,8 +119,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (!roundtrip) {
-		diag_init(&diag, cbor_in);
+		diag_init(&diag, cbor_in, stderr);
 		cbor_stream_set_error_handler(cbor_in, error_handler, &diag);
+		cbor_stream_set_diag(cbor_in, &diag);
 		diag_dump(&diag, stdout);
 		diag_free(&diag);
 

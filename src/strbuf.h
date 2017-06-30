@@ -25,6 +25,9 @@ char *strbuf_get_string(struct strbuf *buf);
 char *strbuf_strcpy(struct strbuf *buf);
 
 size_t strbuf_printf(struct strbuf *buf, char *fmt, ...);
+size_t strbuf_vprintf(struct strbuf *buf, char *fmt, va_list args);
 size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args);
+
+void strbuf_fill(struct strbuf *buf, size_t offset, size_t count, char c);
 
 #endif

@@ -101,3 +101,9 @@ void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t 
 	cs->error_handler = handler;
 	cs->error_handler_arg = arg;
 }
+
+
+void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag)
+{
+	cs->diag = diag;
+}

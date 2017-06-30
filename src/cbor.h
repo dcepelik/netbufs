@@ -6,7 +6,9 @@
 #define CBOR_H
 
 #include "common.h"
+#include "diag.h"
 #include "error.h"
+#include "sval.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -22,21 +24,10 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
 void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t *handler,
 	void *arg);
+void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag);
 
 char *cbor_stream_strerror(struct cbor_stream *cs);
 bool cbor_block_stack_empty(struct cbor_stream *cs);
-
-/*
- * CBOR Simple Values
- * @see RFC 7049, section 2.3.
- */
-enum cbor_sval
-{
-	CBOR_SVAL_FALSE = 20,
-	CBOR_SVAL_TRUE,
-	CBOR_SVAL_NULL,
-	CBOR_SVAL_UNDEF,
-};
 
 /*
  * Type of a CBOR Data Item as percieved by the user.
@@ -64,6 +55,14 @@ struct cbor_pair;
 
 /*
  * CBOR Data Item
+ * TODO Fit tags as u32 into padding.
+ * 1 B type
+ * 1 B flags
+ * 2 B padding/explicit rfu
+ * 4 B tag
+ * 8 B union
+ * TODO Use a hashmap for map.
+ * //TODO Embedded strings.
  */
 struct cbor_item
 {
@@ -160,7 +159,8 @@ nb_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
 nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 	byte_t **bytes, size_t *len);
-nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream, byte_t **bytes, size_t *len);
+nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
+	byte_t **bytes, size_t *len);
 
 nb_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len);
 nb_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);

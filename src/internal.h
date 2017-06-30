@@ -3,6 +3,7 @@
 
 #include "buf.h"
 #include "cbor.h"
+#include "diag.h"
 #include "stack.h"
 #include "strbuf.h"
 #include <stdlib.h>
@@ -74,6 +75,7 @@ struct cbor_stream
 	struct cbor_item peek;	/* item predecoded during last cbor_peek_item call */
 	nb_err_t err;			/* last error */
 	struct strbuf err_buf;	/* error string buffer */
+	struct diag *diag;		/* diagnostics buffer */
 
 	/* TODO various encoding/decoding options to come as needed */
 	cbor_error_handler_t *error_handler;

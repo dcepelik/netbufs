@@ -33,16 +33,16 @@ void strbuf_init(struct strbuf *buf, size_t init_size)
 }
 
 
-void strbuf_prepare_write(struct strbuf *buf, size_t count)
+void strbuf_prepare_append(struct strbuf *buf, size_t count)
 {
 	if (buf->len + count >= buf->size) /* >= because of the '\0' */
-		strbuf_resize(buf, MAX(count, 2 * buf->size));
+		strbuf_resize(buf, MAX(buf->len + count, 2 * buf->size));
 }
 
 
 size_t strbuf_putc(struct strbuf *buf, char c)
 {
-	strbuf_prepare_write(buf, 1);
+	strbuf_prepare_append(buf, 1);
 	buf->str[buf->len++] = c;
 	return 1;
 }
@@ -117,6 +117,12 @@ size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list a
 }
 
 
+size_t strbuf_vprintf(struct strbuf *buf, char *fmt, va_list args)
+{
+	return strbuf_vprintf_at(buf, buf->len, fmt, args);
+}
+
+
 size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
 {
 	size_t num_written;
@@ -127,4 +133,14 @@ size_t strbuf_printf(struct strbuf *buf, char *fmt, ...)
 	va_end(args);
 
 	return num_written;
+}
+
+
+void strbuf_fill(struct strbuf *buf, size_t offset, size_t count, char c)
+{
+	size_t size_reqd = offset + count + 1;
+	if (size_reqd > buf->size)
+		strbuf_resize(buf, MAX(size_reqd, 2 * buf->size));
+
+	memset(buf->str + offset, c, count);
 }
