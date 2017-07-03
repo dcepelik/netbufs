@@ -12,15 +12,6 @@
 typedef uint64_t nb_pid_t;
 
 
-/* TODO remove this */
-size_t nb_internal_recv_array_size(struct nb *nb)
-{
-	size_t nitems;
-	cbor_decode_array_begin(nb->cs, &nitems);
-	return nitems;
-}
-
-
 void nb_init(struct nb *nb, struct nb_buf *buf)
 {
 	nb->cs = cbor_stream_new(buf);

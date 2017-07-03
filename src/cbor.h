@@ -74,6 +74,7 @@ struct cbor_item
 
 /*
  * CBOR block context for arrays, maps and infeninite-length byte and text streams.
+ * TODO Documentation: netbfus leverages this stack, too.
  */
 struct block
 {
@@ -81,7 +82,8 @@ struct block
 	bool indefinite;		/* is indefinite-lenght encoding used? */
 	uint64_t len;			/* intended length of the block when !indefinite */
 	size_t num_items;		/* actual number of items encoded */
-	struct nb_group *group;	/* active netbufs group TODO MM */
+	struct nb_group *group;	/* active netbufs group */
+	struct nb_attr *attr;	/* current attribute */
 };
 
 typedef void (cbor_error_handler_t)(struct cbor_stream *cs, nb_err_t err, void *arg);

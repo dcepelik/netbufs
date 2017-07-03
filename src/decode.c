@@ -527,14 +527,20 @@ nb_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
 nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
 {
 	nb_err_t err;
+	bool indefinite;
 
+	indefinite = top_block(cs)->indefinite;
 	if ((err = decode_block_end(cs, CBOR_TYPE_ARRAY)) != NB_ERR_OK)
 		return err;
+
+	if (!indefinite)
+		diag_force_newline(cs->diag); /* TODO cleanup */
 
 	diag_decrease(cs->diag);
 	diag_log_cbor(cs->diag, "]");
 	handle_diag_item_decoration(cs);
 	diag_dump_line(cs->diag);
+
 	return NB_ERR_OK;
 }
 

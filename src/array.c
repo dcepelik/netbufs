@@ -21,7 +21,7 @@ static inline struct array_header *array_get_header(void *arr)
 
 
 /*
- * TODO Alignment
+ * TODO Alignment 8-multiples
  */
 static void *resize(void *arr, size_t new_capacity, size_t item_size)
 {
@@ -37,7 +37,6 @@ static void *resize(void *arr, size_t new_capacity, size_t item_size)
 	header->item_size = item_size;
 	header->capacity = new_capacity; 
 	return header + 1;
-
 }
 
 

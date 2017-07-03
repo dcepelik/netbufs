@@ -148,6 +148,12 @@ void diag_dump_line(struct diag *diag)
 }
 
 
+void diag_force_newline(struct diag *diag)
+{
+	diag_dump_line_internal(diag);
+}
+
+
 void diag_log_sval(struct diag *diag, uint64_t sval)
 {
 	switch (sval) {

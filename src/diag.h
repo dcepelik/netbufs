@@ -43,6 +43,7 @@ nb_err_t diag_dump(struct diag *diag, FILE *out);
 void diag_free(struct diag *diag);
 
 void diag_dump_line(struct diag *diag);
+void diag_force_newline(struct diag *diag);
 
 void diag_log_offset(struct diag *diag, size_t offset);
 void diag_log_raw(struct diag *diag, unsigned char *bytes, size_t count);

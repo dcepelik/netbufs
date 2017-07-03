@@ -17,6 +17,7 @@ struct nb
 	struct nb_group **groups;
 	struct diag diag;
 	struct nb_group *active_group;
+	struct nb_attr *cur_attr;
 };
 
 /* TODO hide this */

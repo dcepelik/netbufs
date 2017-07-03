@@ -7,7 +7,8 @@
 void nb_send_id(struct nb *nb, nb_lid_t id)
 {
 	/* TODO */
-	cbor_encode_int32(nb->cs, id);
+	if (id >= 0)
+		cbor_encode_int32(nb->cs, id);
 }
 
 
