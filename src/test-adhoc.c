@@ -1,6 +1,5 @@
 #include "cbor.h"
 #include "debug.h"
-#include "internal.h"
 #include "util.h"
 
 #include <assert.h>

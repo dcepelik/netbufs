@@ -1,8 +1,8 @@
 #ifndef DIAG_H
 #define DIAG_H
 
-#include "strbuf.h"
 #include "error.h"
+#include "strbuf.h"
 #include "sval.h"
 #include <inttypes.h>
 #include <stdio.h>

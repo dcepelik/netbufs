@@ -1,8 +1,8 @@
 #include "array.h"
+#include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
 #include "netbufs.h"
-#include "internal.h"
 
 
 static bool recv_id(struct nb *nb, nb_lid_t *id)
@@ -26,7 +26,7 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 	bool ret;
 	ret = recv_id(nb, id);
 	/* TODO remove this conditional by always having an active (default) group */
-	if (ret && nb->active_group != NULL) {
+	if (nb->active_group != NULL) {
 		if (*id <= array_size(nb->active_group->attrs))
 			if (nb->active_group->attrs[*id] != NULL)
 				diag_log_proto(&nb->diag, "%s/%s",
@@ -128,7 +128,7 @@ void nb_recv_bool(struct nb *nb, bool *b)
 void nb_recv_string(struct nb *nb, char **str)
 {
 	size_t len;
-	cbor_decode_text(nb->cs, (byte_t **)str, &len);
+	cbor_decode_text(nb->cs, (nb_byte_t **)str, &len);
 }
 
 

@@ -4,8 +4,9 @@
  * The files are then diffed by run-tests.sh.
  */
 
+#include "buf.h"
 #include "cbor.h"
-#include "internal.h"
+#include "common.h"
 
 #include <assert.h>
 #include <fcntl.h>

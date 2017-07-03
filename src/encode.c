@@ -1,10 +1,11 @@
 /*
- * encode:
- * CBOR encoder
+ * CBOR Encoder
  */
 
+#include "buf.h"
+#include "cbor-internal.h"
+#include "cbor.h"
 #include "debug.h"
-#include "internal.h"
 #include "memory.h"
 #include "stack.h"
 
@@ -16,9 +17,9 @@
 #include <stdbool.h>
 
 
-static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, byte_t lbits)
+static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, nb_byte_t lbits)
 {
-	byte_t hdr;
+	nb_byte_t hdr;
 	struct block *block;
 
 	hdr = (major << 5) + lbits;
@@ -26,7 +27,7 @@ static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, byte_t lbits
 }
 
 
-static nb_err_t write_hdr_count(struct cbor_stream *cs, enum major major, byte_t lbits)
+static nb_err_t write_hdr_count(struct cbor_stream *cs, enum major major, nb_byte_t lbits)
 {
 	top_block(cs)->num_items++;
 	return write_hdr(cs, major, lbits);
@@ -53,18 +54,18 @@ static nb_err_t write_break(struct cbor_stream *cs)
 
 static nb_err_t write_hdr_u64(struct cbor_stream *cs, enum major major, uint64_t u64)
 {
-	byte_t lbits;
-	byte_t bytes[8];
+	nb_byte_t lbits;
+	nb_byte_t bytes[8];
 	size_t len;
 	uint64_t u64be;
-	byte_t *u64be_ptr = (byte_t *)&u64be;
+	nb_byte_t *u64be_ptr = (nb_byte_t *)&u64be;
 	nb_err_t err;
 	size_t i;
 
 	assert(major >= 0 && major < 7);
 
 	if (u64 <= 23) {
-		return write_hdr_count(cs, major, (byte_t)u64);
+		return write_hdr_count(cs, major, (nb_byte_t)u64);
 	}
 
 	if (u64 <= UINT8_MAX) {
@@ -247,7 +248,7 @@ nb_err_t cbor_encode_map_end(struct cbor_stream *cs)
 }
 
 
-static nb_err_t encode_bytes(struct cbor_stream *cs, enum major major, byte_t *bytes, size_t len)
+static nb_err_t encode_bytes(struct cbor_stream *cs, enum major major, nb_byte_t *bytes, size_t len)
 {
 	nb_err_t err;
 	if ((err = write_hdr_u64(cs, major, len)) == NB_ERR_OK)
@@ -256,7 +257,7 @@ static nb_err_t encode_bytes(struct cbor_stream *cs, enum major major, byte_t *b
 }
 
 
-nb_err_t cbor_encode_bytes(struct cbor_stream *cs, byte_t *bytes, size_t len)
+nb_err_t cbor_encode_bytes(struct cbor_stream *cs, nb_byte_t *bytes, size_t len)
 {
 	return encode_bytes(cs, CBOR_MAJOR_BYTES, bytes, len);
 }
@@ -274,7 +275,7 @@ nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs)
 }
 
 
-nb_err_t cbor_encode_text(struct cbor_stream *cs, byte_t *str, size_t len)
+nb_err_t cbor_encode_text(struct cbor_stream *cs, nb_byte_t *str, size_t len)
 {
 	return encode_bytes(cs, CBOR_MAJOR_TEXT, str, len);
 }
@@ -304,10 +305,10 @@ nb_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 
 	if (sval >= 0 && sval <= 255) {
 		if (sval <= 23)
-			return write_hdr_major7(cs, (byte_t)sval);
+			return write_hdr_major7(cs, (nb_byte_t)sval);
 		
 		if ((err = write_hdr_major7(cs, CBOR_MINOR_SVAL)) == NB_ERR_OK)
-			return nb_buf_write(cs->buf, (byte_t *)&sval, 1);
+			return nb_buf_write(cs->buf, (nb_byte_t *)&sval, 1);
 		return err;
 	}
 
@@ -398,7 +399,7 @@ nb_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_BYTES:
 		return cbor_encode_bytes(cs, item->bytes, item->len);
 	case CBOR_TYPE_TEXT:
-		return cbor_encode_text(cs, (byte_t *)item->str, item->len);
+		return cbor_encode_text(cs, (nb_byte_t *)item->str, item->len);
 	case CBOR_TYPE_ARRAY:
 		return encode_array(cs, item);
 	case CBOR_TYPE_MAP:

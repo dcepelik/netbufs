@@ -1,14 +1,16 @@
 /*
- * decode:
- * CBOR decoder
+ * CBOR Decoder
  *
  * TODO Get rid of all recursion, or limit allowed nesting of maps and arrays.
  * TODO Open a nesting block when using cbor_decode_item and we run into an array, too.
+ * TODO Enforce memory limits (globally or per item).
  */
 
+#include "buf.h"
+#include "cbor-internal.h"
+#include "cbor.h"
 #include "debug.h"
 #include "diag.h"
-#include "internal.h"
 #include "memory.h"
 #include "util.h"
 
@@ -47,7 +49,7 @@ static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 }
 
 
-static inline nb_err_t read_stream(struct cbor_stream *cs, byte_t *bytes, size_t nbytes)
+static inline nb_err_t read_stream(struct cbor_stream *cs, nb_byte_t *bytes, size_t nbytes)
 {
 	nb_err_t err;
 	
@@ -62,10 +64,10 @@ static inline nb_err_t read_stream(struct cbor_stream *cs, byte_t *bytes, size_t
 
 static inline nb_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, uint64_t *u64)
 {
-	byte_t bytes[8];
+	nb_byte_t bytes[8];
 	uint8_t nbytes;
 	uint64_t u64be = 0;
-	byte_t *u64be_ptr = (byte_t *)&u64be;
+	nb_byte_t *u64be_ptr = (nb_byte_t *)&u64be;
 	size_t i;
 	nb_err_t err;
 
@@ -177,9 +179,9 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 
 static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 {
-	byte_t hdr;
+	nb_byte_t hdr;
 	enum major major;
-	byte_t lbits;
+	nb_byte_t lbits;
 	uint64_t u64;
 	nb_err_t err;
 
@@ -550,7 +552,7 @@ nb_err_t cbor_decode_map_end(struct cbor_stream *cs)
 
 
 static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stream,
-	struct cbor_item *chunk, byte_t **bytes, size_t *len)
+	struct cbor_item *chunk, nb_byte_t **bytes, size_t *len)
 {
 	nb_err_t err;
 
@@ -574,7 +576,7 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 
 
 nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
-	byte_t **bytes, size_t *len)
+	nb_byte_t **bytes, size_t *len)
 {
 	struct cbor_item chunk;
 	nb_err_t err;
@@ -605,7 +607,7 @@ nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 
 
 nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
-	byte_t **bytes, size_t *len)
+	nb_byte_t **bytes, size_t *len)
 {
 	nb_err_t err;
 	if ((err = cbor_decode_stream(cs, stream, bytes, len)) == NB_ERR_OK)
@@ -614,7 +616,7 @@ nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
 }
 
 
-nb_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **str, size_t *len)
+nb_err_t cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 {
 	struct cbor_item item;
 	nb_err_t err;
@@ -632,7 +634,7 @@ nb_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **str, size_t *len)
 }
 
 
-nb_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len)
+nb_err_t cbor_decode_text(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 {
 	struct cbor_item item;
 	nb_err_t err;

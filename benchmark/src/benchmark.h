@@ -8,28 +8,31 @@
 
 #include "array.h"
 #include "buf.h"
-#include "internal.h"
+#include "common.h"
 #include "memory.h"
+
 #include <assert.h>
 #include <inttypes.h>
 #include <time.h>
+
+typedef uint32_t ipv4_t;
 
 static inline void ipv4_init(ipv4_t *ip)
 {
 	*ip = 0;
 }
 
-static inline void ipv4_set_byte(ipv4_t *ip, size_t i, byte_t b)
+static inline void ipv4_set_byte(ipv4_t *ip, size_t i, nb_byte_t b)
 {
 	assert(i >= 0 && i <= 3);
-	byte_t *ip_ptr = (byte_t *)ip;
+	nb_byte_t *ip_ptr = (nb_byte_t *)ip;
 	ip_ptr[i] = b;
 }
 
-static byte_t ipv4_get_byte(ipv4_t *ip, size_t i)
+static nb_byte_t ipv4_get_byte(ipv4_t *ip, size_t i)
 {
 	assert(i >= 0 && i <= 3);
-	byte_t *ip_ptr = (byte_t *)ip;
+	nb_byte_t *ip_ptr = (nb_byte_t *)ip;
 	return ip_ptr[i];
 }
 

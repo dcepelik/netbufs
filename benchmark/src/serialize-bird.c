@@ -1,5 +1,5 @@
-#include "debug.h"
 #include "benchmark.h"
+#include "debug.h"
 #include "strbuf.h"
 #include "util.h"
 
@@ -23,7 +23,7 @@ static size_t print_ipv4(struct strbuf *sb, ipv4_t *ip)
 }
 
 
-static size_t print_ipv4_net(struct strbuf *sb, ipv4_t *ip, byte_t netmask)
+static size_t print_ipv4_net(struct strbuf *sb, ipv4_t *ip, nb_byte_t netmask)
 {
 	size_t len;
 	len = print_ipv4(sb, ip);
@@ -279,5 +279,5 @@ void serialize_bird(struct rt *rt, struct nb_buf *buf)
 	for (i = 0; i < array_size(rt->entries); i++)
 		print_rte(&sb, &rt->entries[i]);
 
-	nb_buf_write(buf, (byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
+	nb_buf_write(buf, (nb_byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
 }

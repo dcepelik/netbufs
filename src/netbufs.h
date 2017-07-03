@@ -2,6 +2,8 @@
 #define NETBUFS_H
 
 #include "buf.h"
+#include "cbor.h"
+#include "diag.h"
 #include "error.h"
 
 #include <stdbool.h>

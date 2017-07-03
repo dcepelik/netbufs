@@ -91,7 +91,7 @@ void nb_send_string(struct nb *nb, nb_lid_t id, char *str)
 	nb_send_id(nb, id);
 	if (str == NULL)
 		str = "";
-	cbor_encode_text(nb->cs, (byte_t *)str, strlen(str));
+	cbor_encode_text(nb->cs, (nb_byte_t *)str, strlen(str));
 }
 
 

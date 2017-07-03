@@ -103,8 +103,8 @@ void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 		cbor_decode_uint32(cs, &attr->aggr.as_no);
 		break;
 	case RTE_ATTR_TYPE_OTHER:
-		cbor_decode_text(cs, (byte_t **)&attr->other_attr.key, &foo);
-		cbor_decode_text(cs, (byte_t **)&attr->other_attr.value, &foo);
+		cbor_decode_text(cs, (nb_byte_t **)&attr->other_attr.key, &foo);
+		cbor_decode_text(cs, (nb_byte_t **)&attr->other_attr.value, &foo);
 		break;
 	}
 }
@@ -118,7 +118,7 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 
 	deserialize_ipv4_net(cs, &rte->netaddr, &rte->netmask);
 	deserialize_ipv4(cs, &rte->gwaddr);
-	cbor_decode_text(cs, (byte_t **)&rte->ifname, &foo);
+	cbor_decode_text(cs, (nb_byte_t **)&rte->ifname, &foo);
 	deserialize_time(cs, &rte->uplink);
 
 	deserialize_bool(cs, &rte->uplink_from_valid);
@@ -154,7 +154,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 	cbor_stream_set_diag(cs, &diag);
 	rt = nb_malloc(sizeof(*rt));
 
-	cbor_decode_text(cs, (byte_t **)&rt->version_str, &foo);
+	cbor_decode_text(cs, (nb_byte_t **)&rt->version_str, &foo);
 
 	rt->entries = array_new(256, sizeof(*rt->entries));
 	for (i = 0; !nb_buf_is_eof(buf); i++) {

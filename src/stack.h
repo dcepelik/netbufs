@@ -1,13 +1,13 @@
 #ifndef STACK_H
 #define STACK_H
 
-#include "cbor.h"
+#include "common.h"
 #include <stdbool.h>
 #include <stdlib.h>
 
 struct stack
 {
-	byte_t *items;
+	nb_byte_t *items;
 	size_t size;
 	size_t item_size;
 	size_t num_items;

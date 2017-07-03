@@ -1,5 +1,6 @@
+#include "buf.h"
+#include "common.h"
 #include "debug.h"
-#include "internal.h"
 #include "memory.h"
 #include "util.h"
 
@@ -10,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes);
+static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes);
 
 
 void nb_buf_init(struct nb_buf *buf)
@@ -25,21 +26,7 @@ void nb_buf_init(struct nb_buf *buf)
 	buf->len = 0;
 	buf->dirty = false;
 	buf->eof = false;
-	buf->read_filter = NULL;
-	buf->write_filter = NULL;
 	buf->ungetc = -1;
-}
-
-
-void nb_buf_set_read_filter(struct nb_buf *buf, filter_t *filter)
-{
-	buf->read_filter = filter;
-}
-
-
-void nb_buf_set_write_filter(struct nb_buf *buf, filter_t *filter)
-{
-	buf->write_filter = filter;
 }
 
 
@@ -83,7 +70,7 @@ static void debug_write(unsigned char *bytes, size_t nbytes)
 
 
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
-static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
+static nb_err_t read_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
@@ -119,7 +106,7 @@ static nb_err_t read_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
 }
 
 
-static inline byte_t hexval(char c)
+static inline nb_byte_t hexval(char c)
 {
 	assert(isxdigit(c));
 
@@ -132,7 +119,7 @@ static inline byte_t hexval(char c)
 }
 
 
-static inline char hexchar(byte_t val)
+static inline char hexchar(nb_byte_t val)
 {
 	assert(val >= 0 && val <= 15);
 
@@ -143,82 +130,26 @@ static inline char hexchar(byte_t val)
 }
 
 
-nb_err_t nb_buf_hex_read_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_read(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
 {
-	size_t nnbytes;
-	byte_t *tmpbuf;
-	size_t i;
-	size_t j;
-	size_t read_len;
-	nb_err_t err;
-
-	nnbytes = 2 * nbytes;
-	tmpbuf = malloc(nnbytes);
-	TEMP_ASSERT(tmpbuf);
-
-	if ((err = read_internal(buf, tmpbuf, nnbytes)) != NB_ERR_OK)
-		return err;
-
-	TEMP_ASSERT(nb_buf_get_last_read_len(buf) % 2 == 0);
-	read_len = nb_buf_get_last_read_len(buf) / 2;
-
-	for (i = 0, j = 0; i < read_len; i++, j += 2) {
-		bytes[i] = 16 * hexval(tmpbuf[j]) + hexval(tmpbuf[j + 1]);
-	}
-
-	free(tmpbuf);
-	return NB_ERR_OK;
-}
-
-
-nb_err_t nb_buf_hex_write_filter(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
-{
-	size_t nnbytes;
-	byte_t *tmpbuf;
-	size_t i;
-	size_t j;
-	nb_err_t err;
-
-	nnbytes = 2 * nbytes;
-	tmpbuf = malloc(nnbytes);
-	TEMP_ASSERT(tmpbuf);
-
-	for (i = 0, j = 0; i < nbytes; i++, j += 2) {
-		tmpbuf[j] = hexchar(bytes[i] >> 4);
-		tmpbuf[j + 1] = hexchar(bytes[i] & 0x0F);
-	}
-
-	err = write_internal(buf, tmpbuf, nnbytes);
-	free(tmpbuf);
-
-	return err;
-}
-
-
-nb_err_t nb_buf_read(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
-{
-	if (buf->read_filter)
-		return buf->read_filter(buf, bytes, nbytes);
 	return read_internal(buf, bytes, nbytes);
 }
 
 
-size_t nb_buf_read_len(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
+size_t nb_buf_read_len(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	read_internal(buf, bytes, nbytes);
 	return nb_buf_get_last_read_len(buf);
 }
 
 
-nb_err_t nb_buf_write(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
+nb_err_t nb_buf_write(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
 {
-	if (buf->write_filter)
-		return buf->write_filter(buf, bytes, nbytes);
 	return write_internal(buf, bytes, nbytes);
 }
 
 
-static nb_err_t write_internal(struct nb_buf *buf, byte_t *bytes, size_t nbytes)
+static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;

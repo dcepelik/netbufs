@@ -1,7 +1,8 @@
+#include "buf.h"
 #include "cbor.h"
+#include "cbor-internal.h"
 #include "debug.h"
 #include "diag.h"
-#include "internal.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -43,7 +44,7 @@ void diag_log_offset(struct diag *diag, size_t offset)
 }
 
 
-void diag_log_raw(struct diag *diag, byte_t *bytes, size_t count)
+void diag_log_raw(struct diag *diag, nb_byte_t *bytes, size_t count)
 {
 	size_t i;
 

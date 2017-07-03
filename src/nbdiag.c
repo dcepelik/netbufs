@@ -5,10 +5,11 @@
  * This utility shall be linked with the die()-ing memory wrappers.
  */
 
+#include "buf.h"
 #include "cbor.h"
-#include "diag.h"
+#include "common.h"
 #include "debug.h"
-#include "internal.h"
+#include "diag.h"
 
 #include <assert.h>
 #include <errno.h>

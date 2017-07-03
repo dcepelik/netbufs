@@ -84,11 +84,11 @@ void serialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 		cbor_encode_uint32(cs, attr->aggr.as_no);
 		break;
 	case RTE_ATTR_TYPE_OTHER:
-		cbor_encode_text(cs, (byte_t *)attr->other_attr.key, strlen(attr->other_attr.key));
+		cbor_encode_text(cs, (nb_byte_t *)attr->other_attr.key, strlen(attr->other_attr.key));
 		value = attr->other_attr.value;
 		if (value == NULL)
 			value = "";
-		cbor_encode_text(cs, (byte_t *)value, strlen(value));
+		cbor_encode_text(cs, (nb_byte_t *)value, strlen(value));
 		break;
 	}
 }
@@ -100,7 +100,7 @@ void serialize_rte(struct cbor_stream *cs, struct rte *rte)
 
 	serialize_ipv4_net(cs, &rte->netaddr, rte->netmask);
 	serialize_ipv4(cs, &rte->gwaddr);
-	cbor_encode_text(cs, (byte_t *)rte->ifname, strlen(rte->ifname));
+	cbor_encode_text(cs, (nb_byte_t *)rte->ifname, strlen(rte->ifname));
 	serialize_time(cs, &rte->uplink);
 
 	serialize_bool(cs, rte->uplink_from_valid);
@@ -126,7 +126,7 @@ void serialize_cbor(struct rt *rt, struct nb_buf *buf)
 	size_t i;
 
 	cs = cbor_stream_new(buf);
-	cbor_encode_text(cs, (byte_t *)rt->version_str, strlen(rt->version_str));
+	cbor_encode_text(cs, (nb_byte_t *)rt->version_str, strlen(rt->version_str));
 	
 	for (i = 0; i < array_size(rt->entries); i++)
 		serialize_rte(cs, &rt->entries[i]);

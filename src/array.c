@@ -1,5 +1,5 @@
 #include "array.h"
-#include "internal.h"
+#include "common.h"
 #include "memory.h"
 #include "util.h"
 #include <assert.h>
@@ -108,5 +108,5 @@ void *array_last(void *arr)
 {
 	struct array_header *hdr = array_get_header(arr);
 	assert(hdr->num_items > 0);
-	return ((byte_t *)arr) + (hdr->num_items - 1) * hdr->item_size;
+	return ((nb_byte_t *)arr) + (hdr->num_items - 1) * hdr->item_size;
 }
