@@ -42,20 +42,22 @@ void diag_init(struct diag *diag, struct cbor_stream *cs, FILE *fout);
 nb_err_t diag_dump(struct diag *diag, FILE *out);
 void diag_free(struct diag *diag);
 
+void diag_dump_line(struct diag *diag);
+
 void diag_log_offset(struct diag *diag, size_t offset);
 void diag_log_raw(struct diag *diag, unsigned char *bytes, size_t count);
 void diag_log_item(struct diag *diag, char *msg, ...);
-void diag_log_cbor(struct diag *diag, char *msg, ...);
-void diag_log_proto(struct diag *diag, char *msg, ...);
-void diag_dump_line(struct diag *diag);
 
 /* TODO rename */
 void diag_increase(struct diag *diag);
 void diag_decrease(struct diag *diag);
+void diag_log_cbor(struct diag *diag, char *msg, ...);
 
 void diag_indent_proto(struct diag *diag);
 void diag_dedent_proto(struct diag *diag);
+void diag_log_proto(struct diag *diag, char *msg, ...);
 
 void diag_log_sval(struct diag *diag, uint64_t u64);
+void diag_print_block_stack(struct diag *diag);
 
 #endif

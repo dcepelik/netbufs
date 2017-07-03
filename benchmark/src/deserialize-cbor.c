@@ -54,7 +54,6 @@ void deserialize_attr_bgp_as_path(struct cbor_stream *cs, struct rte_attr *attr)
 		attr->bgp_as_path = array_push(attr->bgp_as_path, 1);
 		cbor_decode_int32(cs, &attr->bgp_as_path[i]);
 	}
-
 	cbor_decode_array_end(cs);
 }
 
@@ -65,8 +64,9 @@ void deserialize_attr_bgp_community(struct cbor_stream *cs, struct rte_attr *att
 	size_t i;
 
 	cbor_decode_array_begin(cs, &nitems);
-	attr->cflags = array_new(nitems, sizeof(*attr->cflags));
-	for (i = 0; i < nitems; i++) {
+	attr->cflags = array_new(nitems / 2, sizeof(*attr->cflags));
+	assert(nitems % 2 == 0); /* TODO clean this up */
+	for (i = 0; i < nitems / 2; i++) {
 		attr->cflags = array_push(attr->cflags, 1);
 		cbor_decode_uint32(cs, &attr->cflags[i].flag);
 		cbor_decode_uint32(cs, &attr->cflags[i].as_no);
@@ -75,7 +75,7 @@ void deserialize_attr_bgp_community(struct cbor_stream *cs, struct rte_attr *att
 }
 
 
-void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
+static void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 {
 	size_t foo;
 
@@ -112,9 +112,9 @@ void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 
 void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 {
-	size_t nitems;
 	size_t i;
 	size_t foo;
+	struct cbor_item item;
 
 	deserialize_ipv4_net(cs, &rte->netaddr, &rte->netmask);
 	deserialize_ipv4(cs, &rte->gwaddr);
@@ -131,9 +131,9 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 	cbor_decode_uint32(cs, &rte->src);
 
 	cbor_decode_int32(cs, (int32_t *)&rte->type);
-	cbor_decode_array_begin(cs, &nitems);
-	rte->attrs = array_new(nitems, sizeof(*rte->attrs));
-	for (i = 0; i < nitems; i++) {
+	cbor_decode_array_begin_indef(cs);
+	rte->attrs = array_new(2, sizeof(*rte->attrs));
+	for (i = 0; cbor_peek(cs, &item) == NB_ERR_OK; i++) {
 		rte->attrs = array_push(rte->attrs, 1);
 		deserialize_rte_attr(cs, &rte->attrs[i]);
 	}

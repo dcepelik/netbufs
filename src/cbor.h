@@ -107,9 +107,12 @@ struct cbor_stream
 
 struct cbor_stream *cbor_stream_new(struct nb_buf *buf);
 void cbor_stream_delete(struct cbor_stream *cs);
+
+void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag);
 void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t *handler,
 	void *arg);
-void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag);
+
+void cbor_default_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg);
 
 char *cbor_stream_strerror(struct cbor_stream *cs);
 bool cbor_block_stack_empty(struct cbor_stream *cs);

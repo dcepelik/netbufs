@@ -13,6 +13,9 @@ struct stack
 	size_t num_items;
 };
 
+#define stack_foreach(stack, item) \
+	for (item = stack_top(stack); (nb_byte_t *)item >= (stack)->items; item--)
+
 bool stack_init(struct stack *stack, size_t init_stack_size, size_t item_size);
 void *stack_push(struct stack *stack);
 void *stack_pop(struct stack *stack);

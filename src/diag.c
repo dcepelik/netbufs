@@ -1,8 +1,9 @@
 #include "buf.h"
-#include "cbor.h"
 #include "cbor-internal.h"
+#include "cbor.h"
 #include "debug.h"
 #include "diag.h"
+#include "netbufs.h"
 #include "util.h"
 
 #include <ctype.h>
@@ -238,4 +239,17 @@ void diag_free(struct diag *diag)
 	strbuf_free(&diag->output.item);
 	isbuf_free(&diag->output.cbor_is);
 	isbuf_free(&diag->output.proto_is);
+}
+
+
+void diag_print_block_stack(struct diag *diag)
+{
+	struct block *block;
+	size_t i = 0;
+
+	stack_foreach(&diag->cs->blocks, block) {
+		fprintf(stderr, "Block #%lu, type=%s, active_group=%s\n",
+			i, cbor_type_string(block->type), block->group ? block->group->name : "<none>");
+		i++;
+	}
 }

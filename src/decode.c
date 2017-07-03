@@ -436,7 +436,8 @@ static nb_err_t decode_break(struct cbor_stream *cs)
 
 	if ((err = predecode(cs, &item)) == NB_ERR_BREAK)
 		return NB_ERR_OK;
-	return error(cs, NB_ERR_ITEM, NULL);
+	return error(cs, NB_ERR_ITEM, "unexpected %s, break was expected",
+		cbor_type_string(item.type));
 }
 
 
@@ -470,21 +471,26 @@ static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type,
 static nb_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 {
 	struct block *block;
+	size_t err;
 
 	if (cbor_block_stack_empty(cs))
 		return error(cs, NB_ERR_OPER, "Cannot end block, there's no block open.");
 
-	block = stack_pop(&cs->blocks);
+	block = stack_top(&cs->blocks);
 	if (block->type != type)
 		return error(cs, NB_ERR_OPER, NULL);
 
-	if (block->indefinite)
-		return decode_break(cs);
+	if (block->indefinite) {
+		if ((err = decode_break(cs)) != NB_ERR_OK)
+			return err;
+	}
+	else if (block->num_items != block->len) {
+		return error(cs, NB_ERR_OPER,
+			"Cannot end %s: designated size is %lu, but %lu items were decoded",
+			cbor_type_string(block->type), block->len, block->num_items);
+	}
 
-	if (block->num_items != block->len)
-		return error(cs, NB_ERR_OPER, "Cannot end block, some items weren't processed.",
-			cbor_type_string(block->type));
-		
+	(void) stack_pop(&cs->blocks);
 	return NB_ERR_OK;
 }
 

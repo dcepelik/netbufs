@@ -48,7 +48,7 @@ void serialize_attr_bgp_community(struct cbor_stream *cs, struct rte_attr *attr)
 {
 	size_t i;
 
-	cbor_encode_array_begin(cs, array_size(attr->cflags));
+	cbor_encode_array_begin(cs, 2 * array_size(attr->cflags));
 	for (i = 0; i < array_size(attr->cflags); i++) {
 		cbor_encode_uint32(cs, attr->cflags[i].flag);
 		cbor_encode_uint32(cs, attr->cflags[i].as_no);
@@ -113,10 +113,17 @@ void serialize_rte(struct cbor_stream *cs, struct rte *rte)
 	cbor_encode_uint32(cs, rte->src);
 
 	cbor_encode_int32(cs, rte->type);
-	cbor_encode_array_begin(cs, array_size(rte->attrs));
+	cbor_encode_array_begin_indef(cs);
 	for (i = 0; i < array_size(rte->attrs); i++)
 		serialize_rte_attr(cs, &rte->attrs[i]);
 	cbor_encode_array_end(cs);
+}
+
+
+static void cbor_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
+{
+	fprintf(stderr, "CBOR encoding error (%i): %s.\n", err, cbor_stream_strerror(cs));
+	exit(EXIT_FAILURE);
 }
 
 

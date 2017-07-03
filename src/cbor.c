@@ -1,6 +1,7 @@
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
+#include "diag.h"
 #include "memory.h"
 #include "strbuf.h"
 #include "util.h"
@@ -46,7 +47,7 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 	cs = nb_malloc(sizeof(*cs));
 	cs->buf = buf;
 	cs->err = NB_ERR_OK;
-	cs->error_handler = NULL; /* don't use an error handler */
+	cs->error_handler = cbor_default_error_handler;
 	cs->peeking = false;
 
 	strbuf_init(&cs->err_buf, 24); /* TODO change strbuf API and return error flags? */
@@ -87,6 +88,7 @@ bool cbor_block_stack_empty(struct cbor_stream *cs)
 void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t *handler,
 	void *arg)
 {
+	assert(handler != NULL);
 	cs->error_handler = handler;
 	cs->error_handler_arg = arg;
 }
@@ -110,8 +112,7 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
 	va_end(args);
 
-	if (cs->error_handler)
-		cs->error_handler(cs, err, cs->error_handler_arg);
+	cs->error_handler(cs, err, cs->error_handler_arg);
 
 	return err;
 }
@@ -143,4 +144,14 @@ struct block *top_block(struct cbor_stream *cs)
 {
 	assert(!stack_is_empty(&cs->blocks));
 	return stack_top(&cs->blocks);
+}
+
+
+void cbor_default_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
+{
+	diag_log_raw(cs->diag, NULL, 0); /* TODO hack */
+	fprintf(stderr, "CBOR error (%i): %s.\n", err, cbor_stream_strerror(cs));
+	//fprintf(stderr, "Block stack:\n");
+	//diag_print_block_stack(cs->diag);
+	exit(EXIT_FAILURE);
 }
