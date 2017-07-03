@@ -11,7 +11,61 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BYTES_DUMP_MAXLEN	64
+#define BYTES_DUMP_MAXLEN_DEFAULT	64
+
+
+static void isbuf_init(struct isbuf *is, size_t init_size)
+{
+	strbuf_init(&is->sb, init_size);
+	is->indent_level = 0;
+	is->indent_next = true;
+}
+
+
+static void isbuf_free(struct isbuf *is)
+{
+	strbuf_free(&is->sb);
+}
+
+
+static void isbuf_indent(struct isbuf *is)
+{
+	is->indent_level++;
+}
+
+
+static void isbuf_dedent(struct isbuf *is)
+{
+	assert(is->indent_level > 0);
+	is->indent_level--;
+}
+
+
+static void isbuf_vprintf(struct isbuf *is, char *msg, va_list args)
+{
+	size_t i;
+
+	if (is->indent_next) {
+		for (i = 0; i < 4 * is->indent_level; i++)
+			strbuf_putc(&is->sb, i % 2 == 0 ? '.' : ' ');
+		is->indent_next = false;
+	}
+
+	strbuf_vprintf(&is->sb, msg, args);
+}
+
+
+static void isbuf_reset(struct isbuf *is)
+{
+	is->indent_next = true;
+	strbuf_reset(&is->sb);
+}
+
+
+static char *isbuf_get_string(struct isbuf *is)
+{
+	return strbuf_get_string(&is->sb);
+}
 
 
 static void diag_dump_line_internal(struct diag *diag)
@@ -24,16 +78,15 @@ static void diag_dump_line_internal(struct diag *diag)
 		//diag->output.offset,
 		strbuf_get_string(&diag->output.raw),
 		strbuf_get_string(&diag->output.item),
-		strbuf_get_string(&diag->output.cbor),
-		strbuf_get_string(&diag->output.proto));
+		isbuf_get_string(&diag->output.cbor_is),
+		isbuf_get_string(&diag->output.proto_is));
 
 	diag->output.offset[0] = '\0';
 	strbuf_reset(&diag->output.raw);
 	strbuf_reset(&diag->output.item);
-	strbuf_reset(&diag->output.cbor);
-	strbuf_reset(&diag->output.proto);
+	isbuf_reset(&diag->output.cbor_is);
+	isbuf_reset(&diag->output.proto_is);
 	
-	diag->indent_next = true;
 	diag->eol_on_next_raw = false;
 }
 
@@ -70,16 +123,9 @@ void diag_log_item(struct diag *diag, char *msg, ...)
 void diag_log_cbor(struct diag *diag, char *msg, ...)
 {
 	va_list args;
-	size_t i;
-
-	if (diag->indent_next) {
-		for (i = 0; i < 4 * diag->indent_level; i++)
-			strbuf_putc(&diag->output.cbor, i % 2 == 0 ? '.' : ' ');
-		diag->indent_next = false;
-	}
 
 	va_start(args, msg);
-	strbuf_vprintf(&diag->output.cbor, msg, args);
+	isbuf_vprintf(&diag->output.cbor_is, msg, args);
 	diag->have_output = true;
 	va_end(args);
 }
@@ -89,22 +135,9 @@ void diag_log_proto(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	strbuf_vprintf(&diag->output.proto, msg, args);
+	isbuf_vprintf(&diag->output.proto_is, msg, args);
 	diag->have_output = true;
 	va_end(args);
-}
-
-
-void diag_increase(struct diag *diag)
-{
-	diag->indent_level++;
-}
-
-
-void diag_decrease(struct diag *diag)
-{
-	assert(diag->indent_level > 0);
-	diag->indent_level--;
 }
 
 
@@ -140,18 +173,40 @@ void diag_init(struct diag *diag, struct cbor_stream *cs, FILE *fout)
 	diag->output.offset[0] = '\0';
 	strbuf_init(&diag->output.raw, 8);
 	strbuf_init(&diag->output.item, 16);
-	strbuf_init(&diag->output.cbor, 32);
-	strbuf_init(&diag->output.proto, 24);
+	isbuf_init(&diag->output.cbor_is, 32);
+	isbuf_init(&diag->output.proto_is, 24);
 
 	diag->cs = cs;
 	diag->fout = fout;
 
-	diag->bytes_dump_maxlen = 16;
-	diag->have_output = false;
-	diag->indent_next = true;
-	diag->indent_level = 0;
+	diag->bytes_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
+	diag->str_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->eol_on_next_raw = false;
-	diag->str_dump_maxlen = 16;
+	diag->have_output = false;
+}
+
+
+void diag_increase(struct diag *diag)
+{
+	isbuf_indent(&diag->output.cbor_is);
+}
+
+
+void diag_decrease(struct diag *diag)
+{
+	isbuf_dedent(&diag->output.cbor_is);
+}
+
+
+void diag_indent_proto(struct diag *diag)
+{
+	isbuf_indent(&diag->output.proto_is);
+}
+
+
+void diag_dedent_proto(struct diag *diag)
+{
+	isbuf_dedent(&diag->output.proto_is);
 }
 
 
@@ -181,6 +236,6 @@ void diag_free(struct diag *diag)
 {
 	strbuf_free(&diag->output.raw);
 	strbuf_free(&diag->output.item);
-	strbuf_free(&diag->output.cbor);
-	strbuf_free(&diag->output.proto);
+	isbuf_free(&diag->output.cbor_is);
+	isbuf_free(&diag->output.proto_is);
 }

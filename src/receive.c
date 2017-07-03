@@ -26,11 +26,11 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 	bool ret;
 	ret = recv_id(nb, id);
 	/* TODO remove this conditional by always having an active (default) group */
-	if (nb->active_group != NULL) {
+	if (ret && nb->active_group != NULL) {
 		if (*id <= array_size(nb->active_group->attrs))
 			if (nb->active_group->attrs[*id] != NULL)
-				diag_log_proto(&nb->diag, "%s/%s",
-					nb->active_group->name, nb->active_group->attrs[*id]->name);
+				diag_log_proto(&nb->diag, "%s =",
+					nb->active_group->attrs[*id]->name);
 	}
 	return ret;
 }
@@ -49,7 +49,8 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 	TEMP_ASSERT(id == id_real);
 
 	nb->active_group = top_block(nb->cs)->group = nb->groups[id];
-	diag_log_proto(&nb->diag, "GROUP=%s", nb->active_group->name);
+	diag_log_proto(&nb->diag, "(%s) {", nb->active_group->name);
+	diag_indent_proto(&nb->diag);
 }
 
 
@@ -64,6 +65,8 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 
 	nb->active_group = top_block(nb->cs)->group;
 	//TEMP_ASSERT(nb->active_group != NULL);
+	diag_dedent_proto(&nb->diag);
+	diag_log_proto(&nb->diag, "}");
 
 	return NB_ERR_OK;
 }
@@ -135,4 +138,6 @@ void nb_recv_string(struct nb *nb, char **str)
 void nb_recv_array_end(struct nb *nb)
 {
 	cbor_decode_array_end(nb->cs);
+	diag_dedent_proto(&nb->diag);
+	diag_log_proto(&nb->diag, "]");
 }

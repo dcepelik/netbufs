@@ -36,6 +36,8 @@ struct nb_group
 #define	nb_recv_array(nb, arr) \
 	do { \
 		*arr = array_new_size(nb_internal_recv_array_size(nb), sizeof(**arr)); \
+		diag_log_proto(&nb->diag, "["); \
+		diag_indent_proto(&nb->diag); \
 	} while (0);
 
 
