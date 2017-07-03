@@ -58,24 +58,25 @@ enum minor
 	CBOR_MINOR_BREAK = 31,
 };
 
-
 struct block
 {
 	enum cbor_type type;	/* type for which this block has been open */
 	bool indefinite;		/* is indefinite-lenght encoding used? */
 	uint64_t len;			/* intended length of the block when !indefinite */
 	size_t num_items;		/* actual number of items encoded */
+	struct nb_group *group;	/* active netbufs group TODO MM */
 };
 
 struct cbor_stream
 {
 	struct nb_buf *buf;		/* the buffer being read or written */
 	struct stack blocks;	/* block stack (open arrays and maps) */
-	bool peeking;			/* is peek a valid predecoded item? */
-	struct cbor_item peek;	/* item predecoded during last cbor_peek_item call */
 	nb_err_t err;			/* last error */
 	struct strbuf err_buf;	/* error string buffer */
 	struct diag *diag;		/* diagnostics buffer */
+
+	bool peeking;			/* are we peeking? */
+	struct cbor_item peek;	/* item to be returned by next predecode() call */
 
 	/* TODO various encoding/decoding options to come as needed */
 	cbor_error_handler_t *error_handler;

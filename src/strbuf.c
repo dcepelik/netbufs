@@ -144,3 +144,16 @@ void strbuf_fill(struct strbuf *buf, size_t offset, size_t count, char c)
 
 	memset(buf->str + offset, c, count);
 }
+
+
+void strbuf_trim(struct strbuf *buf, ssize_t len)
+{
+	if (len >= 0) {
+		assert(len <= buf->len);
+		buf->len = len;
+	}
+	else { /* len is negative (and relative) */
+		assert(-len <= buf->len);
+		buf->len += len;
+	}
+}

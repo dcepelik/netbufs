@@ -24,6 +24,9 @@
 #define CBOR_BSTACK_INIT_SIZE	4
 #define INT64_MIN_ABS			(-(INT64_MIN + 1))
 
+#define	MAJOR_MASK	0xE0
+#define	LBITS_MASK	0x1F
+
 
 static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 {
@@ -55,6 +58,7 @@ static inline nb_err_t read_stream(struct cbor_stream *cs, byte_t *bytes, size_t
 	diag_log_raw(cs->diag, bytes, MIN(nbytes, 4));
 	return NB_ERR_OK;
 }
+
 
 static inline nb_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, uint64_t *u64)
 {
@@ -100,7 +104,23 @@ static inline nb_err_t u64_to_i64(struct cbor_stream *cs, uint64_t u64, int64_t 
 }
 
 
-static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item, enum minor minor)
+static void handle_diag_item_decoration(struct cbor_stream *cs)
+{
+	switch (top_block(cs)->type) {
+	case CBOR_TYPE_ARRAY:
+	case CBOR_TYPE_MAP: /* TODO */
+		if (top_block(cs)->num_items > 0)
+			diag_log_cbor(cs->diag, ",");
+		break;
+	default:
+		break;
+	}
+	diag_dump_line(cs->diag);
+}
+
+
+static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
+	enum minor minor)
 {
 	uint64_t u64;
 
@@ -110,12 +130,19 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 		item->type = CBOR_TYPE_SVAL;
 		item->sval = minor;
 		item->u64 = item->sval;
+
+		/* TODO deduplicate */
+		diag_log_item(cs->diag, "sval(%u)", item->u64);
+		diag_log_sval(cs->diag, item->u64);
+		diag_dump_line(cs->diag);
+		handle_diag_item_decoration(cs);
+
 		return NB_ERR_OK;
 	}
 
 	if (minor == CBOR_MINOR_BREAK) {
 		diag_log_item(cs->diag, "break");
-		diag_dump_line(cs->diag);
+		//diag_dump_line(cs->diag);
 		return cs->err = NB_ERR_BREAK; /* TODO is this a hack? */
 	}
 
@@ -127,6 +154,13 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 		item->type = CBOR_TYPE_SVAL;
 		item->sval = u64;
 		item->u64 = item->sval; /* TODO */
+
+		/* TODO deduplicate */
+		diag_log_sval(cs->diag, item->u64);
+		diag_log_item(cs->diag, "sval(%u)", item->u64);
+		diag_dump_line(cs->diag);
+		handle_diag_item_decoration(cs);
+
 		return NB_ERR_OK;
 	case CBOR_MINOR_FLOAT16:
 	case CBOR_MINOR_FLOAT32:
@@ -146,7 +180,6 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	byte_t hdr;
 	enum major major;
 	byte_t lbits;
-	bool indefinite = false;
 	uint64_t u64;
 	nb_err_t err;
 
@@ -164,74 +197,72 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	if ((err = read_stream(cs, &hdr, 1)) != NB_ERR_OK)
 		return err;
 
-	major = (hdr & 0xE0) >> 5;
+	major = (hdr & MAJOR_MASK) >> 5;
+	lbits = hdr & LBITS_MASK;
 	assert(major >= 0 && major <= 7);
-
-	lbits = hdr & 0x1F;
 
 	if (major == CBOR_MAJOR_7)
 		return decode_item_major7(cs, item, lbits);
 
 	item->type = (enum cbor_type)major;
+	item->indefinite = (lbits == LBITS_INDEFINITE);
 
-	if (lbits == LBITS_INDEFINITE) {
-		if (!major_allows_indefinite(major))
-			return error(cs, NB_ERR_INDEF, "Indefinite-length "
-				"encoding is not allowed for %s items.",
-				cbor_type_string(major));
-		indefinite = true;
+	if (item->indefinite && !major_allows_indefinite(major))
+		return error(cs, NB_ERR_INDEF, "Indefinite-length encoding is not allowed "
+			"for %s items.", cbor_type_string(major));
+
+	if (!item->indefinite && (err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
+		return err;
+
+	if (item->indefinite)
+		diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
+	else
+		diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
+
+	if (item->indefinite) {
+		diag_dump_line(cs->diag);
+		return NB_ERR_OK;
 	}
-	item->indefinite = indefinite;
 
-	if (!indefinite) {
-		if ((err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
+	item->u64 = u64; /* TODO remove */
+	switch (item->type)
+	{
+	case CBOR_TYPE_UINT:
+		item->u64 = u64;
+		diag_log_cbor(cs->diag, "%lu", item->u64);
+		handle_diag_item_decoration(cs);
+		break;
+
+	case CBOR_TYPE_INT:
+		if ((err = u64_to_i64(cs, u64, &item->i64)) != NB_ERR_OK)
 			return err;
+		diag_log_cbor(cs->diag, "%li", item->i64);
+		handle_diag_item_decoration(cs);
+		break;
+
+	case CBOR_TYPE_BYTES:
+	case CBOR_TYPE_TEXT:
+	case CBOR_TYPE_ARRAY:
+	case CBOR_TYPE_MAP:
+		item->len = u64;
+		break;
+	
+	case CBOR_TYPE_TAG:
+		item->tag = u64;
+		handle_diag_item_decoration(cs);
+		break;
+
+	default:
+		return error(cs, NB_ERR_PARSE, "Invalid major type.");
 	}
 
-	if (indefinite || major == CBOR_MAJOR_ARRAY || major == CBOR_MAJOR_MAP) {
-		//DEBUG_TRACE;
-		//if ((err = push_block(cs, major, indefinite, u64)) != NB_ERR_OK)
-		//	return err;
-
-		if (indefinite)
-			return NB_ERR_OK;
-	}
-
-	item->u64 = u64;
-
-	//switch (item->type)
-	//{
-	//case CBOR_TYPE_UINT:
-	//	item->u64 = u64;
-	//	break;
-
-	//case CBOR_TYPE_INT:
-	//	return u64_to_i64(cs, u64, &item->i64);
-
-	//case CBOR_TYPE_BYTES:
-	//case CBOR_TYPE_TEXT:
-	//case CBOR_TYPE_ARRAY:
-	//case CBOR_TYPE_MAP:
-	//	item->len = u64;
-	//	break;
-	//
-	//case CBOR_TYPE_TAG:
-	//	item->tag = u64;
-	//	break;
-
-	//default:
-	//	return error(cs, NB_ERR_PARSE, "Invalid major type.");
-	//}
-
-	if (item->type == CBOR_TYPE_INT) {
-		return u64_to_i64(cs, u64, &item->i64);
-	}
-
+	if (item->type != CBOR_TYPE_TEXT && item->type != CBOR_TYPE_BYTES)
+		diag_dump_line(cs->diag);
 	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_peek_item(struct cbor_stream *cs, struct cbor_item *item)
+nb_err_t cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
 {
 	nb_err_t err;
 
@@ -239,13 +270,6 @@ nb_err_t cbor_peek_item(struct cbor_stream *cs, struct cbor_item *item)
 	*item = cs->peek; /* TODO avoid the copy */
 	cs->peeking = true;
 	return err;
-}
-
-
-nb_err_t cbor_skip_header(struct cbor_stream *cs)
-{
-	struct cbor_item skipped;
-	return predecode(cs, &skipped);
 }
 
 
@@ -304,7 +328,8 @@ static int64_t decode_int(struct cbor_stream *cs, nb_err_t *err, int64_t min, in
 		i64 = (int64_t)item.u64;
 	}
 	else {
-		*err = error(cs, NB_ERR_ITEM, "Unsigned or signed integer expected");
+		*err = error(cs, NB_ERR_ITEM, "%s was unexpected, (unsigned) integer was expected",
+			cbor_type_string(item.type));
 		return 0;
 	}
 
@@ -464,20 +489,45 @@ static nb_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 
 nb_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
 {
-	return decode_block_start(cs, CBOR_TYPE_ARRAY, false, len);
+	nb_err_t err;
+
+	if ((err = decode_block_start(cs, CBOR_TYPE_ARRAY, false, len)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "[");
+	diag_increase(cs->diag);
+	diag_dump_line(cs->diag);
+	return NB_ERR_OK;
 }
 
 
 nb_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
 {
-	uint64_t tmp;
-	return decode_block_start(cs, CBOR_TYPE_ARRAY, true, &tmp);
+	nb_err_t err;
+	uint64_t foo;
+
+	if ((err = decode_block_start(cs, CBOR_TYPE_ARRAY, true, &foo)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "[_");
+	diag_increase(cs->diag);
+	diag_dump_line(cs->diag);
+	return NB_ERR_OK;
 }
 
 
 nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
 {
-	return decode_block_end(cs, CBOR_TYPE_ARRAY);
+	nb_err_t err;
+
+	if ((err = decode_block_end(cs, CBOR_TYPE_ARRAY)) != NB_ERR_OK)
+		return err;
+
+	diag_decrease(cs->diag);
+	diag_log_cbor(cs->diag, "]");
+	handle_diag_item_decoration(cs);
+	diag_dump_line(cs->diag);
+	return NB_ERR_OK;
 }
 
 
@@ -518,10 +568,6 @@ static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stre
 	}
 
 	(*bytes)[*len + chunk->u64] = 0;
-	diag_dump_line(cs->diag);
-	diag_log_item(cs->diag, "chunk(len=%luB)", chunk->u64);
-	diag_log_cbor(cs->diag, "\"%s\"", (char *)*bytes + *len);
-
 	*len += chunk->u64;
 	return NB_ERR_OK;
 }
@@ -548,8 +594,6 @@ nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 
 		if ((err = read_stream_chunk(cs, stream, &chunk, bytes, len) != NB_ERR_OK))
 			break;
-
-		diag_dump_line(cs->diag);
 	}
 
 	if (err == NB_ERR_BREAK)
@@ -575,9 +619,16 @@ nb_err_t cbor_decode_bytes(struct cbor_stream *cs, byte_t **str, size_t *len)
 	struct cbor_item item;
 	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_BYTES)) == NB_ERR_OK)
-		return cbor_decode_stream(cs, &item, str, len);
-	return err;
+	if ((err = predecode_check(cs, &item, CBOR_TYPE_BYTES)) != NB_ERR_OK)
+		return err;
+
+	if ((err = cbor_decode_stream(cs, &item, str, len)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "\"%s\"", *str);
+	diag_dump_line(cs->diag);
+	handle_diag_item_decoration(cs);
+	return NB_ERR_OK;
 }
 
 
@@ -586,9 +637,16 @@ nb_err_t cbor_decode_text(struct cbor_stream *cs, byte_t **str, size_t *len)
 	struct cbor_item item;
 	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) == NB_ERR_OK)
-		return cbor_decode_stream0(cs, &item, str, len);
-	return err;
+	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) != NB_ERR_OK)
+		return err;
+
+	if ((err = cbor_decode_stream0(cs, &item, str, len)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "\"%s\"", *str);
+	diag_dump_line(cs->diag);
+	handle_diag_item_decoration(cs);
+	return NB_ERR_OK;
 }
 
 
@@ -614,24 +672,8 @@ static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr
 
 		while (i < size) {
 			item = *items + i;
-
-			if (i > 0 && (!map_diag || i % 2 == 0)) {
-				diag_log_cbor(cs->diag, ",");
-				diag_dump_line(cs->diag);
-
-				if (map_diag)
-					diag_decrease(cs->diag);
-			}
-
 			if ((err = cbor_decode_item(cs, item)) != NB_ERR_OK)
 				break;
-
-			if (map_diag && i % 2 == 0) {
-				diag_log_cbor(cs->diag, ":");
-				diag_dump_line(cs->diag);
-				diag_increase(cs->diag);
-			}
-
 			i++;
 		}
 
@@ -680,73 +722,40 @@ static nb_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 {
 	nb_err_t err;
+	assert(false);
 
 	if ((err = predecode(cs, item)) != NB_ERR_OK)
 		return err;
 
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
-		diag_log_item(cs->diag, "uint(val=%lu)", item->u64);
-		diag_log_cbor(cs->diag, "%lu", item->u64);
-		return NB_ERR_OK;
 	case CBOR_TYPE_SVAL:
-		diag_log_item(cs->diag, "sval(val=%lu)", item->u64);
-		diag_log_sval(cs->diag, item->u64);
-		return NB_ERR_OK;
 	case CBOR_TYPE_INT:
-		diag_log_item(cs->diag, "int(val=%li)", item->i64);
-		diag_log_cbor(cs->diag, "%li", item->i64);
-		return NB_ERR_OK;
 	case CBOR_TYPE_FLOAT16:
 	case CBOR_TYPE_FLOAT32:
 	case CBOR_TYPE_FLOAT64:
-		return NB_ERR_OK;
+		return NB_ERR_OK; /* TODO really OK for floats? */
+
 	case CBOR_TYPE_BYTES:
-		diag_log_item(cs->diag, "bytestream");
 		return cbor_decode_stream(cs, item, &item->bytes, &item->len);
+
 	case CBOR_TYPE_TEXT:
-		diag_log_item(cs->diag, "text");
 		return cbor_decode_stream0(cs, item, &item->bytes, &item->len);
+
 	case CBOR_TYPE_ARRAY:
-		if (!item->indefinite)
-			diag_log_item(cs->diag, "array(nitems=%lu)", item->u64);
-		else
-			diag_log_item(cs->diag, "array(nitems=?)");
 		diag_log_cbor(cs->diag, "[");
-		diag_dump_line(cs->diag);
-		diag_increase(cs->diag);
 		err = decode_array_items(cs, item, &item->items, &item->len, false);
-		diag_decrease(cs->diag);
-		diag_dump_line(cs->diag);
-		diag_dump_line(cs->diag);
 		diag_log_cbor(cs->diag, "]");
 		return err;
+
 	case CBOR_TYPE_MAP:
-		if (!item->indefinite)
-			diag_log_item(cs->diag, "map(nitems=%lu)", item->u64);
-		else
-			diag_log_item(cs->diag, "map(nitems=?)");
-		diag_log_cbor(cs->diag, "{");
-		diag_dump_line(cs->diag);
-		diag_increase(cs->diag);
-		err = decode_map_items(cs, item, &item->pairs, &item->len);
-		if (!item->indefinite && item->len > 0)
-			diag_decrease(cs->diag);
-		diag_decrease(cs->diag);
-		diag_dump_line(cs->diag);
-		diag_log_cbor(cs->diag, "}");
-		return err;
+		return decode_map_items(cs, item, &item->pairs, &item->len);
 
 	case CBOR_TYPE_TAG:
 		item->tagged_item = nb_malloc(sizeof(*item->tagged_item));
-		diag_dump_line(cs->diag);
-		diag_log_cbor(cs->diag, "%lu(", item->tag);
 		if (!item->tagged_item)
 			return NB_ERR_NOMEM;
-		err = cbor_decode_item(cs, item->tagged_item);
-		diag_dump_line(cs->diag);
-		diag_log_cbor(cs->diag, ")");
-		return err;
+		return cbor_decode_item(cs, item->tagged_item);
 
 	default:
 		return error(cs, NB_ERR_UNSUP, NULL);

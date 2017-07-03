@@ -8,7 +8,7 @@
 struct strbuf
 {
 	char *str;		/* the buffer itself */
-	size_t size;		/* current size of the buffer */
+	size_t size;	/* current size of the buffer */
 	size_t len;		/* length of the string */
 };
 
@@ -29,5 +29,6 @@ size_t strbuf_vprintf(struct strbuf *buf, char *fmt, va_list args);
 size_t strbuf_vprintf_at(struct strbuf *buf, size_t offset, char *fmt, va_list args);
 
 void strbuf_fill(struct strbuf *buf, size_t offset, size_t count, char c);
+void strbuf_trim(struct strbuf *buf, ssize_t len);
 
 #endif

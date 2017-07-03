@@ -7,21 +7,33 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 typedef int nb_lid_t;
-
 
 struct nb
 {
 	struct cbor_stream *cs;
 	struct nb_group **groups;
+	struct diag diag;
+	struct nb_group *active_group;
 };
 
-struct nb_group;
+/* TODO hide this */
+struct nb_attr
+{
+	const char *name;
+	bool reqd;
+};
+
+/* TODO hide this */
+struct nb_group
+{
+	const char *name;
+	struct nb_attr **attrs;
+};
 
 #define	nb_recv_array(nb, arr) \
 	do { \
-		*arr = array_new_size(nb_internal_recv_array_size(nb), sizeof(*arr)); \
+		*arr = array_new_size(nb_internal_recv_array_size(nb), sizeof(**arr)); \
 	} while (0);
 
 
@@ -33,6 +45,8 @@ void nb_free(struct nb *nb);
 
 void nb_bind(struct nb_group *group, nb_lid_t id, const char *name, bool reqd);
 struct nb_group *nb_group(struct nb *nb, nb_lid_t id, const char *name);
+
+void nb_send_id(struct nb *nb, nb_lid_t id);
 
 void nb_send_group(struct nb *nb, nb_lid_t id);
 nb_err_t nb_send_group_end(struct nb *nb);
@@ -57,7 +71,7 @@ void nb_send_array_end(struct nb *nb);
 void nb_recv_group(struct nb *nb, nb_lid_t id);
 nb_err_t nb_recv_group_end(struct nb *nb);
 
-bool nb_recv_id(struct nb *nb, nb_lid_t *id);
+bool nb_recv_attr(struct nb *nb, nb_lid_t *id);
 void nb_recv_bool(struct nb *nb, bool *b);
 
 void nb_recv_i8(struct nb *nb, int8_t *i8);

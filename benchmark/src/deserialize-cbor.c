@@ -137,18 +137,21 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 		rte->attrs = array_push(rte->attrs, 1);
 		deserialize_rte_attr(cs, &rte->attrs[i]);
 	}
-	cbor_encode_array_end(cs);
+	cbor_decode_array_end(cs);
 }
 
 
 struct rt *deserialize_cbor(struct nb_buf *buf)
 {
 	struct cbor_stream *cs;
+	struct diag diag;
 	struct rt *rt;
 	size_t i;
 	size_t foo;
 
 	cs = cbor_stream_new(buf);
+	diag_init(&diag, cs, stderr);
+	cbor_stream_set_diag(cs, &diag);
 	rt = nb_malloc(sizeof(*rt));
 
 	cbor_decode_text(cs, (byte_t **)&rt->version_str, &foo);

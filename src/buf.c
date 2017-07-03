@@ -292,6 +292,12 @@ static size_t nb_buf_file_tell(struct nb_buf *buf)
 }
 
 
+static size_t nb_buf_memory_tell(struct nb_buf *buf)
+{
+	return 0;
+}
+
+
 static void nb_buf_file_fill(struct nb_buf *buf)
 {
 	int retval;
@@ -424,6 +430,7 @@ nb_err_t nb_buf_open_memory(struct nb_buf *buf)
 	buf->close = nb_buf_memory_close;
 	buf->fill = nb_buf_memory_fill;
 	buf->flush = nb_buf_memory_flush;
+	buf->tell = nb_buf_memory_tell;
 
 	return NB_ERR_OK;
 }

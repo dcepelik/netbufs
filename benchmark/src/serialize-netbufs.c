@@ -5,7 +5,8 @@
 
 static nb_err_t send_time(struct nb *nb, int id, struct tm *tm)
 {
-	nb_send_group(nb, id);
+	nb_send_id(nb, id);
+	nb_send_group(nb, BIRD_ORG_TIME);
 	nb_send_i32(nb, BIRD_ORG_TIME_HOUR, tm->tm_hour);
 	nb_send_i32(nb, BIRD_ORG_TIME_MIN, tm->tm_min);
 	nb_send_i32(nb, BIRD_ORG_TIME_SEC, tm->tm_sec);
@@ -19,13 +20,13 @@ static void send_ipv4(struct nb *nb, nb_lid_t id, ipv4_t ip)
 }
 
 
-static nb_err_t send_bgp_aggr(struct nb *nb, struct bgp_aggr *aggr)
-{
-	nb_send_group(nb, BIRD_ORG_RTA_BGP_AGGR);
-	send_ipv4(nb, BIRD_ORG_RTA_BGP_AGGR_IP, aggr->ip);
-	nb_send_u32(nb, BIRD_ORG_RTA_BGP_AGGR_AS_NO, aggr->as_no);
-	return nb_send_group_end(nb);
-}
+//static nb_err_t send_bgp_aggr(struct nb *nb, struct bgp_aggr *aggr)
+//{
+//	nb_send_group(nb, BIRD_ORG_RTA_BGP_AGGR);
+//	send_ipv4(nb, BIRD_ORG_RTA_BGP_AGGR_IP, aggr->ip);
+//	nb_send_u32(nb, BIRD_ORG_RTA_BGP_AGGR_AS_NO, aggr->as_no);
+//	return nb_send_group_end(nb);
+//}
 
 
 static nb_err_t send_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
@@ -39,9 +40,9 @@ static nb_err_t send_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
 
 static nb_err_t send_rta_other(struct nb *nb, struct rte_attr *attr)
 {
-	nb_send_group(nb, BIRD_ORG_RTA_OTHER);
-	nb_send_string(nb, BIRD_ORG_RTA_OTHER_KEY, attr->other_attr.key);
-	nb_send_string(nb, BIRD_ORG_RTA_OTHER_VALUE, attr->other_attr.value);
+	nb_send_group(nb, BIRD_ORG_KVP);
+	nb_send_string(nb, BIRD_ORG_KVP_KEY, attr->other_attr.key);
+	nb_send_string(nb, BIRD_ORG_KVP_VALUE, attr->other_attr.value);
 	return nb_send_group_end(nb);
 }
 
@@ -64,7 +65,8 @@ static nb_err_t send_rte_attr(struct nb *nb, struct rte_attr *attr)
 		nb_send_u32(nb, BIRD_ORG_RTA_BGP_LOCAL_PREF, attr->bgp_local_pref);
 		break;
 	case RTE_ATTR_TYPE_BGP_AS_PATH:
-		nb_send_array(nb, BIRD_ORG_RTA_BGP_AS_PATH, array_size(attr->bgp_as_path));
+		/* TODO 2 * is a hack */
+		nb_send_array(nb, BIRD_ORG_RTA_BGP_AS_PATH, 2 * array_size(attr->bgp_as_path));
 		for (i = 0; i < array_size(attr->bgp_as_path); i++)
 			nb_send_u32(nb, -1, attr->bgp_as_path[i]); /* TODO give a name to -1 */
 		nb_send_array_end(nb);
@@ -79,10 +81,10 @@ static nb_err_t send_rte_attr(struct nb *nb, struct rte_attr *attr)
 		nb_send_array_end(nb);
 		break;
 	case RTE_ATTR_TYPE_OTHER:
+		nb_send_id(nb, BIRD_ORG_RTA_OTHER);
 		send_rta_other(nb, attr);
 		break;
 	}
-
 	return nb_send_group_end(nb);
 }
 

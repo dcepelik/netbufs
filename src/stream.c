@@ -30,6 +30,10 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len)
 {
 	struct block *block;
+	struct nb_group *active_group = NULL;
+
+	if (!stack_is_empty(&cs->blocks))
+		active_group = top_block(cs)->group;
 
 	block = stack_push(&cs->blocks);
 	if (!block)
@@ -39,6 +43,7 @@ nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite
 	block->indefinite = indefinite;
 	block->len = len;
 	block->num_items = 0;
+	block->group = active_group;
 
 	return NB_ERR_OK;
 }
@@ -58,8 +63,8 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 	cs = nb_malloc(sizeof(*cs));
 	cs->buf = buf;
 	cs->err = NB_ERR_OK;
-	cs->peeking = false;
 	cs->error_handler = NULL; /* don't use an error handler */
+	cs->peeking = false;
 
 	strbuf_init(&cs->err_buf, 24); /* TODO change strbuf API and return error flags? */
 
@@ -68,8 +73,9 @@ struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
 		return NULL; /* lift to NB_ERR_NOMEM */
 	}
 	
-	/* cannot fail, stack was initialized to size >= 1 */
+	/* assert: cannot fail, stack was initialized to size >= 1 */
 	assert(push_block(cs, -1, true, 0) == NB_ERR_OK);
+	top_block(cs)->group = NULL;
 
 	return cs;
 }

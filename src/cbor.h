@@ -186,7 +186,7 @@ nb_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item);
 nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item);
 
 /* TODO valid fields in item when using peek_item -> manual */
-nb_err_t cbor_peek_item(struct cbor_stream *cs, struct cbor_item *item);
+nb_err_t cbor_peek(struct cbor_stream *cs, struct cbor_item *item);
 nb_err_t cbor_skip_header(struct cbor_stream *cs);
 
 #endif

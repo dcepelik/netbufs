@@ -7,14 +7,18 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+/*
+ * Diagnostics buffer
+ */
 struct diag
 {
 	struct cbor_stream *cs;
 	FILE *fout;
 
-	unsigned level;			/* output.cbor indentation level */
+	unsigned indent_level;	/* output.cbor indentation level */
 	bool indent_next;		/* shall indent next write to output.cbor? */
 	bool have_output;		/* do we have output to print? */
+	bool eol_on_next_raw;	/* emit EOL on next diag_log_raw call? */
 
 	struct {
 		char offset[16 + 1];

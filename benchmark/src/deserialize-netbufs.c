@@ -14,7 +14,7 @@ static nb_err_t recv_time(struct nb *nb, struct tm *tm)
 	nb_lid_t id;
 
 	nb_recv_group(nb, BIRD_ORG_TIME);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 			case BIRD_ORG_TIME_HOUR:
 				nb_recv_i32(nb, &tm->tm_hour);
@@ -36,7 +36,7 @@ static nb_err_t recv_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
 	nb_lid_t id;
 
 	nb_recv_group(nb, BIRD_ORG_RTA_BGP_CFLAG);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 		case BIRD_ORG_RTA_BGP_CFLAG_FLAG:
 			nb_recv_u32(nb, &cflag->flag);
@@ -55,7 +55,7 @@ static nb_err_t recv_bgp_aggr(struct nb *nb, struct rte_attr *attr)
 	nb_lid_t id;
 
 	nb_recv_group(nb, BIRD_ORG_RTA_BGP_AGGR);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 		case BIRD_ORG_RTA_BGP_AGGR_IP:
 			recv_ipv4(nb, &attr->aggr.ip);
@@ -73,13 +73,13 @@ static nb_err_t recv_rta_other(struct nb *nb, struct rte_attr *attr)
 {
 	nb_lid_t id;
 
-	nb_recv_group(nb, BIRD_ORG_RTA_OTHER);
-	while (nb_recv_id(nb, &id)) {
+	nb_recv_group(nb, BIRD_ORG_KVP);
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
-		case BIRD_ORG_RTA_OTHER_KEY:
+		case BIRD_ORG_KVP_KEY:
 			nb_recv_string(nb, &attr->other_attr.key);
 			break;
-		case BIRD_ORG_RTA_OTHER_VALUE:
+		case BIRD_ORG_KVP_VALUE:
 			nb_recv_string(nb, &attr->other_attr.value);
 			break;
 		}
@@ -94,7 +94,7 @@ static nb_err_t recv_rta(struct nb *nb, struct rte_attr *attr)
 	size_t i;
 
 	nb_recv_group(nb, BIRD_ORG_RTA);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 		case BIRD_ORG_RTA_TFLAG:
 			nb_recv_bool(nb, &attr->tflag);
@@ -145,7 +145,7 @@ static nb_err_t recv_rte(struct nb *nb, struct rte *rte)
 	size_t i;
 
 	nb_recv_group(nb, BIRD_ORG_RTE);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 		case BIRD_ORG_RTE_NETADDR:
 			recv_ipv4(nb, &rte->netaddr);
@@ -192,7 +192,7 @@ static nb_err_t recv_rt(struct nb *nb, struct rt *rt)
 	size_t i;
 
 	nb_recv_group(nb, BIRD_ORG_RT);
-	while (nb_recv_id(nb, &id)) {
+	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
 		case BIRD_ORG_RT_VERSION:
 			nb_recv_string(nb, &rt->version_str);
@@ -210,6 +210,14 @@ static nb_err_t recv_rt(struct nb *nb, struct rt *rt)
 }
 
 
+void handle_cbor_error(struct cbor_stream *cs, nb_err_t err, void *arg)
+{
+	diag_log_raw(cs->diag, NULL, 0); /* TODO hack */
+	fprintf(stderr, "CBOR decoding error: %s.\n", cbor_stream_strerror(cs));
+	exit(EXIT_FAILURE);
+}
+
+
 struct rt *deserialize_netbufs(struct nb_buf *buf)
 {
 	struct nb nb;
@@ -217,6 +225,7 @@ struct rt *deserialize_netbufs(struct nb_buf *buf)
 
 	nb_init(&nb, buf);
 	setup_ids(&nb);
+	cbor_stream_set_error_handler(nb.cs, handle_cbor_error, NULL);
 
 	rt = nb_malloc(sizeof(*rt));
 	recv_rt(&nb, rt);

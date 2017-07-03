@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
 		rt2 = deserialize_cbor(mry);
 	}
 	else if (strcmp(method, "netbufs") == 0) {
-		serialize_netbufs(rt, out);
-		nb_buf_flush(out);
-		//rt2 = deserialize_netbufs(mry);
+		serialize_netbufs(rt, mry);
+		nb_buf_flush(mry);
+		rt2 = deserialize_netbufs(mry);
 	}
 	else {
 		fprintf(stderr, "%s: unknown method: '%s'\n", argv0, method);

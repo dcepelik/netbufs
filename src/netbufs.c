@@ -12,20 +12,6 @@
 typedef uint64_t nb_pid_t;
 
 
-struct nb_attr
-{
-	const char *name;
-	bool reqd;
-};
-
-
-struct nb_group
-{
-	const char *name;
-	struct nb_attr **attrs;
-};
-
-
 /* TODO remove this */
 size_t nb_internal_recv_array_size(struct nb *nb)
 {
@@ -38,6 +24,11 @@ size_t nb_internal_recv_array_size(struct nb *nb)
 void nb_init(struct nb *nb, struct nb_buf *buf)
 {
 	nb->cs = cbor_stream_new(buf);
+
+	/* TODO clean-up */
+	diag_init(&nb->diag, nb->cs, stderr);
+	cbor_stream_set_diag(nb->cs, &nb->diag);
+
 	nb->groups = array_new(NB_GROUPS_INIT_SIZE, sizeof(*nb->groups));
 }
 

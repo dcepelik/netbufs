@@ -2,17 +2,24 @@
 #define NBIDS_H
 
 #include "netbufs.h"
+#include "debug.h"
+
+enum bird_org
+{
+	BIRD_ORG_RT,
+	BIRD_ORG_RTA,
+	BIRD_ORG_RTE,
+	BIRD_ORG_TIME,
+};
 
 enum bird_org_rt
 {
-	BIRD_ORG_RT,
 	BIRD_ORG_RT_ROUTES,
 	BIRD_ORG_RT_VERSION,
 };
 
 enum bird_org_rte
 {
-	BIRD_ORG_RTE,
 	BIRD_ORG_RTE_AS_NO,
 	BIRD_ORG_RTE_ATTRS,
 	BIRD_ORG_RTE_GWADDR,
@@ -25,29 +32,32 @@ enum bird_org_rte
 	BIRD_ORG_RTE_UPLINK,
 };
 
+enum bird_org_kvp
+{
+	BIRD_ORG_KVP,
+	BIRD_ORG_KVP_KEY,
+	BIRD_ORG_KVP_VALUE,
+};
+
 enum bird_org_rta
 {
-	BIRD_ORG_RTA,
-	BIRD_ORG_RTA_TFLAG,
 	BIRD_ORG_RTA_BGP_AGGR,
-	BIRD_ORG_RTA_BGP_AGGR_IP,
 	BIRD_ORG_RTA_BGP_AGGR_AS_NO,
+	BIRD_ORG_RTA_BGP_AGGR_IP,
 	BIRD_ORG_RTA_BGP_AS_PATH,
-	BIRD_ORG_RTA_BGP_COMMUNITY,
 	BIRD_ORG_RTA_BGP_CFLAG,
-	BIRD_ORG_RTA_BGP_CFLAG_FLAG,
 	BIRD_ORG_RTA_BGP_CFLAG_AS_NO,
+	BIRD_ORG_RTA_BGP_CFLAG_FLAG,
+	BIRD_ORG_RTA_BGP_COMMUNITY,
 	BIRD_ORG_RTA_BGP_LOCAL_PREF,
 	BIRD_ORG_RTA_BGP_NEXT_HOP,
 	BIRD_ORG_RTA_BGP_ORIGIN,
 	BIRD_ORG_RTA_OTHER,
-	BIRD_ORG_RTA_OTHER_KEY,
-	BIRD_ORG_RTA_OTHER_VALUE,
+	BIRD_ORG_RTA_TFLAG,
 };
 
 enum bird_org_time
 {
-	BIRD_ORG_TIME,
 	BIRD_ORG_TIME_HOUR,
 	BIRD_ORG_TIME_MIN,
 	BIRD_ORG_TIME_SEC,
@@ -59,8 +69,9 @@ static inline void setup_ids(struct nb *nb)
 	struct nb_group *rt;
 	struct nb_group *rte;
 	struct nb_group *rta;
-	struct nb_group *rta_other;
+	struct nb_group *kvp;
 	struct nb_group *time;
+	struct nb_group *bgp_cflag;
 
 	rt = nb_group(nb, BIRD_ORG_RT, "bird.org/rt");
 	nb_bind(rt, BIRD_ORG_RT_ROUTES, "./routes", true);
@@ -88,9 +99,13 @@ static inline void setup_ids(struct nb *nb)
 	nb_bind(rta, BIRD_ORG_RTA_BGP_ORIGIN, "./bgp_origin", false);
 	nb_bind(rta, BIRD_ORG_RTA_OTHER, "./other", false);
 
-	rta_other = nb_group(nb, BIRD_ORG_RTA_OTHER, "bird.org/rta_other");
-	nb_bind(rta_other, BIRD_ORG_RTA_OTHER_KEY, "./key", true);
-	nb_bind(rta_other, BIRD_ORG_RTA_OTHER_VALUE, "./value", true);
+	kvp = nb_group(nb, BIRD_ORG_KVP, "bird.org/rta/kvp");
+	nb_bind(kvp, BIRD_ORG_KVP_KEY, "./key", true);
+	nb_bind(kvp, BIRD_ORG_KVP_VALUE, "./value", true);
+
+	bgp_cflag = nb_group(nb, BIRD_ORG_RTA_BGP_CFLAG, "bird.org/rta/bgp_cflag");
+	nb_bind(bgp_cflag, BIRD_ORG_RTA_BGP_CFLAG_FLAG, "./flag", true);
+	nb_bind(bgp_cflag, BIRD_ORG_RTA_BGP_CFLAG_AS_NO, "./as_no", true);
 
 	time = nb_group(nb, BIRD_ORG_TIME, "bird.org/time");
 	nb_bind(time, BIRD_ORG_TIME_HOUR, "./hour", true);

@@ -2,25 +2,70 @@
 #include "cbor.h"
 #include "debug.h"
 #include "netbufs.h"
+#include "internal.h"
 
 
-bool nb_recv_id(struct nb *nb, nb_lid_t *id)
+static bool recv_id(struct nb *nb, nb_lid_t *id)
 {
 	nb_err_t err;
+	struct cbor_item item;
 
-	if ((err = cbor_decode_int32(nb->cs, id)) == NB_ERR_OK)
-		return true;
-	TEMP_ASSERT(err == NB_ERR_BREAK);
-	return false;
+	if ((err = cbor_peek(nb->cs, &item)) != NB_ERR_OK) {
+		TEMP_ASSERT(err == NB_ERR_BREAK);
+		diag_log_raw(&nb->diag, NULL, 0); /* TODO remove, just for debugging */
+		return false;
+	}
+
+	assert(cbor_decode_int32(nb->cs, id) == NB_ERR_OK);
+	return true;
 }
 
 
-void nb_recv_group(struct nb *nb, nb_lid_t id_expected)
+bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
+{
+	bool ret;
+	ret = recv_id(nb, id);
+	/* TODO remove this conditional by always having an active (default) group */
+	if (ret && nb->active_group != NULL) {
+		if (*id <= array_size(nb->active_group->attrs))
+			if (nb->active_group->attrs[*id] != NULL)
+				diag_log_proto(&nb->diag, "%s/%s",
+					nb->active_group->name, nb->active_group->attrs[*id]->name);
+	}
+	return ret;
+}
+
+
+void nb_recv_group(struct nb *nb, nb_lid_t id)
 {
 	nb_lid_t id_real;
-	nb_recv_id(nb, &id_real);
-	TEMP_ASSERT(id_expected == id_real);
+
 	cbor_decode_array_begin_indef(nb->cs);
+	TEMP_ASSERT(top_block(nb->cs)->type == CBOR_TYPE_ARRAY);
+
+	recv_id(nb, &id_real);
+	TEMP_ASSERT(id <= array_size(nb->groups));
+	TEMP_ASSERT(nb->groups[id] != NULL);
+	TEMP_ASSERT(id == id_real);
+
+	nb->active_group = top_block(nb->cs)->group = nb->groups[id];
+	diag_log_proto(&nb->diag, "GROUP=%s", nb->active_group->name);
+}
+
+
+nb_err_t nb_recv_group_end(struct nb *nb)
+{
+	nb_err_t err;
+
+	if ((err = cbor_decode_array_end(nb->cs)) != NB_ERR_OK) {
+		assert(false);
+		return err;
+	}
+
+	nb->active_group = top_block(nb->cs)->group;
+	//TEMP_ASSERT(nb->active_group != NULL);
+
+	return NB_ERR_OK;
 }
 
 
@@ -90,10 +135,4 @@ void nb_recv_string(struct nb *nb, char **str)
 void nb_recv_array_end(struct nb *nb)
 {
 	cbor_decode_array_end(nb->cs);
-}
-
-
-nb_err_t nb_recv_group_end(struct nb *nb)
-{
-	return cbor_decode_array_end(nb->cs);
 }
