@@ -110,9 +110,18 @@ static void handle_diag_item_decoration(struct cbor_stream *cs)
 {
 	switch (top_block(cs)->type) {
 	case CBOR_TYPE_ARRAY:
-	case CBOR_TYPE_MAP: /* TODO */
 		if (top_block(cs)->num_items > 0)
 			diag_log_cbor(cs->diag, ",");
+		break;
+	case CBOR_TYPE_MAP: /* TODO */
+		if (top_block(cs)->num_items % 2 == 0) {
+			diag_log_cbor(cs->diag, ",");
+			diag_decrease(cs->diag);
+		}
+		else {
+			diag_log_cbor(cs->diag, ":");
+			diag_increase(cs->diag);
+		}
 		break;
 	default:
 		break;
@@ -547,19 +556,51 @@ nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
 
 nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
 {
-	return decode_block_start(cs, CBOR_TYPE_MAP, false, len);
+	nb_err_t err;
+
+	if ((err = decode_block_start(cs, CBOR_TYPE_MAP, false, len)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "{");
+	diag_increase(cs->diag);
+	diag_dump_line(cs->diag);
+	return NB_ERR_OK;
 }
 
 
 nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs)
 {
-	return decode_block_start(cs, CBOR_TYPE_MAP, true, 0);
+	nb_err_t err;
+	uint64_t foo;
+
+	if ((err = decode_block_start(cs, CBOR_TYPE_MAP, true, &foo)) != NB_ERR_OK)
+		return err;
+
+	diag_log_cbor(cs->diag, "{_");
+	diag_increase(cs->diag);
+	diag_dump_line(cs->diag);
+	return NB_ERR_OK;
 }
 
 
 nb_err_t cbor_decode_map_end(struct cbor_stream *cs)
 {
-	return decode_block_end(cs, CBOR_TYPE_MAP);
+	nb_err_t err;
+	bool indefinite;
+
+	indefinite = top_block(cs)->indefinite;
+	if ((err = decode_block_end(cs, CBOR_TYPE_MAP)) != NB_ERR_OK)
+		return err;
+
+	if (!indefinite)
+		diag_force_newline(cs->diag); /* TODO cleanup */
+
+	diag_decrease(cs->diag);
+	diag_log_cbor(cs->diag, "}");
+	handle_diag_item_decoration(cs);
+	diag_dump_line(cs->diag);
+
+	return NB_ERR_OK;
 }
 
 

@@ -14,14 +14,15 @@ void nb_send_id(struct nb *nb, nb_lid_t id)
 
 void nb_send_group(struct nb *nb, nb_lid_t id)
 {
-	cbor_encode_array_begin_indef(nb->cs);
+	cbor_encode_map_begin_indef(nb->cs);
+	nb_send_id(nb, 20892); /* TODO */
 	nb_send_id(nb, id);
 }
 
 
 nb_err_t nb_send_group_end(struct nb *nb)
 {
-	return cbor_encode_array_end(nb->cs);
+	return cbor_encode_map_end(nb->cs);
 }
 
 

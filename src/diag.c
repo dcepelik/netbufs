@@ -75,7 +75,7 @@ static void diag_dump_line_internal(struct diag *diag)
 		return;
 	diag->have_output = false;
 
-	fprintf(diag->fout, "%-16s %-20s %-40s %-40s\n",
+	fprintf(diag->fout, "%-16s %-20s %-60s %-60s\n",
 		//diag->output.offset,
 		strbuf_get_string(&diag->output.raw),
 		strbuf_get_string(&diag->output.item),
@@ -92,13 +92,13 @@ static void diag_dump_line_internal(struct diag *diag)
 }
 
 
-void diag_log_offset(struct diag *diag, size_t offset)
+void diag_log_offset_internal(struct diag *diag, size_t offset)
 {
 	snprintf(diag->output.offset, sizeof(diag->output.offset), "0x%zx", offset);
 }
 
 
-void diag_log_raw(struct diag *diag, nb_byte_t *bytes, size_t count)
+void diag_log_raw_internal(struct diag *diag, nb_byte_t *bytes, size_t count)
 {
 	size_t i;
 
@@ -111,7 +111,7 @@ void diag_log_raw(struct diag *diag, nb_byte_t *bytes, size_t count)
 }
 
 
-void diag_log_item(struct diag *diag, char *msg, ...)
+void diag_log_item_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
@@ -121,7 +121,7 @@ void diag_log_item(struct diag *diag, char *msg, ...)
 }
 
 
-void diag_log_cbor(struct diag *diag, char *msg, ...)
+void diag_log_cbor_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 
@@ -132,7 +132,7 @@ void diag_log_cbor(struct diag *diag, char *msg, ...)
 }
 
 
-void diag_log_proto(struct diag *diag, char *msg, ...)
+void diag_log_proto_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
@@ -186,6 +186,7 @@ void diag_init(struct diag *diag, struct cbor_stream *cs, FILE *fout)
 	diag->cs = cs;
 	diag->fout = fout;
 
+	diag->enabled = true;
 	diag->bytes_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->str_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->eol_on_next_raw = false;

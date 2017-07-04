@@ -35,7 +35,7 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 {
 	bool ret;
 
-	if (top_block(nb->cs)->num_items > 1)
+	if (top_block(nb->cs)->num_items > 2)
 		diag_dedent_proto(&nb->diag);
 	ret = recv_id(nb, id);
 
@@ -58,9 +58,11 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 {
 	nb_lid_t id_real;
 
-	cbor_decode_array_begin_indef(nb->cs);
-	TEMP_ASSERT(top_block(nb->cs)->type == CBOR_TYPE_ARRAY);
+	cbor_decode_map_begin_indef(nb->cs);
+	TEMP_ASSERT(top_block(nb->cs)->type == CBOR_TYPE_MAP);
 
+	recv_id(nb, &id_real);
+	assert(id_real == 20892);
 	recv_id(nb, &id_real);
 	TEMP_ASSERT(id <= array_size(nb->groups));
 	TEMP_ASSERT(nb->groups[id] != NULL);
@@ -82,7 +84,7 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 	if (top_block(nb->cs)->num_items > 0)
 		diag_dedent_proto(&nb->diag);
 	
-	if ((err = cbor_decode_array_end(nb->cs)) != NB_ERR_OK) {
+	if ((err = cbor_decode_map_end(nb->cs)) != NB_ERR_OK) {
 		assert(false);
 		return err;
 	}
