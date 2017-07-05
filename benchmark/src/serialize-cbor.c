@@ -57,11 +57,13 @@ void serialize_attr_bgp_community(struct cbor_stream *cs, struct rte_attr *attr)
 }
 
 
+/* as no is u64 */
 void serialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 {
+	char *value;
+
 	cbor_encode_int32(cs, attr->type);
 	serialize_bool(cs, attr->tflag);
-	char *value;
 
 	switch (attr->type) {
 	case RTE_ATTR_TYPE_BGP_AS_PATH:

@@ -4,12 +4,9 @@
 #include "error.h"
 #include "strbuf.h"
 #include "sval.h"
+
 #include <inttypes.h>
 #include <stdio.h>
-
-#ifndef	NB_USE_DIAG
-#define NB_USE_DIAG	1
-#endif
 
 
 #define diag_log_offset(diag, offset) \

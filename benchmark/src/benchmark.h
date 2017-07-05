@@ -168,4 +168,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf);
 void serialize_netbufs(struct rt *rt, struct nb_buf *buf);
 struct rt *deserialize_netbufs(struct nb_buf *buf);
 
+void serialize_binary(struct rt *rt, struct nb_buf *buf);
+struct rt *deserialize_binary(struct nb_buf *buf);
+
 #endif

@@ -4,6 +4,7 @@
  */
 #include "buf.h"
 #include "benchmark.h"
+#include "util.h"
 
 #include <fcntl.h>
 #include <libgen.h>
@@ -11,6 +12,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+
+static struct {
+	char *name;
+	void (*serialize)(struct rt *rt, struct nb_buf *buf);
+	struct rt *(*deserialize)(struct nb_buf *buf);
+} methods[] = {
+	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
+	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
+	{ .name = "binary", .serialize = serialize_binary, .deserialize = NULL },
+	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
+	{ .name = "xml", .serialize = NULL, .deserialize = NULL },
+	{ .name = "protobufs", .serialize = NULL, .deserialize = NULL },
+};
 
 
 int main(int argc, char *argv[])
@@ -24,15 +39,18 @@ int main(int argc, char *argv[])
 	struct nb_buf *out;
 	struct nb_buf *mry;
 	const char *argv0;
+	bool found;
+	size_t i;
 
     clock_t start;
 	clock_t end;
-	double cpu_time_used;
+	double time_serialize;
+	double time_deserialize;
 
 	argv0 = (const char *)basename(argv[0]);
 
 	if (argc != 4) {
-		fprintf(stderr, "Usage: %s <method> <input-file> <output-file>\n", argv0);
+		fprintf(stderr, "Usage: %s METHOD INPUT-FILE OUTPUT-FILE\n", argv0);
 		return EXIT_FAILURE;
 	}
 
@@ -55,42 +73,35 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	printf("Using bird_deserialize() to load RT from '%s'\n", fn_in);
-
 	rt = deserialize_bird(in);
 
-	printf("RT loaded with %lu entries\n", array_size(rt->entries));
-	printf("Transferring data using method '%s'\n", method);
+	for (i = 0, found = false; i < ARRAY_SIZE(methods); i++)
+		if (strcmp(method, methods[i].name) == 0) {
+			found = true;
+			break;
+		}
 
-	start = clock();
-	if (strcmp(method, "bird") == 0) {
-		serialize_bird(rt, mry);
-		nb_buf_flush(mry);
-		rt2 = deserialize_bird(mry);
-
-	}
-	else if (strcmp(method, "cbor") == 0) {
-		serialize_cbor(rt, mry);
-		nb_buf_flush(mry);
-		rt2 = deserialize_cbor(mry);
-	}
-	else if (strcmp(method, "netbufs") == 0) {
-		serialize_netbufs(rt, mry);
-		nb_buf_flush(mry);
-		rt2 = deserialize_netbufs(mry);
-	}
-	else {
+	if (!found) {
 		fprintf(stderr, "%s: unknown method: '%s'\n", argv0, method);
 		exit(EXIT_FAILURE);
 	}
+
+	start = clock();
+	methods[i].serialize(rt, mry);
 	end = clock();
+	time_serialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-	printf("Using bird_serialize() to write RT back to '%s'\n", fn_out);
-	//serialize_bird(rt2, out);
-	//nb_buf_flush(out);
+	nb_buf_flush(mry);
 
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("%.3f\n", cpu_time_used);
+	start = clock();
+	rt2 = methods[i].deserialize(mry);
+	end = clock();
+	time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+	serialize_bird(rt2, out);
+	nb_buf_flush(out);
+
+	printf("%lu %.3f %.3f\n", array_size(rt->entries), time_serialize, time_deserialize);
 	nb_buf_delete(in);
 	nb_buf_delete(mry);
 	nb_buf_delete(out);
