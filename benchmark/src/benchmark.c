@@ -19,12 +19,12 @@ static struct {
 	void (*serialize)(struct rt *rt, struct nb_buf *buf);
 	struct rt *(*deserialize)(struct nb_buf *buf);
 } methods[] = {
-	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
-	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
-	{ .name = "binary", .serialize = serialize_binary, .deserialize = NULL },
+	{ .name = "binary", .serialize = serialize_binary, .deserialize = deserialize_binary },
 	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
-	{ .name = "xml", .serialize = NULL, .deserialize = NULL },
+	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
+	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
 	{ .name = "protobufs", .serialize = NULL, .deserialize = NULL },
+	{ .name = "xml", .serialize = NULL, .deserialize = NULL },
 };
 
 
