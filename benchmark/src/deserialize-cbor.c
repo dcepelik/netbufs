@@ -151,6 +151,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 
 	cs = cbor_stream_new(buf);
 	diag_init(&diag, cs, stderr);
+	diag.enabled = false;
 	cbor_stream_set_diag(cs, &diag);
 	rt = nb_malloc(sizeof(*rt));
 

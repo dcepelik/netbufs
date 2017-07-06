@@ -18,6 +18,7 @@ void nb_init(struct nb *nb, struct nb_buf *buf)
 
 	/* TODO clean-up */
 	diag_init(&nb->diag, nb->cs, stderr);
+	nb->diag.enabled = false;
 	cbor_stream_set_diag(nb->cs, &nb->diag);
 
 	nb->groups = array_new(NB_GROUPS_INIT_SIZE, sizeof(*nb->groups));
