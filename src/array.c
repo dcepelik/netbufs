@@ -1,9 +1,11 @@
 #include "array.h"
 #include "common.h"
+#include "debug.h"
 #include "memory.h"
 #include "util.h"
+
 #include <assert.h>
-#include "debug.h"
+#include <string.h>
 
 
 struct array_header
@@ -27,13 +29,23 @@ static void *resize(void *arr, size_t new_capacity, size_t item_size)
 {
 	size_t actual_size;
 	struct array_header *header = NULL;
+	nb_byte_t *new_mem_start;
+	size_t old_capacity = 0;
 
-	if (arr)
+	if (arr) {
 		header = array_get_header(arr);
+		old_capacity = header->capacity;
+	}
+
+	assert(new_capacity >= old_capacity);
 
 	actual_size = sizeof(struct array_header) + new_capacity * item_size;
 
 	header = nb_realloc(header, actual_size);
+	new_mem_start = (nb_byte_t *)(header + 1) + old_capacity * item_size;
+
+	memset(new_mem_start, 0, (new_capacity - old_capacity) * item_size);
+
 	header->item_size = item_size;
 	header->capacity = new_capacity; 
 	return header + 1;
@@ -77,7 +89,7 @@ void *array_ensure_index(void *arr, size_t index)
 	size_t nitems_after;
 
 	nitems_after = index + 1;
-	hdr->num_items = nitems_after;
+	hdr->num_items = MAX(hdr->num_items, nitems_after);
 
 	if (hdr->capacity >= nitems_after)
 		return arr;
