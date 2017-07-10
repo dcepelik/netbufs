@@ -4,6 +4,8 @@
 #include "debug.h"
 #include "netbufs.h"
 
+#include <string.h>
+
 
 /* TODO remove this if possible */
 size_t nb_internal_recv_array_size(struct nb *nb)
@@ -15,42 +17,88 @@ size_t nb_internal_recv_array_size(struct nb *nb)
 }
 
 
-static bool recv_id(struct nb *nb, nb_lid_t *id)
+static nb_err_t recv_pid(struct nb *nb, nb_pid_t *pid)
+{
+	return cbor_decode_uint64(nb->cs, pid);
+}
+
+
+static void recv_ikg(struct nb *nb, struct nb_group *group)
+{
+	char *name;
+	nb_pid_t pid;
+	bool found;
+	nb_lid_t lid;
+	size_t foo;
+
+	TEMP_ASSERT(cbor_decode_text(nb->cs, (nb_byte_t **)&name, &foo) == NB_ERR_OK);
+	TEMP_ASSERT(recv_pid(nb, &pid) == NB_ERR_OK);
+
+	group->pid_to_lid = array_ensure_index(group->pid_to_lid, pid);
+
+	for (lid = 0, found = false; lid < array_size(group->attrs); lid++)
+		if (group->attrs[lid] && strcmp(group->attrs[lid]->name, name) == 0) {
+			found = true;
+			break;
+		}
+
+	TEMP_ASSERT(found);
+
+	group->pid_to_lid[pid] = lid;
+}
+
+
+static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 {
 	nb_err_t err;
 	struct cbor_item item;
+	nb_pid_t pid;
 
+again:
 	if ((err = cbor_peek(nb->cs, &item)) != NB_ERR_OK) {
 		TEMP_ASSERT(err == NB_ERR_BREAK);
-		diag_log_raw(&nb->diag, NULL, 0); /* TODO remove, just for debugging */
 		return false;
 	}
 
-	assert(cbor_decode_int32(nb->cs, id) == NB_ERR_OK);
+	if (item.type == CBOR_TYPE_TEXT) { /* an IKG */
+		recv_ikg(nb, group);
+		goto again;
+	}
+
+	TEMP_ASSERT(recv_pid(nb, &pid) == NB_ERR_OK);
+
+	if (pid == 0) {
+		*id = 0;
+		return true;
+	}
+
+	assert(pid != 0);
+	TEMP_ASSERT(array_size(group->pid_to_lid) >= pid);
+	*id = group->pid_to_lid[pid];
+	//TEMP_ASSERT(*id != 0); TODO
+
 	return true;
 }
 
 
 bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 {
-	bool ret;
+	//if (top_block(nb->cs)->num_items > 2)
+		//diag_dedent_proto(&nb->diag);
+	
+	TEMP_ASSERT(nb->active_group != NULL);
+	if (!recv_id(nb, nb->active_group, id))
+		return false;
 
-	if (top_block(nb->cs)->num_items > 2)
-		diag_dedent_proto(&nb->diag);
-	ret = recv_id(nb, id);
+	TEMP_ASSERT(array_size(nb->active_group->attrs) >= *id);
+	TEMP_ASSERT(nb->active_group->attrs[*id] != NULL);
 
-	/* TODO remove this conditional by always having an active (default) group */
-	if (ret && nb->active_group != NULL) {
-		if (*id <= array_size(nb->active_group->attrs))
-			if (nb->active_group->attrs[*id] != NULL) {
-				diag_log_proto(&nb->diag, "%s =",
-					nb->active_group->attrs[*id]->name);
-				nb->cur_attr = nb->active_group->attrs[*id];
-			}
-	}
+	diag_log_proto(&nb->diag, "%s =",
+		nb->active_group->attrs[*id]->name);
+	nb->cur_attr = nb->active_group->attrs[*id];
 
-	diag_indent_proto(&nb->diag);
-	return ret;
+	//diag_indent_proto(&nb->diag);
+	return true;
 }
 
 
@@ -58,17 +106,21 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 {
 	nb_lid_t id_real;
 
-	cbor_decode_map_begin_indef(nb->cs);
+	TEMP_ASSERT(cbor_decode_map_begin_indef(nb->cs) == NB_ERR_OK);
 	TEMP_ASSERT(top_block(nb->cs)->type == CBOR_TYPE_MAP);
 
-	recv_id(nb, &id_real);
-	assert(id_real == 20892);
-	recv_id(nb, &id_real);
-	TEMP_ASSERT(id <= array_size(nb->groups));
-	TEMP_ASSERT(nb->groups[id] != NULL);
-	TEMP_ASSERT(id == id_real);
+	/* check that the first key in a group is 0, meaning "type of this group" */
+	TEMP_ASSERT(recv_id(nb, &nb->groups_ns, &id_real) == true);
+	TEMP_ASSERT(id_real == 0);
 
-	nb->active_group = top_block(nb->cs)->group = nb->groups[id];
+	recv_id(nb, &nb->groups_ns, &id_real);
+	TEMP_ASSERT(id == id_real);
+	TEMP_ASSERT(array_size(nb->groups) >= id_real);
+	TEMP_ASSERT(nb->groups[id_real] != NULL);
+
+	nb->active_group = nb->groups[id_real];
+	top_block(nb->cs)->group = nb->active_group;
+
 	diag_log_proto(&nb->diag, "(%s) {", nb->active_group->name);
 	diag_indent_proto(&nb->diag);
 }
@@ -81,8 +133,8 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 
 	ended_group = top_block(nb->cs)->group;
 
-	if (top_block(nb->cs)->num_items > 0)
-		diag_dedent_proto(&nb->diag);
+	//if (top_block(nb->cs)->num_items > 0)
+		//diag_dedent_proto(&nb->diag);
 	
 	if ((err = cbor_decode_map_end(nb->cs)) != NB_ERR_OK) {
 		assert(false);

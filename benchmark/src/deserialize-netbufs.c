@@ -35,13 +35,13 @@ static nb_err_t recv_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
 {
 	nb_lid_t id;
 
-	nb_recv_group(nb, BIRD_ORG_RTA_BGP_CFLAG);
+	nb_recv_group(nb, BIRD_ORG_BGP_CFLAG);
 	while (nb_recv_attr(nb, &id)) {
 		switch (id) {
-		case BIRD_ORG_RTA_BGP_CFLAG_FLAG:
+		case BIRD_ORG_BGP_CFLAG_FLAG:
 			nb_recv_u32(nb, &cflag->flag);
 			break;
-		case BIRD_ORG_RTA_BGP_CFLAG_AS_NO:
+		case BIRD_ORG_BGP_CFLAG_AS_NO:
 			nb_recv_u32(nb, &cflag->as_no);
 			break;
 		}
@@ -210,14 +210,6 @@ static nb_err_t recv_rt(struct nb *nb, struct rt *rt)
 }
 
 
-void handle_cbor_error(struct cbor_stream *cs, nb_err_t err, void *arg)
-{
-	diag_log_raw(cs->diag, NULL, 0); /* TODO hack */
-	fprintf(stderr, "CBOR decoding error: %s.\n", cbor_stream_strerror(cs));
-	exit(EXIT_FAILURE);
-}
-
-
 struct rt *deserialize_netbufs(struct nb_buf *buf)
 {
 	struct nb nb;
@@ -225,7 +217,6 @@ struct rt *deserialize_netbufs(struct nb_buf *buf)
 
 	nb_init(&nb, buf);
 	setup_ids(&nb);
-	cbor_stream_set_error_handler(nb.cs, handle_cbor_error, NULL);
 
 	rt = nb_malloc(sizeof(*rt));
 	recv_rt(&nb, rt);

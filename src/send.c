@@ -1,28 +1,105 @@
+#include "array.h"
+#include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
 #include "netbufs.h"
 #include "string.h"
 
 
+static void send_pid(struct nb *nb, nb_pid_t pid)
+{
+	cbor_encode_uint64(nb->cs, pid);
+}
+
+
+static struct nb_attr *group_get_attr(struct nb *nb, struct nb_group *group, nb_lid_t lid)
+{
+	if (array_size(group->attrs) < lid)
+		return NULL;
+	return group->attrs[lid];
+}
+
+
+/* TODO deduplicate code */
+static void send_ikg(struct nb *nb, char *name, nb_pid_t pid)
+{
+	//assert(nb->active_group != NULL);
+	cbor_encode_text(nb->cs, (nb_byte_t *)name, strlen(name));
+	send_pid(nb, pid);
+}
+
+
+static nb_pid_t lid_to_pid(struct nb *nb, struct nb_group *group, nb_lid_t lid)
+{
+	struct nb_attr *attr;
+
+	attr = group_get_attr(nb, group, lid);
+
+	if (!attr)
+		DEBUG_PRINTF("It seems that attribute %i isn't bound to group %s",
+			lid, group->name);
+	TEMP_ASSERT(attr != NULL);
+
+	if (attr->pid == 0) {
+		attr->pid = ++group->max_pid;
+		send_ikg(nb, (char *)attr->name, attr->pid);
+	}
+
+	assert(attr->pid != 0);	/* pID 0 is reserved */
+	return attr->pid;
+}
+
+
+static struct nb_group *get_group(struct nb *nb, nb_lid_t lid)
+{
+	struct nb_group *group;
+	if (array_size(nb->groups) < lid)
+		return NULL;
+	return nb->groups[lid];
+}
+
+
 void nb_send_id(struct nb *nb, nb_lid_t id)
 {
-	/* TODO */
-	if (id >= 0)
-		cbor_encode_int32(nb->cs, id);
+	nb_pid_t pid;
+
+	if (id < 0)
+		return; /* TODO */
+
+	TEMP_ASSERT(nb->active_group != NULL); /* TODO make it an assert */
+
+	pid = lid_to_pid(nb, nb->active_group, id);
+	send_pid(nb, pid);
 }
 
 
 void nb_send_group(struct nb *nb, nb_lid_t id)
 {
+	struct nb_group *group;
+	nb_pid_t pid;
+
+	group = get_group(nb, id);
+	if (!group)
+		DEBUG_PRINTF("Cannot get group (lid=%i)", id);
+	TEMP_ASSERT(group != NULL);
+
 	cbor_encode_map_begin_indef(nb->cs);
-	nb_send_id(nb, 20892); /* TODO */
-	nb_send_id(nb, id);
+	nb->active_group = group;
+	top_block(nb->cs)->group = nb->active_group;
+
+	pid = lid_to_pid(nb, &nb->groups_ns, id);
+
+	send_pid(nb, 0);
+	send_pid(nb, pid); /* TODO */
 }
 
 
 nb_err_t nb_send_group_end(struct nb *nb)
 {
-	return cbor_encode_map_end(nb->cs);
+	cbor_encode_map_end(nb->cs);
+	nb->active_group = top_block(nb->cs)->group;
+
+	return NB_ERR_OK; /* suppress retval */
 }
 
 
@@ -31,6 +108,7 @@ void nb_send_bool(struct nb *nb, nb_lid_t id, bool b)
 	nb_send_id(nb, id);
 	cbor_encode_sval(nb->cs, b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
 }
+
 
 void nb_send_i8(struct nb *nb, nb_lid_t id, int8_t i8)
 {

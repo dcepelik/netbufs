@@ -22,9 +22,10 @@ MAINS = $(addprefix objs/netbufs/, nbdiag.o test-array.o test-stream.o test-adho
 CFLAGS += -c -std=gnu11 -Wall -Werror --pedantic \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR) \
+	-I /usr/include/libxml2 \
 	-ggdb3 -DDEBUG
 
-LDFLAGS += -Wall
+LDFLAGS += -Wall -lxml2
 
 all: $(BINS)
 

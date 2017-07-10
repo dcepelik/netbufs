@@ -9,22 +9,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef int nb_lid_t;
-
-struct nb
-{
-	struct cbor_stream *cs;
-	struct nb_group **groups;
-	struct diag diag;
-	struct nb_group *active_group;
-	struct nb_attr *cur_attr;
-};
+typedef int			nb_lid_t;
+typedef	uint64_t	nb_pid_t;
 
 /* TODO hide this */
 struct nb_attr
 {
 	const char *name;
 	bool reqd;
+	nb_pid_t pid;
 };
 
 /* TODO hide this */
@@ -32,6 +25,18 @@ struct nb_group
 {
 	const char *name;
 	struct nb_attr **attrs;
+	nb_pid_t max_pid;
+	nb_lid_t *pid_to_lid;
+};
+
+struct nb
+{
+	struct cbor_stream *cs;
+	struct nb_group **groups;
+	struct diag diag;
+	struct nb_group groups_ns;			/* groups namespace */
+	struct nb_group *active_group;
+	struct nb_attr *cur_attr;
 };
 
 #define	nb_recv_array(nb, arr) \

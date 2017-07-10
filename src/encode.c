@@ -239,10 +239,8 @@ nb_err_t cbor_encode_map_begin_indef(struct cbor_stream *cs)
 
 nb_err_t cbor_encode_map_end(struct cbor_stream *cs)
 {
-	if (top_block(cs)->num_items % 2 != 0) {
-		DEBUG_EXPR("%lu", top_block(cs)->num_items);
-		return error(cs, NB_ERR_NITEMS, "Odd number of items in a map.");
-	}
+	if (top_block(cs)->num_items % 2 != 0)
+		return error(cs, NB_ERR_NITEMS, "Odd number of items in a map");
 
 	return end_block(cs, CBOR_MAJOR_MAP);
 }

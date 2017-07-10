@@ -69,32 +69,58 @@ static char *isbuf_get_string(struct isbuf *is)
 }
 
 
+static void reset_line(struct diag_line *line)
+{
+	line->offset[0] = '\0';
+	strbuf_reset(&line->raw);
+	strbuf_reset(&line->item);
+	isbuf_reset(&line->cbor);
+	isbuf_reset(&line->proto);
+	line->empty = true;
+	line->cbor_comma = false;
+}
+
+
+static void switch_lines(struct diag *diag)
+{
+	assert(ARRAY_SIZE(diag->lines) == 2);
+
+	unsigned char new_idx;
+
+	/* TODO is it possible to avoid these copies? */
+	new_idx = 1 - diag->line_idx;
+	assert(new_idx != diag->line_idx);
+
+	diag->lines[new_idx].cbor.indent_level = diag->line->cbor.indent_level;
+	diag->lines[new_idx].proto.indent_level = diag->line->proto.indent_level;
+
+	diag->line_idx = new_idx;
+	diag->line = &diag->lines[diag->line_idx];
+}
+
+
 static void diag_dump_line_internal(struct diag *diag)
 {
-	if (!diag->have_output)
-		return;
-	diag->have_output = false;
+	switch_lines(diag);
 
-	fprintf(diag->fout, "%-16s %-20s %-60s %-60s\n",
-		//diag->output.offset,
-		strbuf_get_string(&diag->output.raw),
-		strbuf_get_string(&diag->output.item),
-		isbuf_get_string(&diag->output.cbor_is),
-		isbuf_get_string(&diag->output.proto_is));
+	if (!diag->line->empty) {
+		fprintf(diag->fout, "%-16s %-20s %-60s %-60s\n",
+			//diag->line->offset,
+			strbuf_get_string(&diag->line->raw),
+			strbuf_get_string(&diag->line->item),
+			isbuf_get_string(&diag->line->cbor),
+			isbuf_get_string(&diag->line->proto));
 
-	diag->output.offset[0] = '\0';
-	strbuf_reset(&diag->output.raw);
-	strbuf_reset(&diag->output.item);
-	isbuf_reset(&diag->output.cbor_is);
-	isbuf_reset(&diag->output.proto_is);
-	
+		reset_line(diag->line);
+	}
+
 	diag->eol_on_next_raw = false;
 }
 
 
 void diag_log_offset_internal(struct diag *diag, size_t offset)
 {
-	snprintf(diag->output.offset, sizeof(diag->output.offset), "0x%zx", offset);
+	snprintf(diag->line->offset, sizeof(diag->line->offset), "0x%zx", offset);
 }
 
 
@@ -106,8 +132,8 @@ void diag_log_raw_internal(struct diag *diag, nb_byte_t *bytes, size_t count)
 		diag_dump_line_internal(diag);
 
 	for (i = 0; i < count; i++)
-		strbuf_printf(&diag->output.raw, "%02X", bytes[i]);
-	diag->have_output = true;
+		strbuf_printf(&diag->line->raw, "%02X", bytes[i]);
+	diag->line->empty = false;
 }
 
 
@@ -115,8 +141,8 @@ void diag_log_item_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	strbuf_vprintf(&diag->output.item, msg, args);
-	diag->have_output = true;
+	strbuf_vprintf(&diag->line->item, msg, args);
+	diag->line->empty = false;
 	va_end(args);
 }
 
@@ -124,10 +150,9 @@ void diag_log_item_internal(struct diag *diag, char *msg, ...)
 void diag_log_cbor_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
-
 	va_start(args, msg);
-	isbuf_vprintf(&diag->output.cbor_is, msg, args);
-	diag->have_output = true;
+	isbuf_vprintf(&diag->line->cbor, msg, args);
+	diag->line->empty = false;
 	va_end(args);
 }
 
@@ -136,8 +161,8 @@ void diag_log_proto_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	isbuf_vprintf(&diag->output.proto_is, msg, args);
-	diag->have_output = true;
+	isbuf_vprintf(&diag->line->proto, msg, args);
+	diag->line->empty = false;
 	va_end(args);
 }
 
@@ -145,6 +170,22 @@ void diag_log_proto_internal(struct diag *diag, char *msg, ...)
 void diag_dump_line(struct diag *diag)
 {
 	diag->eol_on_next_raw = true;
+}
+
+
+void diag_eol(struct diag *diag, bool cbor_comma)
+{
+	diag->line->cbor_comma = cbor_comma;
+	diag->eol_on_next_raw = true;
+}
+
+
+void diag_comma(struct diag *diag)
+{
+	if (diag->lines[1 - diag->line_idx].cbor_comma) {
+		strbuf_printf(&diag->lines[1 - diag->line_idx].cbor.sb, ",");
+		diag->lines[1 - diag->line_idx].cbor_comma = false;
+	}
 }
 
 
@@ -175,46 +216,57 @@ void diag_log_sval(struct diag *diag, uint64_t sval)
 }
 
 
+static void init_line(struct diag_line *line)
+{
+	line->offset[0] = '\0';
+	strbuf_init(&line->raw, 8);
+	strbuf_init(&line->item, 16);
+	isbuf_init(&line->cbor, 32);
+	isbuf_init(&line->proto, 24);
+	reset_line(line);
+}
+
+
 void diag_init(struct diag *diag, struct cbor_stream *cs, FILE *fout)
 {
-	diag->output.offset[0] = '\0';
-	strbuf_init(&diag->output.raw, 8);
-	strbuf_init(&diag->output.item, 16);
-	isbuf_init(&diag->output.cbor_is, 32);
-	isbuf_init(&diag->output.proto_is, 24);
+	size_t i;
+	
+	for (i = 0; i < ARRAY_SIZE(diag->lines); i++)
+		init_line(&diag->lines[i]);
+
+	diag->line_idx = 0;
+	diag->line = &diag->lines[diag->line_idx];
 
 	diag->cs = cs;
 	diag->fout = fout;
-
 	diag->enabled = true;
 	diag->bytes_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->str_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->eol_on_next_raw = false;
-	diag->have_output = false;
 }
 
 
 void diag_increase(struct diag *diag)
 {
-	isbuf_indent(&diag->output.cbor_is);
+	isbuf_indent(&diag->line->cbor);
 }
 
 
 void diag_decrease(struct diag *diag)
 {
-	isbuf_dedent(&diag->output.cbor_is);
+	isbuf_dedent(&diag->line->cbor);
 }
 
 
 void diag_indent_proto(struct diag *diag)
 {
-	isbuf_indent(&diag->output.proto_is);
+	isbuf_indent(&diag->line->proto);
 }
 
 
 void diag_dedent_proto(struct diag *diag)
 {
-	isbuf_dedent(&diag->output.proto_is);
+	isbuf_dedent(&diag->line->proto);
 }
 
 
@@ -242,10 +294,10 @@ nb_err_t diag_dump(struct diag *diag, FILE *out)
 
 void diag_free(struct diag *diag)
 {
-	strbuf_free(&diag->output.raw);
-	strbuf_free(&diag->output.item);
-	isbuf_free(&diag->output.cbor_is);
-	isbuf_free(&diag->output.proto_is);
+	strbuf_free(&diag->line->raw);
+	strbuf_free(&diag->line->item);
+	isbuf_free(&diag->line->cbor);
+	isbuf_free(&diag->line->proto);
 }
 
 

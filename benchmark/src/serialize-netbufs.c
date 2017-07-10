@@ -3,7 +3,7 @@
 #include "netbufs.h"
 
 
-static nb_err_t send_time(struct nb *nb, int id, struct tm *tm)
+static nb_err_t send_time(struct nb *nb, nb_lid_t id, struct tm *tm)
 {
 	nb_send_id(nb, id);
 	nb_send_group(nb, BIRD_ORG_TIME);
@@ -31,9 +31,9 @@ static void send_ipv4(struct nb *nb, nb_lid_t id, ipv4_t ip)
 
 static nb_err_t send_bgp_cflag(struct nb *nb, struct bgp_cflag *cflag)
 {
-	nb_send_group(nb, BIRD_ORG_RTA_BGP_CFLAG);
-	nb_send_u32(nb, BIRD_ORG_RTA_BGP_CFLAG_FLAG, cflag->flag);
-	nb_send_u32(nb, BIRD_ORG_RTA_BGP_CFLAG_AS_NO, cflag->as_no);
+	nb_send_group(nb, BIRD_ORG_BGP_CFLAG);
+	nb_send_u32(nb, BIRD_ORG_BGP_CFLAG_FLAG, cflag->flag);
+	nb_send_u32(nb, BIRD_ORG_BGP_CFLAG_AS_NO, cflag->as_no);
 	return nb_send_group_end(nb);
 }
 

@@ -22,9 +22,11 @@ static struct {
 	{ .name = "binary", .serialize = serialize_binary, .deserialize = deserialize_binary },
 	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
 	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
-	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
+	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = NULL },
 	{ .name = "protobufs", .serialize = NULL, .deserialize = NULL },
 	{ .name = "xml", .serialize = NULL, .deserialize = NULL },
+
+	{ .name = "bc-ex1", .serialize = serialize_bc_ex1, .deserialize = NULL },
 };
 
 
@@ -45,7 +47,7 @@ int main(int argc, char *argv[])
     clock_t start;
 	clock_t end;
 	double time_serialize;
-	double time_deserialize;
+	double time_deserialize = 0;
 
 	argv0 = (const char *)basename(argv[0]);
 
@@ -86,22 +88,29 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	start = clock();
-	methods[i].serialize(rt, mry);
-	end = clock();
-	time_serialize = ((double) (end - start)) / CLOCKS_PER_SEC;
+	if (methods[i].deserialize) {
+		start = clock();
+		methods[i].serialize(rt, mry);
+		end = clock();
+		time_serialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-	nb_buf_flush(mry);
+		nb_buf_flush(mry);
 
-	start = clock();
-	rt2 = methods[i].deserialize(mry);
-	end = clock();
-	time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
+		start = clock();
+		rt2 = methods[i].deserialize(mry);
+		end = clock();
+		time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-	serialize_bird(rt2, out);
-	nb_buf_flush(out);
+		serialize_bird(rt2, out);
+		nb_buf_flush(out);
 
-	printf("%lu %.3f %.3f\n", array_size(rt->entries), time_serialize, time_deserialize);
+		printf("%lu %.3f %.3f\n", array_size(rt->entries), time_serialize, time_deserialize);
+	}
+	else {
+		methods[i].serialize(rt, out);
+		nb_buf_flush(out);
+	}
+
 	nb_buf_delete(in);
 	nb_buf_delete(mry);
 	nb_buf_delete(out);
