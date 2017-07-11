@@ -24,7 +24,7 @@ static struct nb_attr *group_get_attr(struct nb *nb, struct nb_group *group, nb_
 static void send_ikg(struct nb *nb, char *name, nb_pid_t pid)
 {
 	//assert(nb->active_group != NULL);
-	cbor_encode_text(nb->cs, (nb_byte_t *)name, strlen(name));
+	cbor_encode_text(nb->cs, name);
 	send_pid(nb, pid);
 }
 
@@ -171,7 +171,7 @@ void nb_send_string(struct nb *nb, nb_lid_t id, char *str)
 	nb_send_id(nb, id);
 	if (str == NULL)
 		str = "";
-	cbor_encode_text(nb->cs, (nb_byte_t *)str, strlen(str));
+	cbor_encode_text(nb->cs, str);
 }
 
 

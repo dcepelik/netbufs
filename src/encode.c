@@ -15,6 +15,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <string.h>
 
 
 static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, nb_byte_t lbits)
@@ -273,9 +274,10 @@ nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs)
 }
 
 
-nb_err_t cbor_encode_text(struct cbor_stream *cs, nb_byte_t *str, size_t len)
+nb_err_t cbor_encode_text(struct cbor_stream *cs, char *str)
 {
-	return encode_bytes(cs, CBOR_MAJOR_TEXT, str, len);
+	size_t len = str ? strlen(str) : 0;
+	return encode_bytes(cs, CBOR_MAJOR_TEXT, (nb_byte_t *)str, len);
 }
 
 
@@ -312,6 +314,12 @@ nb_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 
 	return error(cs, NB_ERR_RANGE, "Simple value %u must be non-negative"
 		"and less than or equal to 255, %i was given.", sval);
+}
+
+
+nb_err_t cbor_encode_bool(struct cbor_stream *cs, bool b)
+{
+	return cbor_encode_sval(cs, b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
 }
 
 
@@ -397,7 +405,7 @@ nb_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_BYTES:
 		return cbor_encode_bytes(cs, item->bytes, item->len);
 	case CBOR_TYPE_TEXT:
-		return cbor_encode_text(cs, (nb_byte_t *)item->str, item->len);
+		return cbor_encode_text(cs, item->str);
 	case CBOR_TYPE_ARRAY:
 		return encode_array(cs, item);
 	case CBOR_TYPE_MAP:
@@ -406,7 +414,6 @@ nb_err_t cbor_encode_item(struct cbor_stream *cs, struct cbor_item *item)
 		return encode_tagged_item(cs, item);
 	case CBOR_TYPE_SVAL:
 		return cbor_encode_sval(cs, item->sval);
-
 	default:
 		return error(cs, NB_ERR_UNSUP, NULL);
 	}

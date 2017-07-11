@@ -57,17 +57,17 @@ struct cbor_item
 	bool indefinite;
 
 	/* refactoring aid */
-	uint64_t len;					/* go away! */
-	uint64_t u64;					/* CBOR_TYPE_UINT */
+	uint64_t len;				/* go away! */
+	uint64_t u64;				/* CBOR_TYPE_UINT */
 
 	union {
-		int64_t i64;				/* CBOR_TYPE_INT */
-		nb_byte_t *bytes;				/* CBOR_TYPE_BYTES */
-		char *str;					/* CBOR_TYPE_TEXT */
+		int64_t i64;			/* CBOR_TYPE_INT */
+		nb_byte_t *bytes;		/* CBOR_TYPE_BYTES */
+		char *str;			/* CBOR_TYPE_TEXT */
 		struct cbor_item *items;	/* CBOR_TYPE_ARRAY */
 		struct cbor_pair *pairs;	/* CBOR_TYPE_MAP */
-		uint64_t tag;				/* CBOR_TYPE_TAG */
-		enum cbor_sval sval;
+		uint64_t tag;			/* CBOR_TYPE_TAG */
+		enum cbor_sval sval;		/* CBOR_TYPE_SVAL */
 	};
 	struct cbor_item *tagged_item;
 };
@@ -79,9 +79,9 @@ struct cbor_item
 struct block
 {
 	enum cbor_type type;	/* type for which this block has been open */
-	bool indefinite;		/* is indefinite-lenght encoding used? */
-	uint64_t len;			/* intended length of the block when !indefinite */
-	size_t num_items;		/* actual number of items encoded */
+	bool indefinite;	/* is indefinite-lenght encoding used? */
+	uint64_t len;		/* intended length of the block (if not indefinite) */
+	size_t num_items;	/* actual number of items encoded */
 	struct nb_group *group;	/* active netbufs group */
 	struct nb_attr *attr;	/* current attribute */
 };
@@ -93,16 +93,16 @@ typedef void (cbor_error_handler_t)(struct cbor_stream *cs, nb_err_t err, void *
  */
 struct cbor_stream
 {
-	struct nb_buf *buf;		/* the buffer being read or written */
+	struct nb_buf *buf;	/* the buffer being read or written */
 	struct stack blocks;	/* block stack (open arrays and maps) */
-	nb_err_t err;			/* last error */
-	struct strbuf err_buf;	/* error string buffer */
-	struct diag *diag;		/* diagnostics buffer */
+	struct diag *diag;	/* diagnostics buffer */
 
-	bool peeking;			/* are we peeking? */
+	bool peeking;		/* are we peeking? */
 	struct cbor_item peek;	/* item to be returned by next predecode() call */
 
 	/* TODO various encoding/decoding options to come as needed */
+	nb_err_t err;		/* last error */
+	struct strbuf err_buf;	/* error string buffer */
 	cbor_error_handler_t *error_handler;
 	void *error_handler_arg;
 };
@@ -174,6 +174,9 @@ nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint64_t *tagno);
 nb_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval val);
 nb_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *val);
 
+nb_err_t cbor_encode_bool(struct cbor_stream *cs, bool b);
+nb_err_t cbor_decode_bool(struct cbor_stream *cs, bool *b);
+
 nb_err_t cbor_encode_array_begin(struct cbor_stream *cs, uint64_t len);
 nb_err_t cbor_encode_array_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_array_end(struct cbor_stream *cs);
@@ -201,15 +204,11 @@ nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
 
 nb_err_t cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **bytes, size_t *len);
 
-/* TODO don't ask for length, assume 0-terminated strings */
-nb_err_t cbor_encode_text(struct cbor_stream *cs, nb_byte_t *str, size_t len);
+nb_err_t cbor_encode_text(struct cbor_stream *cs, char *str);
 nb_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_text_end(struct cbor_stream *cs);
 
-/* TODO I'm given the string, so I don't really need the length most of the time */
-nb_err_t cbor_decode_text(struct cbor_stream *cs, nb_byte_t **str, size_t *len);
-
-/* TODO normalization for byte and text strings? */
+nb_err_t cbor_decode_text(struct cbor_stream *cs, char **str);
 
 /* TODO valid fields in item when using peek_item -> manual */
 nb_err_t cbor_peek(struct cbor_stream *cs, struct cbor_item *item);

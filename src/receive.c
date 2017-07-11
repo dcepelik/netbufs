@@ -2,9 +2,12 @@
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
+#include "netbufs-internal.h"
 #include "netbufs.h"
 
 #include <string.h>
+
+#define	LID_UNKNOWN	(-1)
 
 
 /* TODO remove this if possible */
@@ -17,22 +20,22 @@ size_t nb_internal_recv_array_size(struct nb *nb)
 }
 
 
-static nb_err_t recv_pid(struct nb *nb, nb_pid_t *pid)
+static void recv_pid(struct nb *nb, nb_pid_t *pid)
 {
-	return cbor_decode_uint64(nb->cs, pid);
+	cbor_decode_uint64(nb->cs, pid);
 }
 
 
-static void recv_ikg(struct nb *nb, struct nb_group *group)
+static void recv_key(struct nb *nb, struct nb_group *group)
 {
 	char *name;
 	nb_pid_t pid;
 	bool found;
 	nb_lid_t lid;
-	size_t foo;
+	nb_err_t err;
 
-	TEMP_ASSERT(cbor_decode_text(nb->cs, (nb_byte_t **)&name, &foo) == NB_ERR_OK);
-	TEMP_ASSERT(recv_pid(nb, &pid) == NB_ERR_OK);
+	cbor_decode_text(nb->cs, &name);
+	recv_pid(nb, &pid);
 
 	group->pid_to_lid = array_ensure_index(group->pid_to_lid, pid);
 
@@ -42,8 +45,7 @@ static void recv_ikg(struct nb *nb, struct nb_group *group)
 			break;
 		}
 
-	TEMP_ASSERT(found);
-
+	TEMP_ASSERT(found); /* TODO allow usage of unknown groups! */
 	group->pid_to_lid[pid] = lid;
 }
 
@@ -54,50 +56,58 @@ static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 	struct cbor_item item;
 	nb_pid_t pid;
 
-again:
+recv_another_key:
 	if ((err = cbor_peek(nb->cs, &item)) != NB_ERR_OK) {
-		TEMP_ASSERT(err == NB_ERR_BREAK);
+		assert(err == NB_ERR_BREAK); /* other error would call error handler */
 		return false;
 	}
 
-	if (item.type == CBOR_TYPE_TEXT) { /* an IKG */
-		recv_ikg(nb, group);
-		goto again;
+	if (item.type == CBOR_TYPE_TEXT) { /* a key to be inserted follows */
+		recv_key(nb, group);
+		goto recv_another_key;
 	}
 
-	TEMP_ASSERT(recv_pid(nb, &pid) == NB_ERR_OK);
+	recv_pid(nb, &pid);
 
+	/* pID 0 is reserved and means "the type of this group", don't do any lookups */
 	if (pid == 0) {
 		*id = 0;
 		return true;
 	}
 
-	assert(pid != 0);
-	TEMP_ASSERT(array_size(group->pid_to_lid) >= pid);
-	*id = group->pid_to_lid[pid];
-	//TEMP_ASSERT(*id != 0); TODO
+	/* TODO undef lids in pid_to_lid shall be LID_UNKNOWN! */
 
+	assert(pid != 0);
+	if (array_size(group->pid_to_lid) < pid || group->pid_to_lid[pid] == LID_UNKNOWN)
+		nb_error(nb, NB_ERR_UNDEF_ID, "pID %lu is undefined", pid);
+
+	*id = group->pid_to_lid[pid];
 	return true;
 }
 
 
 bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 {
+	struct nb_attr *attr;
+
 	//if (top_block(nb->cs)->num_items > 2)
 		//diag_dedent_proto(&nb->diag);
 	
-	TEMP_ASSERT(nb->active_group != NULL);
+	if (nb->active_group == NULL)
+		nb_error(nb, NB_ERR_OPER, "Cannot receive attributes outside of a group");
+
 	if (!recv_id(nb, nb->active_group, id))
 		return false;
 
-	TEMP_ASSERT(array_size(nb->active_group->attrs) >= *id);
-	TEMP_ASSERT(nb->active_group->attrs[*id] != NULL);
+	assert(array_size(nb->active_group->attrs) >= *id); /* if not, recv_id would fail */
 
-	diag_log_proto(&nb->diag, "%s =",
-		nb->active_group->attrs[*id]->name);
-	nb->cur_attr = nb->active_group->attrs[*id];
+	attr = nb->active_group->attrs[*id];
+	assert(attr != NULL); /* if not, recv_id would fail */
 
+	diag_log_proto(&nb->diag, "%s =", attr->name);
+	nb->cur_attr = attr;
 	//diag_indent_proto(&nb->diag);
+
 	return true;
 }
 
@@ -105,20 +115,24 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 void nb_recv_group(struct nb *nb, nb_lid_t id)
 {
 	nb_lid_t id_real;
+	struct nb_group *group;
 
-	TEMP_ASSERT(cbor_decode_map_begin_indef(nb->cs) == NB_ERR_OK);
-	TEMP_ASSERT(top_block(nb->cs)->type == CBOR_TYPE_MAP);
-
-	/* check that the first key in a group is 0, meaning "type of this group" */
-	TEMP_ASSERT(recv_id(nb, &nb->groups_ns, &id_real) == true);
-	TEMP_ASSERT(id_real == 0);
+	cbor_decode_map_begin_indef(nb->cs);
 
 	recv_id(nb, &nb->groups_ns, &id_real);
-	TEMP_ASSERT(id == id_real);
-	TEMP_ASSERT(array_size(nb->groups) >= id_real);
-	TEMP_ASSERT(nb->groups[id_real] != NULL);
+	if (id_real != 0)
+		nb_error(nb, NB_ERR_OTHER, "First key sent in a group has to be 0");
 
-	nb->active_group = nb->groups[id_real];
+	recv_id(nb, &nb->groups_ns, &id_real);
+	if (id != id_real) /* TODO msg */
+		nb_error(nb, NB_ERR_OTHER, "Expected group `%s', but group `%s' follows",
+			NULL, NULL);
+
+	assert(array_size(nb->groups) >= id_real); /* if not, recv_id would fail */
+	group = nb->groups[id_real];
+
+	assert(group != NULL); /* if not, recv_id would fail */
+	nb->active_group = group;
 	top_block(nb->cs)->group = nb->active_group;
 
 	diag_log_proto(&nb->diag, "(%s) {", nb->active_group->name);
@@ -126,26 +140,24 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 }
 
 
+/* TODO void nb_recv_group... */
 nb_err_t nb_recv_group_end(struct nb *nb)
 {
 	nb_err_t err;
 	struct nb_group *ended_group;
 
-	ended_group = top_block(nb->cs)->group;
+	ended_group = top_block(nb->cs)->group; /* in Czech: `skončivší', ha ha */
+	assert(ended_group != NULL); /* TODO check this */
 
 	//if (top_block(nb->cs)->num_items > 0)
 		//diag_dedent_proto(&nb->diag);
 	
-	if ((err = cbor_decode_map_end(nb->cs)) != NB_ERR_OK) {
-		assert(false);
-		return err;
-	}
+	cbor_decode_map_end(nb->cs);
 
 	nb->active_group = top_block(nb->cs)->group;
-	//TEMP_ASSERT(nb->active_group != NULL);
+
 	diag_dedent_proto(&nb->diag);
-	diag_log_proto(&nb->diag, "} /* %s */",
-		ended_group ? ended_group->name : "<none>");
+	diag_log_proto(&nb->diag, "} /* %s */", ended_group->name);
 
 	return NB_ERR_OK;
 }
@@ -209,17 +221,17 @@ void nb_recv_u64(struct nb *nb, uint64_t *u64)
 
 void nb_recv_bool(struct nb *nb, bool *b)
 {
-	enum cbor_sval sval;
-	cbor_decode_sval(nb->cs, &sval);
-	*b = (sval == CBOR_SVAL_TRUE);
-	diag_log_proto(&nb->diag, "simple(%u)", sval);
+	const char *sval_name;
+	cbor_decode_bool(nb->cs, b);
+	sval_name = diag_get_sval_name(&nb->diag, *b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
+	assert(sval_name != NULL);
+	diag_log_proto(&nb->diag, "%s", sval_name);
 }
 
 
 void nb_recv_string(struct nb *nb, char **str)
 {
-	size_t len;
-	cbor_decode_text(nb->cs, (nb_byte_t **)str, &len);
+	cbor_decode_text(nb->cs, str);
 	diag_log_proto(&nb->diag, "\"%s\"", *str);
 }
 
@@ -228,8 +240,13 @@ void nb_recv_array_end(struct nb *nb)
 {
 	struct nb_attr *attr;
 
+	if (cbor_block_stack_empty(nb->cs))
+		nb_error(nb, NB_ERR_OPER, "Cannot end group, there's no group open");
+
 	attr = top_block(nb->cs)->attr;
+	assert(attr != NULL);
+
 	cbor_decode_array_end(nb->cs);
 	diag_dedent_proto(&nb->diag);
-	diag_log_proto(&nb->diag, "] /* %s */", attr ? attr->name : "?");
+	diag_log_proto(&nb->diag, "] /* %s */", attr->name);
 }

@@ -77,8 +77,6 @@ void deserialize_attr_bgp_community(struct cbor_stream *cs, struct rte_attr *att
 
 static void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 {
-	size_t foo;
-
 	cbor_decode_int32(cs, (int32_t *)&attr->type);
 	deserialize_bool(cs, &attr->tflag);
 
@@ -103,8 +101,8 @@ static void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 		cbor_decode_uint32(cs, &attr->aggr.as_no);
 		break;
 	case RTE_ATTR_TYPE_OTHER:
-		cbor_decode_text(cs, (nb_byte_t **)&attr->other_attr.key, &foo);
-		cbor_decode_text(cs, (nb_byte_t **)&attr->other_attr.value, &foo);
+		cbor_decode_text(cs, &attr->other_attr.key);
+		cbor_decode_text(cs, &attr->other_attr.value);
 		break;
 	}
 }
@@ -113,12 +111,11 @@ static void deserialize_rte_attr(struct cbor_stream *cs, struct rte_attr *attr)
 void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 {
 	size_t i;
-	size_t foo;
 	struct cbor_item item;
 
 	deserialize_ipv4_net(cs, &rte->netaddr, &rte->netmask);
 	deserialize_ipv4(cs, &rte->gwaddr);
-	cbor_decode_text(cs, (nb_byte_t **)&rte->ifname, &foo);
+	cbor_decode_text(cs, &rte->ifname);
 	deserialize_time(cs, &rte->uplink);
 
 	deserialize_bool(cs, &rte->uplink_from_valid);
@@ -147,7 +144,6 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 	struct diag diag;
 	struct rt *rt;
 	size_t i;
-	size_t foo;
 
 	cs = cbor_stream_new(buf);
 	diag_init(&diag, cs, stderr);
@@ -155,7 +151,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 	cbor_stream_set_diag(cs, &diag);
 	rt = nb_malloc(sizeof(*rt));
 
-	cbor_decode_text(cs, (nb_byte_t **)&rt->version_str, &foo);
+	cbor_decode_text(cs, &rt->version_str);
 
 	rt->entries = array_new(256, sizeof(*rt->entries));
 	for (i = 0; !nb_buf_is_eof(buf); i++) {

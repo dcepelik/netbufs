@@ -51,6 +51,8 @@ nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int oflags, int mo
 nb_err_t nb_buf_open_stdin(struct nb_buf *buf);
 nb_err_t nb_buf_open_stdout(struct nb_buf *buf);
 
+nb_err_t nb_buf_open_fd(struct nb_buf *buf, int fd);
+
 nb_err_t nb_buf_open_memory(struct nb_buf *buf);
 
 void nb_buf_close(struct nb_buf *buf);

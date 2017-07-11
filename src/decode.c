@@ -435,6 +435,23 @@ nb_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *sval)
 }
 
 
+nb_err_t cbor_decode_bool(struct cbor_stream *cs, bool *b)
+{
+	enum cbor_sval sval;
+	nb_err_t err;
+
+	if ((err = cbor_decode_sval(cs, &sval)) != NB_ERR_OK)
+		return err;
+
+	if (sval != CBOR_SVAL_TRUE && sval != CBOR_SVAL_FALSE)
+		return error(cs, NB_ERR_RANGE, "expected bool, but the decoded simple "
+			"value was neither true nor false");
+
+	*b = (sval == CBOR_SVAL_TRUE);
+	return NB_ERR_OK;
+}
+
+
 static nb_err_t decode_break(struct cbor_stream *cs)
 {
 	struct cbor_item item;
@@ -685,7 +702,7 @@ nb_err_t cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 }
 
 
-nb_err_t cbor_decode_text(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
+static nb_err_t decode_text(struct cbor_stream *cs, char **str, size_t *len)
 {
 	struct cbor_item item;
 	nb_err_t err;
@@ -693,12 +710,19 @@ nb_err_t cbor_decode_text(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) != NB_ERR_OK)
 		return err;
 
-	if ((err = cbor_decode_stream0(cs, &item, str, len)) != NB_ERR_OK)
+	if ((err = cbor_decode_stream0(cs, &item, (nb_byte_t **)str, len)) != NB_ERR_OK)
 		return err;
 
 	diag_log_cbor(cs->diag, "\"%s\"", *str);
 	diag_finish_item(cs);
 	return NB_ERR_OK;
+}
+
+
+nb_err_t cbor_decode_text(struct cbor_stream *cs, char **str)
+{
+	size_t unused;
+	return decode_text(cs, str, &unused);
 }
 
 
@@ -793,7 +817,7 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_BYTES:
 		return cbor_decode_bytes(cs, &item->bytes, &item->len);
 	case CBOR_TYPE_TEXT:
-		return cbor_decode_text(cs, (nb_byte_t **)&item->str, &item->len);
+		return decode_text(cs, &item->str, &item->len);
 	case CBOR_TYPE_ARRAY:
 		if (!item->indefinite)
 			err = cbor_decode_array_begin(cs, &item->len);

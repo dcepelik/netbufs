@@ -46,7 +46,7 @@ static void serialize_bool(struct cbor_stream *cs, bool b)
 
 static void serialize_string(struct cbor_stream *cs, char *str)
 {
-	cbor_encode_text(cs, (nb_byte_t *)str, strlen(str));
+	cbor_encode_text(cs, str);
 }
 
 
@@ -76,7 +76,7 @@ void serialize_bc_ex1(struct rt *rt, struct nb_buf *buf)
 	serialize_ipv4(cs, &rte->gwaddr);
 
 	serialize_string(cs, "ifname");
-	cbor_encode_text(cs, (nb_byte_t *)rte->ifname, strlen(rte->ifname));
+	cbor_encode_text(cs, rte->ifname);
 
 	serialize_string(cs, "uplink");
 	serialize_time(cs, &rte->uplink);

@@ -123,4 +123,6 @@ void diag_log_proto_internal(struct diag *diag, char *msg, ...);
 void diag_log_sval(struct diag *diag, uint64_t u64);
 void diag_print_block_stack(struct diag *diag);
 
+const char *diag_get_sval_name(struct diag *diag, enum cbor_sval sval);
+
 #endif

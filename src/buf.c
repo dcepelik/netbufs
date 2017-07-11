@@ -338,7 +338,12 @@ static nb_err_t open_fd(struct nb_buf *buf, int fd)
 }
 
 
-/* TODO DRY */
+nb_err_t nb_buf_open_fd(struct nb_buf *buf, int fd)
+{
+	return open_fd(buf, fd);
+}
+
+
 nb_err_t nb_buf_open_stdout(struct nb_buf *buf)
 {
 	return open_fd(buf, STDOUT_FILENO);

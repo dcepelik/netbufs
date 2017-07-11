@@ -38,10 +38,29 @@ static struct option longopts[] = {
 static void usage(int status)
 {
 	fprintf(stderr, "Usage: %s [OPTION]... [FILE]\n\n", argv0);
-	fprintf(stderr, "With no FILE or when FILE is -, read stdin.\n\n");
-	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "\t%-20sWrite output to FILE instead of stdout\n", "-o, --output=FILE");
-	fprintf(stderr, "\t%-20sRead the data and write it back\n", "-r, --roundtrip");
+
+	fprintf(stderr, "With no FILE or when FILE is -, read stdin. Default columns are -04.\n\n");
+
+	fprintf(stderr, "Mode switch:\n");
+	fprintf(stderr, "  -m, --mirror    Mirror the CBOR stream (pass-through)\n\n");
+
+	fprintf(stderr, "Column selection options:\n");
+	fprintf(stderr, "  -0    Print stream offset column\n");
+	fprintf(stderr, "  -1    Print raw data column\n");
+	fprintf(stderr, "  -2    Print CBOR items column\n");
+	fprintf(stderr, "  -3    Print CBOR Diagnostic Notation column\n");
+	fprintf(stderr, "  -4    Print NetBufs diagnostics data column\n\n");
+
+	fprintf(stderr, "Formatting options:\n");
+	fprintf(stderr, "  -e, --escape              Escape special characters in text\n");
+	fprintf(stderr, "  -t, --trim-text=NUM       Limit text output to NUM characters\n");
+	fprintf(stderr, "  -b, --trim-bytes=NUM      Limit bytes output to NUM bytes\n");
+	fprintf(stderr, "  -i, --indent-char=CHAR    Use CHAR for indentation (dot by default)\n");
+	fprintf(stderr, "  -I, --indent-size=NUM     Indent size is NUM chars\n\n");
+
+	fprintf(stderr, "Other options:\n");
+	fprintf(stderr, "  -o, --output=FILE     Write output to FILE instead of stdout\n");
+	fprintf(stderr, "  --help                Print this message and exit\n\n");
 	exit(status);
 }
 

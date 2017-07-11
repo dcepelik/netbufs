@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef int			nb_lid_t;
+typedef int		nb_lid_t;
 typedef	uint64_t	nb_pid_t;
 
 /* TODO hide this */
@@ -29,15 +29,31 @@ struct nb_group
 	nb_lid_t *pid_to_lid;
 };
 
+struct nb;
+
+void nb_default_err_handler(struct nb *nb, nb_err_t err, void *arg);
+typedef void (nb_err_handler_t)(struct nb *nb, nb_err_t err, void *arg);
+
+/*
+ * NetBufs execution context.
+ */
 struct nb
 {
 	struct cbor_stream *cs;
 	struct nb_group **groups;
 	struct diag diag;
-	struct nb_group groups_ns;			/* groups namespace */
+	struct nb_group groups_ns;		/* groups namespace */
 	struct nb_group *active_group;
 	struct nb_attr *cur_attr;
+
+	nb_err_t err;				/* last error which occured */
+	struct strbuf err_msg;			/* error message buffer */
+	nb_err_handler_t *err_handler;		/* error handler */
+	void *err_arg;				/* extra argument to the error handler */
 };
+
+void nb_set_err_handler(struct nb *nb, nb_err_handler_t *handler, void *arg);
+char *nb_strerror(struct nb *nb);
 
 #define	nb_recv_array(nb, arr) \
 	do { \
@@ -45,7 +61,6 @@ struct nb
 		diag_log_proto(&nb->diag, "["); \
 		diag_indent_proto(&nb->diag); \
 	} while (0);
-
 
 size_t nb_internal_recv_array_size(struct nb *nb);
 

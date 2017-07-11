@@ -100,16 +100,16 @@ void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag)
 }
 
 
-nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
+nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *msg, ...)
 {
 	assert(err != NB_ERR_OK);
 
 	va_list args;
 
 	cs->err = err;
-	va_start(args, str);
+	va_start(args, msg);
 	strbuf_reset(&cs->err_buf);
-	strbuf_vprintf_at(&cs->err_buf, 0, str, args);
+	strbuf_vprintf_at(&cs->err_buf, 0, msg, args);
 	va_end(args);
 
 	cs->error_handler(cs, err, cs->error_handler_arg);
@@ -118,7 +118,8 @@ nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...)
 }
 
 
-nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len)
+nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite,
+	uint64_t len)
 {
 	struct block *block;
 	struct nb_group *active_group = NULL;
@@ -149,6 +150,8 @@ struct block *top_block(struct cbor_stream *cs)
 
 void cbor_default_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 {
+	(void) arg;
+
 	diag_log_raw(cs->diag, NULL, 0); /* TODO hack */
 	fprintf(stderr, "%s: encoding/decoding error #%i: %s.\n",
 		__func__, err, cbor_stream_strerror(cs));

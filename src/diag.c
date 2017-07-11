@@ -312,3 +312,20 @@ void diag_print_block_stack(struct diag *diag)
 		i++;
 	}
 }
+
+
+const char *diag_get_sval_name(struct diag *diag, enum cbor_sval sval)
+{
+	switch (sval) {
+	case CBOR_SVAL_FALSE:
+		return "false";
+	case CBOR_SVAL_TRUE:
+		return "true";
+	case CBOR_SVAL_NULL:
+		return "null";
+	case CBOR_SVAL_UNDEF:
+		return "undefined";
+	default:
+		return NULL; /* not a named sval */
+	}
+}
