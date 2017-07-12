@@ -131,12 +131,14 @@ static void cbor_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 
 void serialize_cbor(struct rt *rt, struct nb_buf *buf)
 {
-	struct cbor_stream *cs;
+	struct cbor_stream cs;
 	size_t i;
 
-	cs = cbor_stream_new(buf);
-	cbor_encode_text(cs, rt->version_str);
+	cbor_stream_init(&cs, buf);
+	cbor_encode_text(&cs, rt->version_str);
 	
 	for (i = 0; i < array_size(rt->entries); i++)
-		serialize_rte(cs, &rt->entries[i]);
+		serialize_rte(&cs, &rt->entries[i]);
+
+	cbor_stream_free(&cs);
 }

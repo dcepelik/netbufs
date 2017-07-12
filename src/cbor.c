@@ -8,6 +8,8 @@
 
 #include <assert.h>
 
+#define MEMPOOL_BLOCK_SIZE	(32 * sizeof(struct cbor_item))
+
 
 const char *cbor_type_string(enum cbor_type type)
 {
@@ -40,36 +42,29 @@ const char *cbor_type_string(enum cbor_type type)
 }
 
 
-struct cbor_stream *cbor_stream_new(struct nb_buf *buf)
+void cbor_stream_init(struct cbor_stream *cs, struct nb_buf *buf)
 {
-	struct cbor_stream *cs;
-
-	cs = nb_malloc(sizeof(*cs));
 	cs->buf = buf;
+	cs->mempool = mempool_new(MEMPOOL_BLOCK_SIZE);
+
 	cs->err = NB_ERR_OK;
 	cs->error_handler = cbor_default_error_handler;
+	cs->error_handler_arg = NULL;
 	cs->peeking = false;
 
-	strbuf_init(&cs->err_buf, 24); /* TODO change strbuf API and return error flags? */
+	strbuf_init(&cs->err_buf, 24);
 
-	if (!stack_init(&cs->blocks, 4, sizeof(struct block))) {
-		xfree(cs);
-		return NULL; /* lift to NB_ERR_NOMEM */
-	}
-	
-	/* assert: cannot fail, stack was initialized to size >= 1 */
-	assert(push_block(cs, -1, true, 0) == NB_ERR_OK);
+	stack_init(&cs->blocks, 4, sizeof(struct block));
+	push_block(cs, -1, true, 0);
 	top_block(cs)->group = NULL;
-
-	return cs;
 }
 
 
-void cbor_stream_delete(struct cbor_stream *cs)
+void cbor_stream_free(struct cbor_stream *cs)
 {
 	strbuf_free(&cs->err_buf);
 	stack_free(&cs->blocks);
-	xfree(cs);
+	mempool_delete(cs->mempool);
 }
 
 

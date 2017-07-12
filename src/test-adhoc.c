@@ -1,3 +1,5 @@
+/* TODO update this or delete this */
+
 #include "cbor.h"
 #include "debug.h"
 #include "util.h"
@@ -252,7 +254,7 @@ void nesting_test_encode(struct cbor_stream *cs)
 int main(int argc, char *argv[])
 {
 	struct nb_buf *out;
-	struct cbor_stream *cs;
+	struct cbor_stream cs;
 	nb_err_t err;
 	int mode;
 	int oflags;
@@ -265,29 +267,27 @@ int main(int argc, char *argv[])
 
 	assert(nb_buf_open_file(out, "../tests/libcbor/arrays+maps.cbor", oflags, mode) == NB_ERR_OK);
 
-	cs = cbor_stream_new(out);
-	assert(cs);
-
-	cs->fail_on_error = true;
+	cbor_stream_new(&cs, out);
 
 	uqueen = (unsigned char *)queen;
-	//array_test_encode(cs);
-	//integers_test_encode(cs);
-	//bytes_test_encode(cs);
-	//text_test_encode(cs);
-	//tags_test_encode(cs);
-	//map_test_encode(cs);
-	//bigmap_test_encode(cs);
-	//nesting_test_encode(cs);
-	arraysnmaps_test_encode(cs);
+	//array_test_encode(&cs);
+	//integers_test_encode(&cs);
+	//bytes_test_encode(&cs);
+	//text_test_encode(&cs);
+	//tags_test_encode(&cs);
+	//map_test_encode(&cs);
+	//bigmap_test_encode(&cs);
+	//nesting_test_encode(&cs);
+	arraysnmaps_test_encode(&cs);
 
 	if (cs->err != NB_ERR_OK) {
 		fprintf(stderr, "Error while encoding the stream: %s\n",
-			cbor_stream_strerror(cs));
+			cbor_stream_strerror(&cs));
 		return EXIT_FAILURE;
 	}
 
 	nb_buf_close(out);
-	cbor_stream_delete(cs);
+	cbor_stream_free(&cs);
+
 	return EXIT_SUCCESS;
 }

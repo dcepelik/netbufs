@@ -548,7 +548,7 @@ nb_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
 	if ((err = decode_block_start(cs, CBOR_TYPE_ARRAY, true, &foo)) != NB_ERR_OK)
 		return err;
 
-	diag_log_cbor(cs->diag, "[_");
+	diag_log_cbor(cs->diag, cs->diag->print_json ? "[" : "[_");
 	diag_eol(cs->diag, false);
 	diag_increase(cs->diag);
 
@@ -599,7 +599,7 @@ nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs)
 	if ((err = decode_block_start(cs, CBOR_TYPE_MAP, true, &foo)) != NB_ERR_OK)
 		return err;
 
-	diag_log_cbor(cs->diag, "{_");
+	diag_log_cbor(cs->diag, cs->diag->print_json ? "{" : "{_");
 	diag_eol(cs->diag, false);
 	diag_increase(cs->diag);
 

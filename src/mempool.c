@@ -2,8 +2,8 @@
  * mempool:
  * Default Implementation of a Memory Pool
  *
- * Taken from the MCC project at github.com/dcepelik/mcc.
- * Copyright (c) 2016-2017 David Čepelík <d@dcepelik.cz>
+ * Taken from the MCC project (c) 2016 David Čepelík <d@dcepelik.cz>
+ * See github.com/dcepelik/mcc.
  */
 
 #include "common.h"
@@ -116,7 +116,7 @@ static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size
 }
 
 
-void *mempool_alloc(struct mempool *pool, size_t size)
+void *mempool_malloc(struct mempool *pool, size_t size)
 {
 	DEBUG_PRINTF("Alloc request, size = %zu B", size);
 
@@ -143,7 +143,7 @@ void *mempool_memcpy(struct mempool *pool, void *src, size_t len)
 	if (!src)
 		return NULL;
 
-	dst = mempool_alloc(pool, len);
+	dst = mempool_malloc(pool, len);
 
 	DEBUG_EXPR("%lu", len);
 
@@ -161,7 +161,7 @@ char *mempool_strdup(struct mempool *pool, char *orig)
 		return NULL;
 
 	len = strlen(orig);
-	dup = mempool_alloc(pool, len + 1);
+	dup = mempool_malloc(pool, len + 1);
 
 	memcpy(dup, orig, len + 1);
 	dup[len] = '\0';
@@ -188,11 +188,12 @@ struct mempool *mempool_new(size_t block_size)
 }
 
 
-//void mempool_free(struct mempool *pool)
-//{
-//	mempool_free_chain(&pool->small);
-//	mempool_free_chain(&pool->big);
-//}
+void mempool_delete(struct mempool *pool)
+{
+	struct mempool pool_copy = *pool;
+	mempool_free_chain(&pool_copy.small);
+	mempool_free_chain(&pool_copy.big);
+}
 
 
 static void print_chain_stats(struct mempool_chain *chain)

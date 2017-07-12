@@ -104,6 +104,7 @@ struct diag
 	char indent_char;			/* character used for indentation */
 	size_t indent_size;			/* indentation size */
 	bool cols_enabled[DIAG_NUM_COLS];	/* which columns are enabled? */
+	bool print_json;			/* print JSON instead of CBOR Diagnostic Notation */
 };
 
 struct cbor_stream;

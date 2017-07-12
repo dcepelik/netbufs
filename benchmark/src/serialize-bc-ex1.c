@@ -55,53 +55,55 @@ void serialize_bc_ex1(struct rt *rt, struct nb_buf *buf)
 	assert(array_size(rt->entries) >= 1);
 
 	struct rte *rte;
-	struct cbor_stream *cs;
+	struct cbor_stream cs;
 	struct diag diag;
 	size_t i;
 
 	rte = &rt->entries[0];
-	cs = cbor_stream_new(buf);
+	cbor_stream_init(&cs, buf);
 	diag_init(&diag, stderr);
-	cbor_stream_set_diag(cs, &diag);
+	cbor_stream_set_diag(&cs, &diag);
 
-	cbor_encode_map_begin_indef(cs);
+	cbor_encode_map_begin_indef(&cs);
 
-	serialize_string(cs, "netaddr");
-	serialize_ipv4(cs, &rte->netaddr);
+	serialize_string(&cs, "netaddr");
+	serialize_ipv4(&cs, &rte->netaddr);
 
-	serialize_string(cs, "netmask");
-	cbor_encode_int32(cs, rte->netmask);
+	serialize_string(&cs, "netmask");
+	cbor_encode_int32(&cs, rte->netmask);
 
-	serialize_string(cs, "gwaddr");
-	serialize_ipv4(cs, &rte->gwaddr);
+	serialize_string(&cs, "gwaddr");
+	serialize_ipv4(&cs, &rte->gwaddr);
 
-	serialize_string(cs, "ifname");
-	cbor_encode_text(cs, rte->ifname);
+	serialize_string(&cs, "ifname");
+	cbor_encode_text(&cs, rte->ifname);
 
-	serialize_string(cs, "uplink");
-	serialize_time(cs, &rte->uplink);
+	serialize_string(&cs, "uplink");
+	serialize_time(&cs, &rte->uplink);
 
-	serialize_string(cs, "uplink_from_valid");
-	serialize_bool(cs, rte->uplink_from_valid);
+	serialize_string(&cs, "uplink_from_valid");
+	serialize_bool(&cs, rte->uplink_from_valid);
 
 	if (rte->uplink_from_valid) {
-		serialize_string(cs, "uplink_from");
-		serialize_ipv4(cs, &rte->uplink_from);
+		serialize_string(&cs, "uplink_from");
+		serialize_ipv4(&cs, &rte->uplink_from);
 	}
 
-	serialize_string(cs, "as_no_valid");
-	serialize_bool(cs, rte->as_no_valid);
+	serialize_string(&cs, "as_no_valid");
+	serialize_bool(&cs, rte->as_no_valid);
 
 	if (rte->as_no_valid) {
-		serialize_string(cs, "as_no");
-		cbor_encode_uint64(cs, rte->as_no);
+		serialize_string(&cs, "as_no");
+		cbor_encode_uint64(&cs, rte->as_no);
 	}
 
-	serialize_string(cs, "src");
-	cbor_encode_uint32(cs, rte->src);
+	serialize_string(&cs, "src");
+	cbor_encode_uint32(&cs, rte->src);
 
-	serialize_string(cs, "type");
-	cbor_encode_int32(cs, rte->type);
+	serialize_string(&cs, "type");
+	cbor_encode_int32(&cs, rte->type);
 
-	cbor_encode_map_end(cs);
+	cbor_encode_map_end(&cs);
+
+	cbor_stream_free(&cs);
 }

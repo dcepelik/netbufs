@@ -11,7 +11,7 @@
 #define NB_GROUPS_INIT_SIZE	4
 #define NB_ATTRS_INIT_SIZE	4
 #define NB_ERR_MSG_INIT_LEN	4
-#define NB_MEMPOOL_BLOCK_SIZE	256
+#define NB_MEMPOOL_BLOCK_SIZE	(16 * sizeof(struct nb_group))
 
 
 static void init_group(struct nb *nb, struct nb_group *group, const char *name)
@@ -40,14 +40,15 @@ static void handle_cbor_error(struct cbor_stream *cs, nb_err_t err, void *arg)
 void nb_init(struct nb *nb, struct nb_buf *buf)
 {
 	nb->mempool = mempool_new(NB_MEMPOOL_BLOCK_SIZE);
-	nb->cs = cbor_stream_new(buf);
-	cbor_stream_set_error_handler(nb->cs, handle_cbor_error, nb);
+
+	cbor_stream_init(&nb->cs, buf);
+	cbor_stream_set_error_handler(&nb->cs, handle_cbor_error, nb);
 
 	/* TODO clean-up */
 	diag_init(&nb->diag, stderr);
 	nb->diag.enabled = true;
 	nb->active_group = NULL;
-	cbor_stream_set_diag(nb->cs, &nb->diag);
+	cbor_stream_set_diag(&nb->cs, &nb->diag);
 
 	init_group(nb, &nb->groups_ns, NULL);
 	strbuf_init(&nb->err_msg, NB_ERR_MSG_INIT_LEN);
@@ -59,62 +60,11 @@ void nb_init(struct nb *nb, struct nb_buf *buf)
 }
 
 
-void nb_set_err_handler(struct nb *nb, nb_err_handler_t *handler, void *arg)
-{
-	nb->err_handler = handler;
-	nb->err_arg = arg;
-}
-
-
-char *nb_strerror(struct nb *nb)
-{
-	return strbuf_get_string(&nb->err_msg);
-}
-
-
-void nb_default_err_handler(struct nb *nb, nb_err_t err, void *arg)
-{
-	(void) arg;
-	fprintf(stderr, "%s: NetBufs error: #%i: %s.\n", __func__, err,
-		nb_strerror(nb));
-	exit(EXIT_FAILURE);
-}
-
-
 void nb_free(struct nb *nb)
 {
-	cbor_stream_delete(nb->cs);
+	cbor_stream_free(&nb->cs);
 	array_delete(nb->groups);
-}
-
-
-struct nb_group *nb_group(struct nb *nb, nb_lid_t id, const char *name)
-{
-	assert(id >= 0);
-
-	struct nb_group *group;
-	group = nb_malloc(sizeof(*group));
-	init_group(nb, group, name);
-
-	nb->groups = array_ensure_index(nb->groups, id);
-	nb_bind(&nb->groups_ns, id, name, false);
-	return nb->groups[id] = group;
-}
-
-
-void nb_bind(struct nb_group *group, nb_lid_t id, const char *name, bool reqd)
-{
-	assert(id >= 0);
-
-	struct nb_attr *attr;
-
-	attr = nb_malloc(sizeof(*attr));
-	attr->name = name;
-	attr->reqd = reqd;
-	attr->pid = 0;
-
-	group->attrs = array_ensure_index(group->attrs, id);
-	group->attrs[id] = attr;
+	mempool_delete(nb->mempool);
 }
 
 
@@ -131,4 +81,56 @@ nb_err_t nb_error(struct nb *nb, nb_err_t err, char *msg, ...)
 	nb->err_handler(nb, err, nb->err_arg);
 
 	return err;
+}
+
+
+void nb_default_err_handler(struct nb *nb, nb_err_t err, void *arg)
+{
+	(void) arg;
+	fprintf(stderr, "%s: NetBufs error: #%i: %s.\n", __func__, err,
+		nb_strerror(nb));
+	exit(EXIT_FAILURE);
+}
+
+
+void nb_set_err_handler(struct nb *nb, nb_err_handler_t *handler, void *arg)
+{
+	nb->err_handler = handler;
+	nb->err_arg = arg;
+}
+
+
+char *nb_strerror(struct nb *nb)
+{
+	return strbuf_get_string(&nb->err_msg);
+}
+
+
+struct nb_group *nb_group(struct nb *nb, nb_lid_t id, const char *name)
+{
+	assert(id >= 0);
+
+	struct nb_group *group;
+	group = mempool_malloc(nb->mempool, sizeof(*group));
+	init_group(nb, group, name);
+
+	nb->groups = array_ensure_index(nb->groups, id);
+	nb_bind(nb, &nb->groups_ns, id, name, false);
+	return nb->groups[id] = group;
+}
+
+
+void nb_bind(struct nb *nb, struct nb_group *group, nb_lid_t id, const char *name, bool reqd)
+{
+	assert(id >= 0);
+
+	struct nb_attr *attr;
+
+	attr = mempool_malloc(nb->mempool, sizeof(*attr));
+	attr->name = name;
+	attr->reqd = reqd;
+	attr->pid = 0;
+
+	group->attrs = array_ensure_index(group->attrs, id);
+	group->attrs[id] = attr;
 }

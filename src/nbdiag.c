@@ -29,14 +29,14 @@
 
 
 static const char *argv0;
-static const char *optstring = "01234b:i:I:emo:t:h";
+static const char *optstring = "01234b:i:I:emo:t:Jh";
 
 static char *fname_in = "-";
 static char *fname_out = "-";
 static struct nb_buf *buf_in;
 static struct nb_buf *buf_out;
-static struct cbor_stream *cbor_in;
-static struct cbor_stream *cbor_out;
+static struct cbor_stream cbor_in;
+static struct cbor_stream cbor_out;
 
 bool cols_given;
 static struct diag diag;
@@ -45,7 +45,6 @@ bool mirror;
 
 static struct option longopts[] = {
 	{ "escape",		no_argument,		0,	'e' },
-	{ "help",		no_argument,		0, 	'r' },
 	{ "indent-char",	required_argument,	0,	'i' },
 	{ "indent-size",	required_argument,	0,	'I' },
 	{ "mirror",		no_argument,		0,	'm' },
@@ -53,6 +52,7 @@ static struct option longopts[] = {
 	{ "trim-bytes",		required_argument,	0,	'b' },
 	{ "trim-text",		required_argument,	0,	't' },
 	{ "help",		no_argument,		0,	'h' },
+	{ "json",		no_argument,		0,	'J' },
 	{ 0,			0,			0,	0 },
 };
 
@@ -64,7 +64,8 @@ static void usage(int status)
 	fprintf(stderr, "With no FILE or when FILE is -, read stdin. Default columns are -04.\n\n");
 
 	fprintf(stderr, "Mode switch:\n");
-	fprintf(stderr, "  -m, --mirror    Mirror the CBOR stream (pass-through)\n\n");
+	fprintf(stderr, "  -m, --mirror    Mirror the CBOR stream (pass-through)\n");
+	fprintf(stderr, "  -J, --json      Print JSON instead of CBOR Diagnostic Notation\n\n");
 
 	fprintf(stderr, "Column selection options:\n");
 	fprintf(stderr, "  -0    Print stream offset column\n");
@@ -169,6 +170,9 @@ static void parse_args(int argc, char *argv[])
 		case 'o':
 			fname_out = optarg;
 			break;
+		case 'J':
+			diag.print_json = true;
+			break;
 		case 'h':
 			usage(EXIT_SUCCESS);
 		default:
@@ -192,8 +196,8 @@ static void mirror_stream(void)
 	nb_err_t err;
 
 	while (!nb_buf_is_eof(buf_in)) {
-		cbor_decode_item(cbor_in, &item);
-		cbor_encode_item(cbor_out, &item);
+		cbor_decode_item(&cbor_in, &item);
+		cbor_encode_item(&cbor_out, &item);
 	}
 }
 
@@ -208,10 +212,10 @@ int main(int argc, char *argv[])
 	parse_args(argc, argv);
 
 	buf_in = nb_buf_new();
-	cbor_in = cbor_stream_new(buf_in);
+	cbor_stream_init(&cbor_in, buf_in);
 
 	buf_out = nb_buf_new();
-	cbor_out = cbor_stream_new(buf_out);
+	cbor_stream_init(&cbor_out, buf_out);
 
 	if (fname_in && strcmp(fname_in, "-") != 0)
 		err = nb_buf_open_file(buf_in, fname_in, O_RDONLY, 0);
@@ -236,12 +240,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (!mirror) {
-		cbor_stream_set_diag(cbor_in, &diag);
-		cbor_stream_set_error_handler(cbor_in, cbor_err_handler, &diag);
-		diag_dump_cbor_stream(&diag, cbor_in);
+		cbor_stream_set_diag(&cbor_in, &diag);
+		cbor_stream_set_error_handler(&cbor_in, cbor_err_handler, &diag);
+		diag_dump_cbor_stream(&diag, &cbor_in);
 		diag_free(&diag);
 
-		if (!cbor_block_stack_empty(cbor_in)) {
+		if (!cbor_block_stack_empty(&cbor_in)) {
 			fprintf(stderr, "%s: warning: some blocks are still open after EOF\n", argv0);
 			return 2;
 		}
@@ -251,10 +255,10 @@ int main(int argc, char *argv[])
 	}
 
 	nb_buf_close(buf_in);
-	cbor_stream_delete(cbor_in);
+	cbor_stream_free(&cbor_in);
 
 	nb_buf_close(buf_out);
-	cbor_stream_delete(cbor_out);
+	cbor_stream_free(&cbor_out);
 
 	return EXIT_SUCCESS;
 }

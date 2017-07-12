@@ -1,3 +1,4 @@
 cbor/rfc/
 cbor/random/
 vgcore.*
+*.test

@@ -41,12 +41,12 @@ typedef void (nb_err_handler_t)(struct nb *nb, nb_err_t err, void *arg);
 struct nb
 {
 	mempool_t mempool;			/* memory pool for this NetBuf */
-	struct cbor_stream *cs;
-	struct nb_group **groups;
-	struct diag diag;
+	struct cbor_stream cs;			/* CBOR stream do encode/decode */
+	struct nb_group **groups;		/* array of defined NB groups */
+	struct diag diag;			/* diagnostics buffer */
 	struct nb_group groups_ns;		/* groups namespace (bit of a hack) */
-	struct nb_group *active_group;
-	struct nb_attr *cur_attr;
+	struct nb_group *active_group;		/* (recv) currently active group */
+	struct nb_attr *cur_attr;		/* (recv) currently processed attribute */
 
 	nb_err_t err;				/* last error which occured */
 	struct strbuf err_msg;			/* error message buffer */
@@ -70,7 +70,7 @@ size_t nb_internal_recv_array_size(struct nb *nb);
 void nb_init(struct nb *nb, struct nb_buf *buf);
 void nb_free(struct nb *nb);
 
-void nb_bind(struct nb_group *group, nb_lid_t id, const char *name, bool reqd);
+void nb_bind(struct nb *nb, struct nb_group *group, nb_lid_t id, const char *name, bool reqd);
 struct nb_group *nb_group(struct nb *nb, nb_lid_t id, const char *name);
 
 void nb_send_id(struct nb *nb, nb_lid_t id);

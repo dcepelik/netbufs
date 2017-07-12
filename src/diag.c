@@ -45,10 +45,12 @@ static void isbuf_dedent(struct isbuf *is)
 static void isbuf_vprintf(struct diag *diag, struct isbuf *is, char *msg, va_list args)
 {
 	size_t i;
+	char c;
 
 	if (is->indent_next) {
+		c = diag->print_json ? ' ' : diag->indent_char;
 		for (i = 0; i < diag->indent_size * is->indent_level; i++)
-			strbuf_putc(&is->sb, i % 2 == 0 ? diag->indent_char : ' ');
+			strbuf_putc(&is->sb, i % 2 == 0 ? c : ' ');
 		is->indent_next = false;
 	}
 
@@ -247,6 +249,7 @@ void diag_init(struct diag *diag, FILE *fout)
 	diag->str_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->indent_char = DIAG_DEFAULT_INDENT_CHAR;
 	diag->indent_size = DIAG_DEFAULT_INDENT_SIZE;
+	diag->print_json = false;
 }
 
 

@@ -14,15 +14,15 @@
 size_t nb_internal_recv_array_size(struct nb *nb)
 {
 	size_t nitems;
-	cbor_decode_array_begin(nb->cs, &nitems);
-	top_block(nb->cs)->attr = nb->cur_attr;
+	cbor_decode_array_begin(&nb->cs, &nitems);
+	top_block(&nb->cs)->attr = nb->cur_attr;
 	return nitems;
 }
 
 
 static void recv_pid(struct nb *nb, nb_pid_t *pid)
 {
-	cbor_decode_uint64(nb->cs, pid);
+	cbor_decode_uint64(&nb->cs, pid);
 }
 
 
@@ -34,7 +34,7 @@ static void recv_key(struct nb *nb, struct nb_group *group)
 	nb_lid_t lid;
 	nb_err_t err;
 
-	cbor_decode_text(nb->cs, &name);
+	cbor_decode_text(&nb->cs, &name);
 	recv_pid(nb, &pid);
 
 	group->pid_to_lid = array_ensure_index(group->pid_to_lid, pid);
@@ -57,7 +57,7 @@ static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 	nb_pid_t pid;
 
 recv_another_key:
-	if ((err = cbor_peek(nb->cs, &item)) != NB_ERR_OK) {
+	if ((err = cbor_peek(&nb->cs, &item)) != NB_ERR_OK) {
 		assert(err == NB_ERR_BREAK); /* other error would call error handler */
 		return false;
 	}
@@ -90,7 +90,7 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 {
 	struct nb_attr *attr;
 
-	//if (top_block(nb->cs)->num_items > 2)
+	//if (top_block(&nb->cs)->num_items > 2)
 		//diag_dedent_proto(&nb->diag);
 	
 	if (nb->active_group == NULL)
@@ -117,7 +117,7 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 	nb_lid_t id_real;
 	struct nb_group *group;
 
-	cbor_decode_map_begin_indef(nb->cs);
+	cbor_decode_map_begin_indef(&nb->cs);
 
 	recv_id(nb, &nb->groups_ns, &id_real);
 	if (id_real != 0)
@@ -133,7 +133,7 @@ void nb_recv_group(struct nb *nb, nb_lid_t id)
 
 	assert(group != NULL); /* if not, recv_id would fail */
 	nb->active_group = group;
-	top_block(nb->cs)->group = nb->active_group;
+	top_block(&nb->cs)->group = nb->active_group;
 
 	diag_log_proto(&nb->diag, "(%s) {", nb->active_group->name);
 	diag_indent_proto(&nb->diag);
@@ -146,15 +146,15 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 	nb_err_t err;
 	struct nb_group *ended_group;
 
-	ended_group = top_block(nb->cs)->group; /* in Czech: `skončivší', ha ha */
+	ended_group = top_block(&nb->cs)->group; /* in Czech: `skončivší', ha ha */
 	assert(ended_group != NULL); /* TODO check this */
 
-	//if (top_block(nb->cs)->num_items > 0)
+	//if (top_block(&nb->cs)->num_items > 0)
 		//diag_dedent_proto(&nb->diag);
 	
-	cbor_decode_map_end(nb->cs);
+	cbor_decode_map_end(&nb->cs);
 
-	nb->active_group = top_block(nb->cs)->group;
+	nb->active_group = top_block(&nb->cs)->group;
 
 	diag_dedent_proto(&nb->diag);
 	diag_log_proto(&nb->diag, "} /* %s */", ended_group->name);
@@ -165,56 +165,56 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 
 void nb_recv_i8(struct nb *nb, int8_t *i8)
 {
-	cbor_decode_int8(nb->cs, i8);
+	cbor_decode_int8(&nb->cs, i8);
 	diag_log_proto(&nb->diag, "%i", *i8);
 }
 
 
 void nb_recv_i16(struct nb *nb, int16_t *i16)
 {
-	cbor_decode_int16(nb->cs, i16);
+	cbor_decode_int16(&nb->cs, i16);
 	diag_log_proto(&nb->diag, "%i", *i16);
 }
 
 
 void nb_recv_i32(struct nb *nb, int32_t *i32)
 {
-	cbor_decode_int32(nb->cs, i32);
+	cbor_decode_int32(&nb->cs, i32);
 	diag_log_proto(&nb->diag, "%i", *i32);
 }
 
 
 void nb_recv_i64(struct nb *nb, int64_t *i64)
 {
-	cbor_decode_int64(nb->cs, i64);
+	cbor_decode_int64(&nb->cs, i64);
 	diag_log_proto(&nb->diag, "%li", *i64);
 }
 
 
 void nb_recv_u8(struct nb *nb, uint8_t *u8)
 {
-	cbor_decode_uint8(nb->cs, u8);
+	cbor_decode_uint8(&nb->cs, u8);
 	diag_log_proto(&nb->diag, "%u", *u8);
 }
 
 
 void nb_recv_u16(struct nb *nb, uint16_t *u16)
 {
-	cbor_decode_uint16(nb->cs, u16);
+	cbor_decode_uint16(&nb->cs, u16);
 	diag_log_proto(&nb->diag, "%u", *u16);
 }
 
 
 void nb_recv_u32(struct nb *nb, uint32_t *u32)
 {
-	cbor_decode_uint32(nb->cs, u32);
+	cbor_decode_uint32(&nb->cs, u32);
 	diag_log_proto(&nb->diag, "%u", *u32);
 }
 
 
 void nb_recv_u64(struct nb *nb, uint64_t *u64)
 {
-	cbor_decode_uint64(nb->cs, u64);
+	cbor_decode_uint64(&nb->cs, u64);
 	diag_log_proto(&nb->diag, "%lu", *u64);
 }
 
@@ -222,7 +222,7 @@ void nb_recv_u64(struct nb *nb, uint64_t *u64)
 void nb_recv_bool(struct nb *nb, bool *b)
 {
 	const char *sval_name;
-	cbor_decode_bool(nb->cs, b);
+	cbor_decode_bool(&nb->cs, b);
 	sval_name = diag_get_sval_name(&nb->diag, *b ? CBOR_SVAL_TRUE : CBOR_SVAL_FALSE);
 	assert(sval_name != NULL);
 	diag_log_proto(&nb->diag, "%s", sval_name);
@@ -231,7 +231,7 @@ void nb_recv_bool(struct nb *nb, bool *b)
 
 void nb_recv_string(struct nb *nb, char **str)
 {
-	cbor_decode_text(nb->cs, str);
+	cbor_decode_text(&nb->cs, str);
 	diag_log_proto(&nb->diag, "\"%s\"", *str);
 }
 
@@ -240,13 +240,13 @@ void nb_recv_array_end(struct nb *nb)
 {
 	struct nb_attr *attr;
 
-	if (cbor_block_stack_empty(nb->cs))
+	if (cbor_block_stack_empty(&nb->cs))
 		nb_error(nb, NB_ERR_OPER, "Cannot end group, there's no group open");
 
-	attr = top_block(nb->cs)->attr;
+	attr = top_block(&nb->cs)->attr;
 	assert(attr != NULL);
 
-	cbor_decode_array_end(nb->cs);
+	cbor_decode_array_end(&nb->cs);
 	diag_dedent_proto(&nb->diag);
 	diag_log_proto(&nb->diag, "] /* %s */", attr->name);
 }

@@ -9,6 +9,7 @@
 #include "common.h"
 #include "diag.h"
 #include "error.h"
+#include "memory.h"
 #include "stack.h"
 #include "sval.h"
 
@@ -95,6 +96,7 @@ typedef void (cbor_error_handler_t)(struct cbor_stream *cs, nb_err_t err, void *
  */
 struct cbor_stream
 {
+	mempool_t mempool;	/* memory pool for this CBOR stream */
 	struct nb_buf *buf;	/* the buffer being read or written */
 	struct stack blocks;	/* block stack (open arrays and maps) */
 	struct diag *diag;	/* diagnostics buffer */
@@ -109,8 +111,8 @@ struct cbor_stream
 	void *error_handler_arg;
 };
 
-struct cbor_stream *cbor_stream_new(struct nb_buf *buf);
-void cbor_stream_delete(struct cbor_stream *cs);
+void cbor_stream_init(struct cbor_stream *cs, struct nb_buf *buf);
+void cbor_stream_free(struct cbor_stream *cs);
 
 void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag);
 void cbor_stream_set_error_handler(struct cbor_stream *cs, cbor_error_handler_t *handler,

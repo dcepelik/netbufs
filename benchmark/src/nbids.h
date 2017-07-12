@@ -78,43 +78,43 @@ static inline void setup_ids(struct nb *nb)
 	struct nb_group *bgp_cflag;
 
 	rt = nb_group(nb, BIRD_ORG_RT, "bird.org/rt");
-	nb_bind(rt, BIRD_ORG_RT_ROUTES, "./routes", true);
-	nb_bind(rt, BIRD_ORG_RT_VERSION, "./version", true);
+	nb_bind(nb, rt, BIRD_ORG_RT_ROUTES, "./routes", true);
+	nb_bind(nb, rt, BIRD_ORG_RT_VERSION, "./version", true);
 
 	rte = nb_group(nb, BIRD_ORG_RTE, "bird.org/rte");
-	nb_bind(rte, BIRD_ORG_RTE_AS_NO, "./as_no", false);
-	nb_bind(rte, BIRD_ORG_RTE_ATTRS, "./attrs", true);
-	nb_bind(rte, BIRD_ORG_RTE_GWADDR, "./gwaddr", true);
-	nb_bind(rte, BIRD_ORG_RTE_IFNAME, "./ifname", false);
-	nb_bind(rte, BIRD_ORG_RTE_NETADDR, "./netaddr", true);
-	nb_bind(rte, BIRD_ORG_RTE_NETMASK, "./netmask", true);
-	nb_bind(rte, BIRD_ORG_RTE_SRC, "./src", true);
-	nb_bind(rte, BIRD_ORG_RTE_TYPE, "./type", true);
-	nb_bind(rte, BIRD_ORG_RTE_UPLINK_FROM, "./uplink_from", false);
-	nb_bind(rte, BIRD_ORG_RTE_UPLINK, "./uplink", false);
+	nb_bind(nb, rte, BIRD_ORG_RTE_AS_NO, "./as_no", false);
+	nb_bind(nb, rte, BIRD_ORG_RTE_ATTRS, "./attrs", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_GWADDR, "./gwaddr", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_IFNAME, "./ifname", false);
+	nb_bind(nb, rte, BIRD_ORG_RTE_NETADDR, "./netaddr", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_NETMASK, "./netmask", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_SRC, "./src", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_TYPE, "./type", true);
+	nb_bind(nb, rte, BIRD_ORG_RTE_UPLINK_FROM, "./uplink_from", false);
+	nb_bind(nb, rte, BIRD_ORG_RTE_UPLINK, "./uplink", false);
 
 	rta = nb_group(nb, BIRD_ORG_RTA, "bird.org/rta");
-	nb_bind(rta, BIRD_ORG_RTA_TFLAG, "./tflag", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_AGGR, "./bgp_aggr", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_AS_PATH, "./bgp_as_path", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_COMMUNITY, "./bgp_community", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_LOCAL_PREF, "./bgp_local_pref", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_NEXT_HOP, "./bgp_next_hop", false);
-	nb_bind(rta, BIRD_ORG_RTA_BGP_ORIGIN, "./bgp_origin", false);
-	nb_bind(rta, BIRD_ORG_RTA_OTHER, "./other", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_TFLAG, "./tflag", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_AGGR, "./bgp_aggr", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_AS_PATH, "./bgp_as_path", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_COMMUNITY, "./bgp_community", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_LOCAL_PREF, "./bgp_local_pref", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_NEXT_HOP, "./bgp_next_hop", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_BGP_ORIGIN, "./bgp_origin", false);
+	nb_bind(nb, rta, BIRD_ORG_RTA_OTHER, "./other", false);
 
 	kvp = nb_group(nb, BIRD_ORG_KVP, "bird.org/rta/kvp");
-	nb_bind(kvp, BIRD_ORG_KVP_KEY, "./key", true);
-	nb_bind(kvp, BIRD_ORG_KVP_VALUE, "./value", true);
+	nb_bind(nb, kvp, BIRD_ORG_KVP_KEY, "./key", true);
+	nb_bind(nb, kvp, BIRD_ORG_KVP_VALUE, "./value", true);
 
 	bgp_cflag = nb_group(nb, BIRD_ORG_BGP_CFLAG, "bird.org/bgp_cflag");
-	nb_bind(bgp_cflag, BIRD_ORG_BGP_CFLAG_FLAG, "./flag", true);
-	nb_bind(bgp_cflag, BIRD_ORG_BGP_CFLAG_AS_NO, "./as_no", true);
+	nb_bind(nb, bgp_cflag, BIRD_ORG_BGP_CFLAG_FLAG, "./flag", true);
+	nb_bind(nb, bgp_cflag, BIRD_ORG_BGP_CFLAG_AS_NO, "./as_no", true);
 
 	time = nb_group(nb, BIRD_ORG_TIME, "bird.org/time");
-	nb_bind(time, BIRD_ORG_TIME_HOUR, "./hour", true);
-	nb_bind(time, BIRD_ORG_TIME_MIN, "./min", true);
-	nb_bind(time, BIRD_ORG_TIME_SEC, "./sec", true);
+	nb_bind(nb, time, BIRD_ORG_TIME_HOUR, "./hour", true);
+	nb_bind(nb, time, BIRD_ORG_TIME_MIN, "./min", true);
+	nb_bind(nb, time, BIRD_ORG_TIME_SEC, "./sec", true);
 }
 
 #endif
