@@ -146,7 +146,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 	size_t i;
 
 	cs = cbor_stream_new(buf);
-	diag_init(&diag, cs, stderr);
+	diag_init(&diag, stderr);
 	diag.enabled = true;
 	cbor_stream_set_diag(cs, &diag);
 	rt = nb_malloc(sizeof(*rt));

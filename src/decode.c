@@ -131,6 +131,22 @@ static void diag_finish_item(struct cbor_stream *cs)
 }
 
 
+static void print_sval_diag(struct cbor_stream *cs, enum cbor_sval sval)
+{
+	const char *sval_name;
+
+	diag_log_item(cs->diag, "sval(%u)", sval);
+
+	sval_name = diag_get_sval_name(cs->diag, sval);
+	if (sval_name)
+		diag_log_cbor(cs->diag, "%s", sval_name);
+	else
+		diag_log_cbor(cs->diag, "simple(%lu)", sval);
+
+	diag_finish_item(cs);
+}
+
+
 static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
 	enum minor minor)
 {
@@ -142,12 +158,7 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 		item->type = CBOR_TYPE_SVAL;
 		item->sval = minor;
 		item->u64 = item->sval;
-
-		/* TODO deduplicate */
-		diag_log_item(cs->diag, "sval(%u)", item->u64);
-		diag_log_sval(cs->diag, item->u64);
-		diag_finish_item(cs);
-
+		print_sval_diag(cs, item->sval);
 		return NB_ERR_OK;
 	}
 
@@ -161,15 +172,10 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 
 	switch (minor) {
 	case CBOR_MINOR_SVAL:
-		item->type = CBOR_TYPE_SVAL;
+		item->type = CBOR_TYPE_SVAL; /* deduplicate */
 		item->sval = u64;
 		item->u64 = item->sval; /* TODO */
-
-		/* TODO deduplicate */
-		diag_log_sval(cs->diag, item->u64);
-		diag_log_item(cs->diag, "sval(%u)", item->u64);
-		diag_finish_item(cs);
-
+		print_sval_diag(cs, item->sval);
 		return NB_ERR_OK;
 	case CBOR_MINOR_FLOAT16:
 	case CBOR_MINOR_FLOAT32:

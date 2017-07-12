@@ -42,13 +42,13 @@ static void isbuf_dedent(struct isbuf *is)
 }
 
 
-static void isbuf_vprintf(struct isbuf *is, char *msg, va_list args)
+static void isbuf_vprintf(struct diag *diag, struct isbuf *is, char *msg, va_list args)
 {
 	size_t i;
 
 	if (is->indent_next) {
-		for (i = 0; i < 4 * is->indent_level; i++)
-			strbuf_putc(&is->sb, i % 2 == 0 ? '.' : ' ');
+		for (i = 0; i < diag->indent_size * is->indent_level; i++)
+			strbuf_putc(&is->sb, i % 2 == 0 ? diag->indent_char : ' ');
 		is->indent_next = false;
 	}
 
@@ -71,7 +71,7 @@ static char *isbuf_get_string(struct isbuf *is)
 
 static void reset_line(struct diag_line *line)
 {
-	line->offset[0] = '\0';
+	line->offset = 0;
 	strbuf_reset(&line->raw);
 	strbuf_reset(&line->item);
 	isbuf_reset(&line->cbor);
@@ -102,25 +102,30 @@ static void switch_lines(struct diag *diag)
 static void diag_dump_line_internal(struct diag *diag)
 {
 	switch_lines(diag);
+	if (diag->line->empty)
+		return;
 
-	if (!diag->line->empty) {
-		fprintf(diag->fout, "%-16s %-20s %-60s %-60s\n",
-			//diag->line->offset,
-			strbuf_get_string(&diag->line->raw),
-			strbuf_get_string(&diag->line->item),
-			isbuf_get_string(&diag->line->cbor),
-			isbuf_get_string(&diag->line->proto));
+	if (diag->cols_enabled[DIAG_COL_OFFSET])
+		fprintf(diag->fout, "0x%016lx ", diag->line->offset);
+	if (diag->cols_enabled[DIAG_COL_RAW])
+		fprintf(diag->fout, "%-16s ", strbuf_get_string(&diag->line->raw));
+	if (diag->cols_enabled[DIAG_COL_ITEMS])
+		fprintf(diag->fout, "%-20s ", strbuf_get_string(&diag->line->item));
+	if (diag->cols_enabled[DIAG_COL_CBOR])
+		fprintf(diag->fout, "%-60s ", isbuf_get_string(&diag->line->cbor));
+	if (diag->cols_enabled[DIAG_COL_PROTO])
+		fprintf(diag->fout, "%-60s ", isbuf_get_string(&diag->line->proto));
 
-		reset_line(diag->line);
-	}
-
+	fputs("\n", diag->fout);
+	
+	reset_line(diag->line);
 	diag->eol_on_next_raw = false;
 }
 
 
 void diag_log_offset_internal(struct diag *diag, size_t offset)
 {
-	snprintf(diag->line->offset, sizeof(diag->line->offset), "0x%zx", offset);
+	diag->line->offset = offset;
 }
 
 
@@ -151,7 +156,7 @@ void diag_log_cbor_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	isbuf_vprintf(&diag->line->cbor, msg, args);
+	isbuf_vprintf(diag, &diag->line->cbor, msg, args);
 	diag->line->empty = false;
 	va_end(args);
 }
@@ -161,15 +166,9 @@ void diag_log_proto_internal(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
-	isbuf_vprintf(&diag->line->proto, msg, args);
+	isbuf_vprintf(diag, &diag->line->proto, msg, args);
 	diag->line->empty = false;
 	va_end(args);
-}
-
-
-void diag_dump_line(struct diag *diag)
-{
-	diag->eol_on_next_raw = true;
 }
 
 
@@ -218,7 +217,7 @@ void diag_log_sval(struct diag *diag, uint64_t sval)
 
 static void init_line(struct diag_line *line)
 {
-	line->offset[0] = '\0';
+	line->offset = 0;
 	strbuf_init(&line->raw, 8);
 	strbuf_init(&line->item, 16);
 	isbuf_init(&line->cbor, 32);
@@ -227,22 +226,27 @@ static void init_line(struct diag_line *line)
 }
 
 
-void diag_init(struct diag *diag, struct cbor_stream *cs, FILE *fout)
+void diag_init(struct diag *diag, FILE *fout)
 {
 	size_t i;
 	
 	for (i = 0; i < ARRAY_SIZE(diag->lines); i++)
 		init_line(&diag->lines[i]);
 
+	for (i = 0; i < ARRAY_SIZE(diag->cols_enabled); i++)
+		diag->cols_enabled[i] = false;
+
 	diag->line_idx = 0;
 	diag->line = &diag->lines[diag->line_idx];
 
-	diag->cs = cs;
 	diag->fout = fout;
 	diag->enabled = true;
+	diag->eol_on_next_raw = false;
+
 	diag->bytes_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
 	diag->str_dump_maxlen = BYTES_DUMP_MAXLEN_DEFAULT;
-	diag->eol_on_next_raw = false;
+	diag->indent_char = DIAG_DEFAULT_INDENT_CHAR;
+	diag->indent_size = DIAG_DEFAULT_INDENT_SIZE;
 }
 
 
@@ -270,24 +274,19 @@ void diag_dedent_proto(struct diag *diag)
 }
 
 
-nb_err_t diag_dump(struct diag *diag, FILE *out)
+nb_err_t diag_dump_cbor_stream(struct diag *diag, struct cbor_stream *cs)
 {
 	struct cbor_item item;
 	nb_err_t err = NB_ERR_OK;
 	size_t i;
 
-	for (i = 0; !nb_buf_is_eof(diag->cs->buf); i++) {
-		if (i > 0) {
-			diag_log_cbor(diag, ",");
-		}
-
-		if ((err = cbor_decode_item(diag->cs, &item)) != NB_ERR_OK)
+	for (i = 0; !nb_buf_is_eof(cs->buf); i++) {
+		if ((err = cbor_decode_item(cs, &item)) != NB_ERR_OK)
 			break;
+		diag_eol(diag, true);
 	}
 
-	if (i > 0)
-		diag_dump_line(diag);
-
+	diag_flush(diag);
 	return err;
 }
 
@@ -303,14 +302,15 @@ void diag_free(struct diag *diag)
 
 void diag_print_block_stack(struct diag *diag)
 {
-	struct block *block;
-	size_t i = 0;
+	//struct block *block;
+	//size_t i = 0;
 
-	stack_foreach(&diag->cs->blocks, block) {
-		fprintf(stderr, "Block #%lu, type=%s, active_group=%s\n",
-			i, cbor_type_string(block->type), block->group ? block->group->name : "<none>");
-		i++;
-	}
+	//stack_foreach(&diag->cs->blocks, block) {
+	//	fprintf(stderr, "Block #%lu, type=%s, active_group=%s\n",
+	//		i, cbor_type_string(block->type),
+	//		block->group ? block->group->name : "<none>");
+	//	i++;
+	//}
 }
 
 
@@ -328,4 +328,18 @@ const char *diag_get_sval_name(struct diag *diag, enum cbor_sval sval)
 	default:
 		return NULL; /* not a named sval */
 	}
+}
+
+
+void diag_enable_col(struct diag *diag, enum diag_col col)
+{
+	assert(col >= 0 && col <= DIAG_NUM_COLS);
+	diag->cols_enabled[col] = true;
+}
+
+
+void diag_flush(struct diag *diag)
+{
+	diag_dump_line_internal(diag);
+	diag_dump_line_internal(diag);
 }

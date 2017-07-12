@@ -3,6 +3,8 @@
  * Diagnostics utility for CBOR-encoded netbuf messages
  *
  * This utility shall be linked with the die()-ing memory wrappers.
+ *
+ * TODO String and bytestream trimming, dynamic col widths.
  */
 
 #include "buf.h"
@@ -16,6 +18,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,12 +29,26 @@
 
 
 static const char *argv0;
+static const char *optstring = "01234b:i:I:emo:t:h";
+
+static char *fname_in = "-";
+static char *fname_out = "-";
+bool cols_given;
+static struct diag diag;
+bool mirror;
 
 
 static struct option longopts[] = {
+	{ "escape",		no_argument,		0,	'e' },
+	{ "help",		no_argument,		0, 	'r' },
+	{ "indent-char",	required_argument,	0,	'i' },
+	{ "indent-size",	required_argument,	0,	'I' },
+	{ "mirror",		no_argument,		0,	'm' },
 	{ "output",		required_argument,	0,	'o' },
-	{ "roundtrip",	no_argument,		0, 	'r' },
-	{ 0,			0,					0,	0 },
+	{ "trim-bytes",		required_argument,	0,	'b' },
+	{ "trim-text",		required_argument,	0,	't' },
+	{ "help",		no_argument,		0,	'h' },
+	{ 0,			0,			0,	0 },
 };
 
 
@@ -60,7 +77,7 @@ static void usage(int status)
 
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "  -o, --output=FILE     Write output to FILE instead of stdout\n");
-	fprintf(stderr, "  --help                Print this message and exit\n\n");
+	fprintf(stderr, "  -h, --help            Print this message and exit\n\n");
 	exit(status);
 }
 
@@ -75,33 +92,80 @@ static void error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 }
 
 
-int main(int argc, char *argv[])
+static long long argtoll(const char *arg, const char *argname)
 {
-	char *fname_in = "-";
-	char *fname_out = "-";
-	struct nb_buf *nb_buf_in;
-	struct nb_buf *nb_buf_out;
-	struct cbor_stream *cbor_in;
-	struct cbor_stream *cbor_out;
-	struct cbor_item item;
-	struct diag diag;
-	int c;
+	char *end;
+	long long val;
+
+	val = strtoll(arg, &end, 10);
+	if ((val == LLONG_MIN || val == LLONG_MAX) && errno == ERANGE) {
+		fprintf(stderr, "%s: value of option %s doesn't fit long long\n", argv0, argname);
+		exit(EXIT_FAILURE);
+	}
+	if (*end != '\0') {
+		fprintf(stderr, "%s: value of option %s is not numeric\n", argv0, argname);
+		exit(EXIT_FAILURE);
+	}
+
+	return val;
+}
+
+
+static void parse_args(int argc, char *argv[])
+{
 	int digit_optind;
 	int option_index;
-	nb_err_t err;
+	int c;
+	size_t num;
 
-	bool roundtrip = false;
-	
-	argv0 = basename(argv[0]);
-
-	while ((c = getopt_long(argc, argv, "hHi:o:p", longopts, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, optstring, longopts, &option_index)) != -1) {
 		switch (c) {
+		case '0':
+			cols_given = true;
+			diag_enable_col(&diag, DIAG_COL_OFFSET);
+			break;
+		case '1':
+			cols_given = true;
+			diag_enable_col(&diag, DIAG_COL_RAW);
+			break;
+		case '2':
+			cols_given = true;
+			diag_enable_col(&diag, DIAG_COL_ITEMS);
+			break;
+		case '3':
+			cols_given = true;
+			diag_enable_col(&diag, DIAG_COL_CBOR);
+			break;
+		case '4':
+			cols_given = true;
+			diag_enable_col(&diag, DIAG_COL_PROTO);
+			break;
+		case 'b':
+			diag.bytes_dump_maxlen = argtoll(optarg, "-b|--trim-bytes");
+			break;
+		case 't':
+			diag.str_dump_maxlen = argtoll(optarg, "-t|--trim-text");
+			break;
+		case 'i':
+			if (strlen(optarg) != 1) {
+				fprintf(stderr, "%s: value of -i|--indent-char must be a "
+					"single char, string \"%s\" was given\n",
+					argv0, optarg);
+				exit(EXIT_FAILURE);
+			}
+			diag.indent_char = optarg[0];
+			break;
+		case 'I':
+			diag.indent_size = argtoll(optarg, "-I|--indent-size");
+			break;
+		case 'm':
+			mirror = true;
+			break;
 		case 'o':
 			fname_out = optarg;
 			break;
-		case 'L':
-			roundtrip = true;
-			break;
+		case 'h':
+			usage(EXIT_SUCCESS);
 		default:
 			usage(EXIT_FAILURE);
 		}
@@ -109,6 +173,27 @@ int main(int argc, char *argv[])
 
 	if (optind < argc)
 		fname_in = argv[optind];
+
+	if (!cols_given) {
+		diag_enable_col(&diag, DIAG_COL_RAW);
+		diag_enable_col(&diag, DIAG_COL_CBOR);
+	}
+}
+
+
+int main(int argc, char *argv[])
+{
+	struct nb_buf *nb_buf_in;
+	struct nb_buf *nb_buf_out;
+	struct cbor_stream *cbor_in;
+	struct cbor_stream *cbor_out;
+	struct cbor_item item;
+	nb_err_t err;
+
+	diag_init(&diag, stderr);
+	
+	argv0 = basename(argv[0]);
+	parse_args(argc, argv);
 
 	nb_buf_in = nb_buf_new();
 	cbor_in = cbor_stream_new(nb_buf_in);
@@ -138,11 +223,10 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if (!roundtrip) {
-		diag_init(&diag, cbor_in, stderr);
+	if (!mirror) {
 		cbor_stream_set_error_handler(cbor_in, error_handler, &diag);
 		cbor_stream_set_diag(cbor_in, &diag);
-		diag_dump(&diag, stdout);
+		diag_dump_cbor_stream(&diag, cbor_in);
 		diag_free(&diag);
 
 		if (!cbor_block_stack_empty(cbor_in)) {

@@ -86,6 +86,8 @@ struct block
 	struct nb_attr *attr;	/* current attribute */
 };
 
+struct cbor_stream;
+
 typedef void (cbor_error_handler_t)(struct cbor_stream *cs, nb_err_t err, void *arg);
 
 /*

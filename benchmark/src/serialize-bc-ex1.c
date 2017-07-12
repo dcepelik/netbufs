@@ -61,7 +61,7 @@ void serialize_bc_ex1(struct rt *rt, struct nb_buf *buf)
 
 	rte = &rt->entries[0];
 	cs = cbor_stream_new(buf);
-	diag_init(&diag, cs, stderr);
+	diag_init(&diag, stderr);
 	cbor_stream_set_diag(cs, &diag);
 
 	cbor_encode_map_begin_indef(cs);

@@ -43,7 +43,7 @@ void nb_init(struct nb *nb, struct nb_buf *buf)
 	cbor_stream_set_error_handler(nb->cs, handle_cbor_error, nb);
 
 	/* TODO clean-up */
-	diag_init(&nb->diag, nb->cs, stderr);
+	diag_init(&nb->diag, stderr);
 	nb->diag.enabled = true;
 	nb->active_group = NULL;
 	cbor_stream_set_diag(nb->cs, &nb->diag);
