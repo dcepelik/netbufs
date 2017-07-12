@@ -1,4 +1,5 @@
 /*
+ * decode:
  * CBOR Decoder
  *
  * TODO Get rid of all recursion, or limit allowed nesting of maps and arrays.
@@ -221,23 +222,26 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 		return decode_item_major7(cs, item, lbits);
 
 	item->type = (enum cbor_type)major;
-	item->indefinite = (lbits == LBITS_INDEFINITE);
+	item->flags = 0;
 
-	if (item->indefinite && !major_allows_indefinite(major))
+	if (lbits == LBITS_INDEFINITE)
+		item->flags |= CBOR_FLAG_INDEFINITE;
+
+	if (is_indefinite(item) && !major_allows_indefinite(major))
 		return error(cs, NB_ERR_INDEF, "Indefinite-length encoding is not allowed "
 			"for %s items.", cbor_type_string(major));
 
-	if (!item->indefinite && (err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
+	if (!is_indefinite(item) && (err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
 		return err;
 
 	diag_comma(cs->diag); /* append a comma to previous line if needed */
 
-	if (item->indefinite)
+	if (is_indefinite(item))
 		diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
 	else
 		diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
 
-	if (item->indefinite) {
+	if (is_indefinite(item)) {
 		return NB_ERR_OK;
 	}
 
@@ -420,14 +424,21 @@ nb_err_t cbor_decode_int64(struct cbor_stream *cs, int64_t *val)
 }
 
 
-nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint64_t *tag)
+nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint32_t *tag)
 {
 	struct cbor_item item;
 	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_TAG)) == NB_ERR_OK)
-		*tag = item.u64;
-	return err;
+	if ((err = predecode_check(cs, &item, CBOR_TYPE_TAG)) != NB_ERR_OK)
+		return err;
+
+	if (item.u64 > UINT32_MAX)
+		return error(cs, NB_ERR_RANGE,
+			"This implementation only supports uint32 tags in the range "
+			"0, ..., %lu; %lu was given", UINT32_MAX, item.u64);
+
+	*tag = (uint32_t)item.u64;
+	return NB_ERR_OK;
 }
 
 
@@ -481,17 +492,17 @@ static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type,
 	if ((err = predecode_check(cs, &item, type)) != NB_ERR_OK)
 		return err;
 
-	if (item.indefinite != indef)
+	if (is_indefinite(&item) != indef)
 		return error(cs, NB_ERR_INDEF, NULL);
 
-	if (!item.indefinite) {
+	if (!is_indefinite(&item)) {
 		*len = item.u64;
 		block_len = item.u64;
 		if (type == CBOR_TYPE_MAP)
 			block_len *= 2;
 	}
 
-	return push_block(cs, item.type, item.indefinite, block_len);
+	return push_block(cs, item.type, is_indefinite(&item), block_len);
 }
 
 
@@ -660,12 +671,12 @@ nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 	*len = 0;
 	*bytes = NULL;
 
-	if (!stream->indefinite)
+	if (!is_indefinite(stream))
 		return read_stream_chunk(cs, stream, stream, bytes, len);
 
 	while ((err = predecode_check(cs, &chunk, stream->type)) == NB_ERR_OK) {
 		/* check indef */
-		if (chunk.indefinite) {
+		if (is_indefinite(&chunk)) {
 			err = NB_ERR_INDEF;
 			break;
 		}
@@ -742,7 +753,7 @@ static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr
 	size_t i;
 
 	size = CBOR_ARRAY_INIT_SIZE;
-	if (!arr->indefinite)
+	if (!is_indefinite(arr))
 		size = arr->u64;
 
 	*items = NULL;
@@ -761,7 +772,7 @@ static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr
 		}
 
 		size *= 2;
-	} while (arr->indefinite && err != NB_ERR_BREAK && err != NB_ERR_EOF);
+	} while (is_indefinite(arr) && err != NB_ERR_BREAK && err != NB_ERR_EOF);
 
 	*nitems = i;
 
@@ -785,7 +796,7 @@ static nb_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 	/* maps are just arrays, so pretend we have one and reuse decode_array_items */
 	arr = (struct cbor_item) {
 		.type = CBOR_TYPE_ARRAY,
-		.indefinite = map->indefinite,
+		.flags = map->flags,
 		.u64 = 2 * map->u64,
 	};
 
@@ -826,10 +837,11 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 	case CBOR_TYPE_TEXT:
 		return decode_text(cs, &item->str, &item->len);
 	case CBOR_TYPE_ARRAY:
-		if (!item->indefinite)
+		if (!is_indefinite(item))
 			err = cbor_decode_array_begin(cs, &item->len);
 		else
 			err = cbor_decode_array_begin_indef(cs);
+
 		if (err != NB_ERR_OK)
 			return err;
 
@@ -839,10 +851,11 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 		return cbor_decode_array_end(cs);
 
 	case CBOR_TYPE_MAP:
-		if (!item->indefinite)
+		if (!is_indefinite(item))
 			err = cbor_decode_map_begin(cs, &item->len);
 		else
 			err = cbor_decode_map_begin_indef(cs);
+
 		if (err != NB_ERR_OK)
 			return err;
 

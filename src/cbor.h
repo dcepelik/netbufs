@@ -1,4 +1,5 @@
 /*
+ * cbor:
  * CBOR Encoder/Decoder Interface
  */
 
@@ -42,20 +43,25 @@ const char *cbor_type_string(enum cbor_type type);
 struct cbor_pair;
 
 /*
+ * Flags for CBOR items.
+ */
+enum cbor_flag
+{
+	CBOR_FLAG_INDEFINITE = 1 << 0,
+};
+
+/*
  * CBOR Data Item
- * TODO Fit tags as u32 into padding.
- * 1 B type
- * 1 B flags
- * 2 B padding/explicit rfu
- * 4 B tag
- * 8 B union
- * TODO Use a hashmap for map.
- * //TODO Embedded strings.
+ *
+ * TODO Use a hashmap for CBOR_TYPE_MAP.
+ * TODO Embed short (<= 14B) strings directly into the structure.
  */
 struct cbor_item
 {
-	enum cbor_type type;
-	bool indefinite;
+	nb_byte_t type;		/* enum cbor_type */
+	nb_byte_t flags;	/* bitmask of enum cbor_flag */
+	nb_byte_t rfu[2];	/* reserved for future use */
+	uint32_t tag;		/* CBOR_TYPE_TAG */
 
 	/* refactoring aid */
 	uint64_t len;				/* go away! */
@@ -67,15 +73,15 @@ struct cbor_item
 		char *str;			/* CBOR_TYPE_TEXT */
 		struct cbor_item *items;	/* CBOR_TYPE_ARRAY */
 		struct cbor_pair *pairs;	/* CBOR_TYPE_MAP */
-		uint64_t tag;			/* CBOR_TYPE_TAG */
 		enum cbor_sval sval;		/* CBOR_TYPE_SVAL */
+		struct cbor_item *tagged_item;	/* CBOR_TYPE_TAG */
 	};
-	struct cbor_item *tagged_item;
 };
 
 /*
  * CBOR block context for arrays, maps and infeninite-length byte and text streams.
- * TODO Documentation: netbfus leverages this stack, too.
+ *
+ * TODO Use for tagged items, too.
  */
 struct block
 {
@@ -172,8 +178,8 @@ nb_err_t cbor_decode_float32(struct cbor_stream *cs, float *val);
 nb_err_t cbor_encode_float64(struct cbor_stream *cs, double val);
 nb_err_t cbor_decode_float64(struct cbor_stream *cs, double *val);
 
-nb_err_t cbor_encode_tag(struct cbor_stream *cs, uint64_t tagno);
-nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint64_t *tagno);
+nb_err_t cbor_encode_tag(struct cbor_stream *cs, uint32_t tagno);
+nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint32_t *tagno);
 
 nb_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval val);
 nb_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *val);
@@ -197,21 +203,13 @@ nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len);
 nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_decode_map_end(struct cbor_stream *cs);
 
-nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
-	nb_byte_t **bytes, size_t *len);
-nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
-	nb_byte_t **bytes, size_t *len);
-
 nb_err_t cbor_encode_bytes(struct cbor_stream *cs, nb_byte_t *bytes, size_t len);
 nb_err_t cbor_encode_bytes_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_bytes_end(struct cbor_stream *cs);
 
-nb_err_t cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **bytes, size_t *len);
-
 nb_err_t cbor_encode_text(struct cbor_stream *cs, char *str);
 nb_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_text_end(struct cbor_stream *cs);
-
 nb_err_t cbor_decode_text(struct cbor_stream *cs, char **str);
 
 /* TODO valid fields in item when using peek_item -> manual */

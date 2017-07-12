@@ -154,3 +154,9 @@ void cbor_default_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 	//diag_print_block_stack(cs->diag);
 	exit(EXIT_FAILURE);
 }
+
+
+bool is_indefinite(struct cbor_item *item)
+{
+	return item->flags & CBOR_FLAG_INDEFINITE;
+}

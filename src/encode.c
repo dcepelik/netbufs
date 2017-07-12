@@ -1,4 +1,5 @@
 /*
+ * encode:
  * CBOR Encoder
  */
 
@@ -293,7 +294,7 @@ nb_err_t cbor_encode_text_end(struct cbor_stream *cs)
 }
 
 
-nb_err_t cbor_encode_tag(struct cbor_stream *cs, uint64_t tag)
+nb_err_t cbor_encode_tag(struct cbor_stream *cs, uint32_t tag)
 {
 	return write_hdr_u64(cs, CBOR_MAJOR_TAG, tag);
 }
@@ -342,7 +343,7 @@ nb_err_t encode_array(struct cbor_stream *cs, struct cbor_item *array)
 	size_t i;
 	nb_err_t err;
 
-	if (array->indefinite)
+	if (is_indefinite(array))
 		err = cbor_encode_array_begin_indef(cs);
 	else
 		err = cbor_encode_array_begin(cs, array->len);
@@ -366,7 +367,7 @@ nb_err_t encode_map(struct cbor_stream *cs, struct cbor_item *map)
 	size_t i;
 	nb_err_t err;
 
-	if (map->indefinite)
+	if (is_indefinite(map))
 		err = cbor_encode_map_begin_indef(cs);
 	else
 		err = cbor_encode_map_begin(cs, map->len);

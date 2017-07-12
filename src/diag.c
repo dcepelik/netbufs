@@ -48,7 +48,9 @@ static void isbuf_vprintf(struct diag *diag, struct isbuf *is, char *msg, va_lis
 	char c;
 
 	if (is->indent_next) {
+		/* use only spaces for indentation in JSON mode */
 		c = diag->print_json ? ' ' : diag->indent_char;
+
 		for (i = 0; i < diag->indent_size * is->indent_level; i++)
 			strbuf_putc(&is->sb, i % 2 == 0 ? c : ' ');
 		is->indent_next = false;

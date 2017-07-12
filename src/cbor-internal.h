@@ -67,5 +67,6 @@ static inline bool major_allows_indefinite(enum major major)
 nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...);
 nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len);
 struct block *top_block(struct cbor_stream *cs);
+bool is_indefinite(struct cbor_item *item);
 
 #endif
