@@ -125,12 +125,12 @@ pass() {
 }
 
 cbordump_retval() {
-	xxd -p -r $1 | $NBDIAG 2>/dev/null >/dev/null
+	xxd -p -r $1 | $NBDIAG -3 2>/dev/null >/dev/null
 	return $?
 }
 
 cbordump_vg() {
-	vg_errs=$(xxd -p -r $1 | valgrind $NBDIAG 2>&1 | tail -n1 | cut -d ' ' -f4,10)
+	vg_errs=$(xxd -p -r $1 | valgrind $NBDIAG -3 2>&1 | tail -n1 | cut -d ' ' -f4,10)
 
 	if [ "$vg_errs" != "0 0" ]; then
 		valgrind_error $test
@@ -157,7 +157,7 @@ run_cbor_positive_tests() {
 		out_json=$test/out.json
 		out_test=$test/out.test
 
-		xxd -p -r $in | $NBDIAG > $out_test
+		xxd -p -r $in | $NBDIAG -3 > $out_test
 
 		if [ $? -ne 0 ]; then
 			runtime_error $test

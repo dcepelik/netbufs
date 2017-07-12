@@ -1,5 +1,16 @@
+/*
+ * This module provides default implementation of basic memory-management
+ * routines from memory.h.
+ *
+ * These function wrap malloc, realloc etc. calls and die upon failure.
+ * If you want different behaviour, provide your own implementation.
+ *
+ * TODO die on nomem
+ */
+
 #include "memory.h"
 #include "util.h"
+
 #include <stdlib.h>
 
 

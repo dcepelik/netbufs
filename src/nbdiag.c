@@ -33,6 +33,11 @@ static const char *optstring = "01234b:i:I:emo:t:h";
 
 static char *fname_in = "-";
 static char *fname_out = "-";
+static struct nb_buf *buf_in;
+static struct nb_buf *buf_out;
+static struct cbor_stream *cbor_in;
+static struct cbor_stream *cbor_out;
+
 bool cols_given;
 static struct diag diag;
 bool mirror;
@@ -82,7 +87,7 @@ static void usage(int status)
 }
 
 
-static void error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
+static void cbor_err_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 {
 	struct diag *diag = (struct diag *)arg;
 	//fputs(strbuf_get_string(&diag->strbuf), stdout); /* TODO */
@@ -181,30 +186,37 @@ static void parse_args(int argc, char *argv[])
 }
 
 
-int main(int argc, char *argv[])
+static void mirror_stream(void)
 {
-	struct nb_buf *nb_buf_in;
-	struct nb_buf *nb_buf_out;
-	struct cbor_stream *cbor_in;
-	struct cbor_stream *cbor_out;
 	struct cbor_item item;
 	nb_err_t err;
 
-	diag_init(&diag, stderr);
+	while (!nb_buf_is_eof(buf_in)) {
+		cbor_decode_item(cbor_in, &item);
+		cbor_encode_item(cbor_out, &item);
+	}
+}
+
+
+int main(int argc, char *argv[])
+{
+	nb_err_t err;
+
+	diag_init(&diag, stdout);
 	
 	argv0 = basename(argv[0]);
 	parse_args(argc, argv);
 
-	nb_buf_in = nb_buf_new();
-	cbor_in = cbor_stream_new(nb_buf_in);
+	buf_in = nb_buf_new();
+	cbor_in = cbor_stream_new(buf_in);
 
-	nb_buf_out = nb_buf_new();
-	cbor_out = cbor_stream_new(nb_buf_out);
+	buf_out = nb_buf_new();
+	cbor_out = cbor_stream_new(buf_out);
 
 	if (fname_in && strcmp(fname_in, "-") != 0)
-		err = nb_buf_open_file(nb_buf_in, fname_in, O_RDONLY, 0);
+		err = nb_buf_open_file(buf_in, fname_in, O_RDONLY, 0);
 	else
-		err = nb_buf_open_stdin(nb_buf_in);
+		err = nb_buf_open_stdin(buf_in);
 
 	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: Cannot open input file '%s': %s\n", argv0, fname_in,
@@ -213,9 +225,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (fname_out && strcmp(fname_out, "-") != 0)
-		err = nb_buf_open_file(nb_buf_out, fname_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
+		err = nb_buf_open_file(buf_out, fname_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	else
-		err = nb_buf_open_stdout(nb_buf_out);
+		err = nb_buf_open_stdout(buf_out);
 	
 	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: Cannot open output file '%s': %s\n", argv0, fname_out,
@@ -224,8 +236,8 @@ int main(int argc, char *argv[])
 	}
 
 	if (!mirror) {
-		cbor_stream_set_error_handler(cbor_in, error_handler, &diag);
 		cbor_stream_set_diag(cbor_in, &diag);
+		cbor_stream_set_error_handler(cbor_in, cbor_err_handler, &diag);
 		diag_dump_cbor_stream(&diag, cbor_in);
 		diag_free(&diag);
 
@@ -235,13 +247,13 @@ int main(int argc, char *argv[])
 		}
 	}
 	else {
-		TEMP_ASSERT(false);
+		mirror_stream();
 	}
 
-	nb_buf_close(nb_buf_in);
+	nb_buf_close(buf_in);
 	cbor_stream_delete(cbor_in);
 
-	nb_buf_close(nb_buf_out);
+	nb_buf_close(buf_out);
 	cbor_stream_delete(cbor_out);
 
 	return EXIT_SUCCESS;

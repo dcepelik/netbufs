@@ -1,6 +1,5 @@
 #include "array.h"
 #include "debug.h"
-#include "memory.h"
 #include "netbufs-internal.h"
 #include "netbufs.h"
 #include "string.h"
@@ -12,6 +11,7 @@
 #define NB_GROUPS_INIT_SIZE	4
 #define NB_ATTRS_INIT_SIZE	4
 #define NB_ERR_MSG_INIT_LEN	4
+#define NB_MEMPOOL_BLOCK_SIZE	256
 
 
 static void init_group(struct nb *nb, struct nb_group *group, const char *name)
@@ -39,6 +39,7 @@ static void handle_cbor_error(struct cbor_stream *cs, nb_err_t err, void *arg)
 
 void nb_init(struct nb *nb, struct nb_buf *buf)
 {
+	nb->mempool = mempool_new(NB_MEMPOOL_BLOCK_SIZE);
 	nb->cs = cbor_stream_new(buf);
 	cbor_stream_set_error_handler(nb->cs, handle_cbor_error, nb);
 

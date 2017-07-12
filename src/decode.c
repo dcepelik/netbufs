@@ -4,6 +4,7 @@
  * TODO Get rid of all recursion, or limit allowed nesting of maps and arrays.
  * TODO Open a nesting block when using cbor_decode_item and we run into an array, too.
  * TODO Enforce memory limits (globally or per item).
+ * TODO Decoding of tagged items
  */
 
 #include "buf.h"
@@ -851,7 +852,7 @@ nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 		return cbor_decode_map_end(cs);
 
 	case CBOR_TYPE_TAG:
-		assert(false);
+		cbor_decode_tag(cs, &item->tag);
 		item->tagged_item = nb_malloc(sizeof(*item->tagged_item));
 		if (!item->tagged_item)
 			return NB_ERR_NOMEM;

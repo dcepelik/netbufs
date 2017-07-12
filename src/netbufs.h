@@ -5,6 +5,7 @@
 #include "cbor.h"
 #include "diag.h"
 #include "error.h"
+#include "memory.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -39,10 +40,11 @@ typedef void (nb_err_handler_t)(struct nb *nb, nb_err_t err, void *arg);
  */
 struct nb
 {
+	mempool_t mempool;			/* memory pool for this NetBuf */
 	struct cbor_stream *cs;
 	struct nb_group **groups;
 	struct diag diag;
-	struct nb_group groups_ns;		/* groups namespace */
+	struct nb_group groups_ns;		/* groups namespace (bit of a hack) */
 	struct nb_group *active_group;
 	struct nb_attr *cur_attr;
 
