@@ -11,6 +11,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define DEBUG_THIS	0
+
 static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 
 
@@ -30,15 +32,9 @@ void nb_buffer_init(struct nb_buffer *buf)
 }
 
 
-void nb_buffer_free(struct nb_buffer *buf)
-{
-	xfree(buf->buf);
-}
-
-
 void nb_buffer_flush(struct nb_buffer *buf)
 {
-	buf->flush(buf);
+	buf->ops->flush(buf);
 	buf->pos = 0;
 	buf->len = 0;
 	buf->dirty = false;
@@ -47,25 +43,9 @@ void nb_buffer_flush(struct nb_buffer *buf)
 
 static bool nb_buffer_fill(struct nb_buffer *buf)
 {
-	buf->fill(buf);
+	buf->ops->fill(buf);
 	buf->pos = 0;
 	return buf->len > 0;
-}
-
-
-static void debug_write(unsigned char *bytes, size_t nbytes)
-{
-	size_t i;
-
-	for (i = 0; i < nbytes; i++) {
-		if (isprint(bytes[i])) {
-			DEBUG_PRINTF("Writing byte 0x%02X [%c]", bytes[i], bytes[i]);
-		}
-		else {
-			DEBUG_PRINTF("Writing byte 0x%02X", bytes[i]);
-		}
-	}
-	DEBUG_EXPR("%s", "---");
 }
 
 
@@ -133,13 +113,6 @@ static inline char hexchar(nb_byte_t val)
 nb_err_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return read_internal(buf, bytes, nbytes);
-}
-
-
-size_t nb_buffer_read_len(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
-{
-	read_internal(buf, bytes, nbytes);
-	return nb_buffer_get_last_read_len(buf);
 }
 
 
@@ -212,81 +185,6 @@ int nb_buffer_peek(struct nb_buffer *buf)
 }
 
 
-static void nb_buffer_file_close(struct nb_buffer *buf)
-{
-	close(buf->fd);
-}
-
-static size_t nb_buffer_file_tell(struct nb_buffer *buf)
-{
-	return lseek(buf->fd, 0, SEEK_CUR);
-}
-
-
-static size_t nb_buffer_memory_tell(struct nb_buffer *buf)
-{
-	return 0;
-}
-
-
-static void nb_buffer_file_fill(struct nb_buffer *buf)
-{
-	int retval;
-
-	retval = read(buf->fd, buf->buf, buf->bufsize);
-	buf->len = MAX(retval, 0);
-
-	/* TODO handle error if retval < 0 */
-
-	buf->eof = (buf->len == 0);
-	TEMP_ASSERT(buf->len >= 0);
-}
-
-
-static void nb_buffer_file_flush(struct nb_buffer *buf)
-{
-	ssize_t written;
-	written = write(buf->fd, buf->buf, buf->len);
-	TEMP_ASSERT(written == buf->len);
-}
-
-
-static void nb_buffer_memory_close(struct nb_buffer *buf)
-{
-	xfree(buf->memory);
-}
-
-
-static void nb_buffer_memory_fill(struct nb_buffer *buf)
-{
-	size_t avail;
-	size_t ncpy;
-	
-	avail = buf->memory_len - buf->memory_pos;
-	ncpy = MIN(avail, buf->bufsize);
-
-	memcpy(buf->buf, buf->memory + buf->memory_pos, ncpy);
-
-	buf->len = ncpy;
-	buf->memory_pos += ncpy;
-}
-
-
-static void nb_buffer_memory_flush(struct nb_buffer *buf)
-{
-	size_t new_mry_size;
-
-	if (buf->memory_len + buf->len > buf->memory_size) {
-		new_mry_size = MAX(2 * buf->memory_size, buf->bufsize);
-		buf->memory = nb_realloc(buf->memory, new_mry_size);
-		buf->memory_size = new_mry_size;
-	}
-
-	memcpy(buf->memory + buf->memory_len, buf->buf, buf->len);
-	buf->memory_len += buf->len;
-}
-
-
 struct nb_buffer *nb_buffer_new(void)
 {
 	struct nb_buffer *buf;
@@ -301,84 +199,11 @@ struct nb_buffer *nb_buffer_new(void)
 
 void nb_buffer_delete(struct nb_buffer *buf)
 {
-	nb_buffer_free(buf);
-	xfree(buf);
-}
-
-
-nb_err_t nb_buffer_open_file(struct nb_buffer *buf, char *filename, int flags, int mode)
-{
-	if ((buf->fd = open(filename, flags, mode)) == -1)
-		return NB_ERR_OPEN;
-
-	buf->filename = filename;
-	buf->mode = mode;
-
-	buf->close = nb_buffer_file_close;
-	buf->fill = nb_buffer_file_fill;
-	buf->flush = nb_buffer_file_flush;
-	buf->tell = nb_buffer_file_tell;
-
-	return NB_ERR_OK;
-}
-
-
-static nb_err_t open_fd(struct nb_buffer *buf, int fd)
-{
-	buf->fd = fd;
-	buf->filename = NULL;
-	buf->mode = 0;
-
-	buf->close = NULL;
-	buf->fill = nb_buffer_file_fill;
-	buf->flush = nb_buffer_file_flush;
-	buf->tell = nb_buffer_file_tell;
-
-	return NB_ERR_OK;
-}
-
-
-nb_err_t nb_buffer_open_fd(struct nb_buffer *buf, int fd)
-{
-	return open_fd(buf, fd);
-}
-
-
-nb_err_t nb_buffer_open_stdout(struct nb_buffer *buf)
-{
-	return open_fd(buf, STDOUT_FILENO);
-}
-
-
-nb_err_t nb_buffer_open_stdin(struct nb_buffer *buf)
-{
-	return open_fd(buf, STDIN_FILENO);
-}
-
-
-nb_err_t nb_buffer_open_memory(struct nb_buffer *buf)
-{
-	buf->memory = NULL;
-	buf->memory_len = 0;
-	buf->memory_size = 0;
-	buf->memory_pos = 0;
-
-	buf->close = nb_buffer_memory_close;
-	buf->fill = nb_buffer_memory_fill;
-	buf->flush = nb_buffer_memory_flush;
-	buf->tell = nb_buffer_memory_tell;
-
-	return NB_ERR_OK;
-}
-
-
-void nb_buffer_close(struct nb_buffer *buf)
-{
 	if (buf->dirty)
-		buf->flush(buf);
+		buf->ops->flush(buf);
 
-	if (buf->close)
-		buf->close(buf);
+	xfree(buf->buf);
+	buf->ops->delete(buf);
 }
 
 
@@ -400,5 +225,12 @@ bool nb_buffer_is_eof(struct nb_buffer *buf)
 
 size_t nb_buffer_tell(struct nb_buffer *buf)
 {
-	return buf->tell(buf);
+	return buf->ops->tell(buf);
+}
+
+
+size_t nb_buffer_read_len(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+{
+	read_internal(buf, bytes, nbytes);
+	return buf->last_read_len;
 }

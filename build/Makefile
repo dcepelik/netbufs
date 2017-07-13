@@ -35,7 +35,7 @@ nbdiag: $(filter-out $(MAINS), $(OBJS)) objs/netbufs/nbdiag.o
 benchmark: $(BENCH_OBJS) $(filter-out $(MAINS), $(OBJS))
 	$(CC) $(LDFLAGS) -o $@ $^
 
-test-stream: $(addprefix objs/netbufs/, test-stream.o buf.o memory.o)
+test-stream: $(addprefix objs/netbufs/, test-stream.o buffer.o buffer-file.o memory.o)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 test-array: $(addprefix objs/netbufs/, test-array.o array.o memory.o)

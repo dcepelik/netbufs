@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
 	mode = S_IRUSR | S_IWUSR;
 	oflags = O_RDWR | O_CREAT | O_TRUNC;
 
-	assert(nb_buffer_open_file(out, "../tests/libcbor/arrays+maps.cbor", oflags, mode) == NB_ERR_OK);
+	assert(nb_buffer_new_file(out, "../tests/libcbor/arrays+maps.cbor", oflags, mode) == NB_ERR_OK);
 
 	cbor_stream_new(&cs, out);
 

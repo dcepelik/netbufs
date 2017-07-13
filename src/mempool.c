@@ -14,6 +14,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define DEBUG_THIS	0
+
 
 struct mempool_block
 {

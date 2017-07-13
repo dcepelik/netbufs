@@ -6,6 +6,7 @@
 #include "benchmark.h"
 #include "util.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -35,6 +36,8 @@ int main(int argc, char *argv[])
 	char *method;
 	char *fn_in;
 	char *fn_out;
+	int fd_in;
+	int fd_out;
 	struct rt *rt;
 	struct rt *rt2;
 	struct nb_buffer *in;
@@ -44,7 +47,7 @@ int main(int argc, char *argv[])
 	bool found;
 	size_t i;
 
-    clock_t start;
+    	clock_t start;
 	clock_t end;
 	double time_serialize;
 	double time_deserialize = 0;
@@ -60,20 +63,20 @@ int main(int argc, char *argv[])
 	fn_in = argv[2];
 	fn_out = argv[3];
 
-	mry = nb_buffer_new();
-	nb_buffer_open_memory(mry);
-
-	in = nb_buffer_new();
-	out = nb_buffer_new();
-
-	if (nb_buffer_open_file(in, fn_in, O_RDONLY, 0) != NB_ERR_OK) {
-		fprintf(stderr, "%s: cannot open file '%s'\n", argv0, fn_in);
+	if ((fd_in = open(fn_in, O_RDONLY, 0)) == -1) {
+		fprintf(stderr, "%s: cannot open input file '%s' for reading: %s\n",
+			argv0, fn_in, strerror(errno));
 		return EXIT_FAILURE;
 	}
-	if (nb_buffer_open_file(out, fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666) != NB_ERR_OK) {
-		fprintf(stderr, "%s: cannot open file '%s'\n", argv0, fn_out);
+	if ((fd_out = open(fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1) {
+		fprintf(stderr, "%s: cannot open output file '%s': %s\n",
+			argv0, fn_out, strerror(errno));
 		return EXIT_FAILURE;
 	}
+
+	in = nb_buffer_new_file(fd_in);
+	out = nb_buffer_new_file(fd_out);
+	mry = nb_buffer_new_memory();
 
 	rt = deserialize_bird(in);
 

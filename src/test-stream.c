@@ -4,9 +4,11 @@
  * The files are then diffed by run-tests.sh.
  */
 
+#include "buffer-internal.h"
 #include "buffer.h"
 #include "cbor.h"
 #include "common.h"
+#include "memory.h"
 
 #include <assert.h>
 #include <fcntl.h>
@@ -21,39 +23,34 @@
 
 int main(int argc, char *argv[])
 {
-	char *infn;
-	char *outfn;
+	char *fn_in;
+	char *fn_out;
+	int fd_in;
+	int fd_out;
 	struct nb_buffer *in;
 	struct nb_buffer *out;
 	unsigned char *buf;
 	size_t len;
-	int mode;
+	int fd_out_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 	assert(argc == 3);
 
-	infn = argv[1];
-	outfn = argv[2];
+	fn_in = argv[1];
+	fn_out = argv[2];
 
-	buf = malloc(BUFSIZE);
-	assert(buf != NULL);
+	assert((fd_in = open(fn_in, O_RDONLY, 0)) != -1);
+	assert((fd_out = open(fn_out, O_RDWR | O_CREAT | O_TRUNC, fd_out_mode)) != -1);
 
-	in = nb_buffer_new();
-	assert(in != NULL);
-
-	assert(nb_buffer_open_file(in, infn, O_RDONLY, 0) == NB_ERR_OK);
-
-	out = nb_buffer_new();
-	assert(out != NULL);
-
-	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-	assert(nb_buffer_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == NB_ERR_OK);
+	buf = nb_malloc(BUFSIZE);
+	in = nb_buffer_new_file(fd_in);
+	out = nb_buffer_new_file(fd_out);
 
 	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0) {
 		nb_buffer_write(out, buf, len);
 	}
 
-	nb_buffer_close(in);
-	nb_buffer_close(out);
+	nb_buffer_delete(in);
+	nb_buffer_delete(out);
 
 	return EXIT_SUCCESS;
 }

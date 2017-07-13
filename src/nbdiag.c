@@ -33,6 +33,8 @@ static const char *optstring = "01234b:i:I:emo:t:Jh";
 
 static char *fname_in = "-";
 static char *fname_out = "-";
+int fd_in;
+int fd_out;
 static struct nb_buffer *buf_in;
 static struct nb_buffer *buf_out;
 static struct cbor_stream cbor_in;
@@ -211,33 +213,32 @@ int main(int argc, char *argv[])
 	argv0 = basename(argv[0]);
 	parse_args(argc, argv);
 
-	buf_in = nb_buffer_new();
+	if (fname_in && strcmp(fname_in, "-") != 0) {
+		if ((fd_in = open(fname_in, O_RDONLY, 0)) == -1) {
+			fprintf(stderr, "%s: cannot open input file '%s' for reading: %s\n",
+				fname_in, argv0, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	else {
+		fd_in = STDIN_FILENO;
+	}
+	buf_in = nb_buffer_new_file(fd_in);
+
+	if (fname_out && strcmp(fname_out, "-") != 0) {
+		if ((fd_out = open(fname_out, O_WRONLY, 0)) == -1) {
+			fprintf(stderr, "%s: cannot open output file '%s' for writing: %s\n",
+				fname_out, argv0, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	else {
+		fd_out = STDOUT_FILENO;
+	}
+	buf_out = nb_buffer_new_file(fd_out);
+
 	cbor_stream_init(&cbor_in, buf_in);
-
-	buf_out = nb_buffer_new();
 	cbor_stream_init(&cbor_out, buf_out);
-
-	if (fname_in && strcmp(fname_in, "-") != 0)
-		err = nb_buffer_open_file(buf_in, fname_in, O_RDONLY, 0);
-	else
-		err = nb_buffer_open_stdin(buf_in);
-
-	if (err != NB_ERR_OK) {
-		fprintf(stderr, "%s: Cannot open input file '%s': %s\n", argv0, fname_in,
-			strerror(errno));
-		return EXIT_FAILURE;
-	}
-
-	if (fname_out && strcmp(fname_out, "-") != 0)
-		err = nb_buffer_open_file(buf_out, fname_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
-	else
-		err = nb_buffer_open_stdout(buf_out);
-	
-	if (err != NB_ERR_OK) {
-		fprintf(stderr, "%s: Cannot open output file '%s': %s\n", argv0, fname_out,
-			strerror(errno));
-		return EXIT_FAILURE;
-	}
 
 	if (!mirror) {
 		cbor_stream_set_diag(&cbor_in, &diag);
@@ -254,11 +255,10 @@ int main(int argc, char *argv[])
 		mirror_stream();
 	}
 
-	nb_buffer_close(buf_in);
 	cbor_stream_free(&cbor_in);
-
-	nb_buffer_close(buf_out);
 	cbor_stream_free(&cbor_out);
+	nb_buffer_delete(buf_in);
+	nb_buffer_delete(buf_out);
 
 	return EXIT_SUCCESS;
 }

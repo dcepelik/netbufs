@@ -4,12 +4,14 @@
 #include <assert.h>
 #include <stdio.h>
 
+#undef DEBUG_THIS
+
 #ifndef DEBUG
 #define DEBUG	0
 #endif
 
 #define DEBUG_PRINTF(fmt, ...) do { \
-	if (DEBUG) fprintf(stderr, "*** DEBUG ***\t%*s % 4d    " fmt "\n", \
+	if (DEBUG && DEBUG_THIS) fprintf(stderr, "*** DEBUG ***\t%*s % 4d    " fmt "\n", \
 				10, __FILE__, __LINE__, __VA_ARGS__); \
 } while (0);
 
