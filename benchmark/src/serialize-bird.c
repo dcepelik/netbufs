@@ -195,7 +195,7 @@ static char rte_src_to_char(enum rte_src src)
 		return '?';
 	}
 
-	die("Unknown enum rte_src value: %i\n", src);
+	nb_die("Unknown enum rte_src value: %i\n", src);
 	return '\0'; /* shut GCC up */
 }
 

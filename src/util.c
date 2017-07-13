@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 
-void die(char *fmt, ...)
+void nb_die(char *fmt, ...)
 {
 	va_list args;
 

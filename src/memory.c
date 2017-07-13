@@ -1,9 +1,6 @@
 /*
- * This module provides default implementation of basic memory-management
- * routines from memory.h.
- *
- * These function wrap malloc, realloc etc. calls and die upon failure.
- * If you want different behaviour, provide your own implementation.
+ * memory:
+ * Default Memory Bridge
  *
  * TODO die on nomem
  */
@@ -12,6 +9,7 @@
 #include "util.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 
 void *nb_malloc(size_t size)
@@ -22,7 +20,11 @@ void *nb_malloc(size_t size)
 
 void *nb_realloc(void *ptr, size_t size)
 {
-	return realloc(ptr, size);
+	ptr = realloc(ptr, size);
+	if (!ptr)
+		nb_die("Cannot allocate %zu bytes of memory.", size);
+
+	return ptr;
 }
 
 
