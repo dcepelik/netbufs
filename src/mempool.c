@@ -1,9 +1,9 @@
 /*
  * mempool:
- * Default Implementation of a Memory Pool
+ * Default Memory Pool Bridge
  *
  * Taken from the MCC project (c) 2016 David Čepelík <d@dcepelik.cz>
- * See github.com/dcepelik/mcc.
+ * See github.com/dcepelik/mcc for more information.
  */
 
 #include "common.h"
@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define DEBUG_THIS	0
+#define NB_DEBUG_THIS	0
 
 
 struct mempool_block
@@ -61,7 +61,7 @@ static void mempool_free_chain(struct mempool_chain *chain)
 		chain->last = chain->last->prev;
 		
 		mem = (unsigned char *)block - block->size;
-		DEBUG_PRINTF("About to free raw block at %p", mem);
+		NB_DEBUG_PRINTF("About to free raw block at %p", mem);
 
 		chain->num_blocks--;
 		chain->total_size -= block->alloc_size;
@@ -82,13 +82,13 @@ struct mempool_block *mempool_new_block(struct mempool_chain *chain, size_t size
 	
 	mem = nb_malloc(alloc_size);
 
-	DEBUG_PRINTF("Alocated new block, alloc_size = %zu B and size = %zu B",
+	NB_DEBUG_PRINTF("Alocated new block, alloc_size = %zu B and size = %zu B",
 		alloc_size, size);
-	DEBUG_PRINTF("Raw block starts at %p", mem);
+	NB_DEBUG_PRINTF("Raw block starts at %p", mem);
 
 	new_block = (struct mempool_block *)((unsigned char *)mem + size);
 
-	DEBUG_PRINTF("Block trailer resides at %p", (void *)new_block);
+	NB_DEBUG_PRINTF("Block trailer resides at %p", (void *)new_block);
 
 	new_block->alloc_size = alloc_size;
 	new_block->size = size;
@@ -120,18 +120,18 @@ static inline void *mempool_alloc_chain(struct mempool_chain *chain, size_t size
 
 void *mempool_malloc(struct mempool *pool, size_t size)
 {
-	DEBUG_PRINTF("Alloc request, size = %zu B", size);
+	NB_DEBUG_PRINTF("Alloc request, size = %zu B", size);
 
 	if (size <= pool->small_treshold) {
 		if (pool->small.last_free < size) {
-			DEBUG_MSG("Allocating block in small chain");
+			NB_DEBUG_MSG("Allocating block in small chain");
 			mempool_new_block(&pool->small, pool->block_size);
 		}
 
 		return mempool_alloc_chain(&pool->small, size);
 	}
 	else {
-		DEBUG_MSG("Allocating block in big chain");
+		NB_DEBUG_MSG("Allocating block in big chain");
 		mempool_new_block(&pool->big, size);
 		return mempool_alloc_chain(&pool->big, size);
 	}
@@ -147,7 +147,7 @@ void *mempool_memcpy(struct mempool *pool, void *src, size_t len)
 
 	dst = mempool_malloc(pool, len);
 
-	DEBUG_EXPR("%lu", len);
+	NB_DEBUG_EXPR("%lu", len);
 
 	memcpy(dst, src, len);
 	return dst;

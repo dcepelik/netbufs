@@ -1,8 +1,6 @@
 /*
  * memory:
  * Default Memory Bridge
- *
- * TODO die on nomem
  */
 
 #include "memory.h"

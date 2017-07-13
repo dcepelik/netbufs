@@ -4,20 +4,20 @@
 #include <assert.h>
 #include <stdio.h>
 
-#undef DEBUG_THIS
+#undef NB_DEBUG_THIS
 
-#ifndef DEBUG
-#define DEBUG	0
+#ifndef NB_DEBUG
+#define NB_DEBUG	0
 #endif
 
-#define DEBUG_PRINTF(fmt, ...) do { \
-	if (DEBUG && DEBUG_THIS) fprintf(stderr, "*** DEBUG ***\t%*s % 4d    " fmt "\n", \
+#define NB_DEBUG_PRINTF(fmt, ...) do { \
+	if (NB_DEBUG && NB_DEBUG_THIS) fprintf(stderr, "*** NB_DEBUG ***\t%*s % 4d    " fmt "\n", \
 				10, __FILE__, __LINE__, __VA_ARGS__); \
 } while (0);
 
-#define DEBUG_MSG(msg)			DEBUG_PRINTF("%s", msg)
-#define DEBUG_EXPR(formatter, expr)	DEBUG_PRINTF(#expr " = " formatter, (expr))
-#define DEBUG_TRACE			DEBUG_PRINTF("Control reached %s", __func__)
+#define NB_DEBUG_MSG(msg)		NB_DEBUG_PRINTF("%s", msg)
+#define NB_DEBUG_EXPR(formatter, expr)	NB_DEBUG_PRINTF(#expr " = " formatter, (expr))
+#define NB_DEBUG_TRACE			NB_DEBUG_PRINTF("Control reached %s", __func__)
 
 #define TEMP_ASSERT(expr)		assert(expr)
 

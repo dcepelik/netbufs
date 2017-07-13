@@ -5,7 +5,7 @@
 #include "netbufs.h"
 #include "string.h"
 
-#define DEBUG_THIS	0
+#define NB_DEBUG_THIS	0
 
 
 static void send_pid(struct nb *nb, nb_pid_t pid)
@@ -38,7 +38,7 @@ static nb_pid_t lid_to_pid(struct nb *nb, struct nb_group *group, nb_lid_t lid)
 	attr = group_get_attr(nb, group, lid);
 
 	if (!attr)
-		DEBUG_PRINTF("It seems that attribute %i isn't bound to group %s",
+		NB_DEBUG_PRINTF("It seems that attribute %i isn't bound to group %s",
 			lid, group->name);
 	TEMP_ASSERT(attr != NULL);
 
@@ -82,7 +82,7 @@ void nb_send_group(struct nb *nb, nb_lid_t id)
 
 	group = get_group(nb, id);
 	if (!group)
-		DEBUG_PRINTF("Cannot get group (lid=%i)", id);
+		NB_DEBUG_PRINTF("Cannot get group (lid=%i)", id);
 	TEMP_ASSERT(group != NULL);
 
 	cbor_encode_map_begin_indef(&nb->cs);
