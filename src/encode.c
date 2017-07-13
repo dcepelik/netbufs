@@ -3,7 +3,7 @@
  * CBOR Encoder
  */
 
-#include "buf.h"
+#include "buffer.h"
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
@@ -25,7 +25,7 @@ static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, nb_byte_t lb
 	struct block *block;
 
 	hdr = (major << 5) + lbits;
-	return nb_buf_write(cs->buf, &hdr, 1);
+	return nb_buffer_write(cs->buf, &hdr, 1);
 }
 
 
@@ -94,7 +94,7 @@ static nb_err_t write_hdr_u64(struct cbor_stream *cs, enum major major, uint64_t
 	for (i = 0; i < len; i++)
 		bytes[i] = u64be_ptr[(8 - len) + i];
 
-	return nb_buf_write(cs->buf, bytes, len);
+	return nb_buffer_write(cs->buf, bytes, len);
 }
 
 
@@ -252,7 +252,7 @@ static nb_err_t encode_bytes(struct cbor_stream *cs, enum major major, nb_byte_t
 {
 	nb_err_t err;
 	if ((err = write_hdr_u64(cs, major, len)) == NB_ERR_OK)
-		return nb_buf_write(cs->buf, bytes, len);
+		return nb_buffer_write(cs->buf, bytes, len);
 	return err;
 }
 
@@ -309,7 +309,7 @@ nb_err_t cbor_encode_sval(struct cbor_stream *cs, enum cbor_sval sval)
 			return write_hdr_major7(cs, (nb_byte_t)sval);
 		
 		if ((err = write_hdr_major7(cs, CBOR_MINOR_SVAL)) == NB_ERR_OK)
-			return nb_buf_write(cs->buf, (nb_byte_t *)&sval, 1);
+			return nb_buffer_write(cs->buf, (nb_byte_t *)&sval, 1);
 		return err;
 	}
 

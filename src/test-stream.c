@@ -4,7 +4,7 @@
  * The files are then diffed by run-tests.sh.
  */
 
-#include "buf.h"
+#include "buffer.h"
 #include "cbor.h"
 #include "common.h"
 
@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
 {
 	char *infn;
 	char *outfn;
-	struct nb_buf *in;
-	struct nb_buf *out;
+	struct nb_buffer *in;
+	struct nb_buffer *out;
 	unsigned char *buf;
 	size_t len;
 	int mode;
@@ -37,23 +37,23 @@ int main(int argc, char *argv[])
 	buf = malloc(BUFSIZE);
 	assert(buf != NULL);
 
-	in = nb_buf_new();
+	in = nb_buffer_new();
 	assert(in != NULL);
 
-	assert(nb_buf_open_file(in, infn, O_RDONLY, 0) == NB_ERR_OK);
+	assert(nb_buffer_open_file(in, infn, O_RDONLY, 0) == NB_ERR_OK);
 
-	out = nb_buf_new();
+	out = nb_buffer_new();
 	assert(out != NULL);
 
 	mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-	assert(nb_buf_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == NB_ERR_OK);
+	assert(nb_buffer_open_file(out, outfn, O_RDWR | O_CREAT | O_TRUNC, mode) == NB_ERR_OK);
 
-	while ((len = nb_buf_read_len(in, buf, BUFSIZE)) > 0) {
-		nb_buf_write(out, buf, len);
+	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0) {
+		nb_buffer_write(out, buf, len);
 	}
 
-	nb_buf_close(in);
-	nb_buf_close(out);
+	nb_buffer_close(in);
+	nb_buffer_close(out);
 
 	return EXIT_SUCCESS;
 }

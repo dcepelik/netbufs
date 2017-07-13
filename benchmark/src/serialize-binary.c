@@ -7,7 +7,7 @@
 #include <string.h>
 
 
-static void serialize_uint(struct nb_buf *buf, size_t nbytes, uint64_t u64)
+static void serialize_uint(struct nb_buffer *buf, size_t nbytes, uint64_t u64)
 {
 	assert(nbytes >= 1 && nbytes <= 8);
 
@@ -16,35 +16,35 @@ static void serialize_uint(struct nb_buf *buf, size_t nbytes, uint64_t u64)
 	size_t i;
 
 	u64be = htobe64(u64);
-	nb_buf_write(buf, u64be_ptr + (8 - nbytes), nbytes);
+	nb_buffer_write(buf, u64be_ptr + (8 - nbytes), nbytes);
 }
 
 
-static void serialize_u8(struct nb_buf *buf, uint8_t u8)
+static void serialize_u8(struct nb_buffer *buf, uint8_t u8)
 {
 	serialize_uint(buf, 1, u8);
 }
 
 
-static void serialize_u32(struct nb_buf *buf, uint32_t u32)
+static void serialize_u32(struct nb_buffer *buf, uint32_t u32)
 {
 	serialize_uint(buf, 4, u32);
 }
 
 
-static void serialize_u64(struct nb_buf *buf, uint64_t u64)
+static void serialize_u64(struct nb_buffer *buf, uint64_t u64)
 {
 	serialize_uint(buf, 8, u64);
 }
 
 
-static void serialize_bool(struct nb_buf *buf, bool b)
+static void serialize_bool(struct nb_buffer *buf, bool b)
 {
 	serialize_u8(buf, b ? 1 : 0);
 }
 
 
-static void serialize_i32(struct nb_buf *buf, int32_t i32)
+static void serialize_i32(struct nb_buffer *buf, int32_t i32)
 {
 	bool negative = (i32 < 0);
 	serialize_bool(buf, negative);
@@ -56,22 +56,22 @@ static void serialize_i32(struct nb_buf *buf, int32_t i32)
 }
 
 
-static void serialize_ipv4(struct nb_buf *buf, ipv4_t ip)
+static void serialize_ipv4(struct nb_buffer *buf, ipv4_t ip)
 {
 	serialize_u32(buf, ip);
 }
 
 
-static void serialize_string(struct nb_buf *buf, char *str)
+static void serialize_string(struct nb_buffer *buf, char *str)
 {
 	size_t len;
 	len = strlen(str);
 	serialize_u64(buf, len);
-	nb_buf_write(buf, (nb_byte_t *)str, len);
+	nb_buffer_write(buf, (nb_byte_t *)str, len);
 }
 
 
-static void serialize_time(struct nb_buf *buf, struct tm *tm)
+static void serialize_time(struct nb_buffer *buf, struct tm *tm)
 {
 	serialize_i32(buf, tm->tm_hour);
 	serialize_i32(buf, tm->tm_min);
@@ -79,7 +79,7 @@ static void serialize_time(struct nb_buf *buf, struct tm *tm)
 }
 
 
-static void serialize_attr_bgp_as_path(struct nb_buf *buf, struct rte_attr *attr)
+static void serialize_attr_bgp_as_path(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	size_t i;
 	serialize_u64(buf, array_size(attr->bgp_as_path));
@@ -88,7 +88,7 @@ static void serialize_attr_bgp_as_path(struct nb_buf *buf, struct rte_attr *attr
 }
 
 
-static void serialize_attr_bgp_community(struct nb_buf *buf, struct rte_attr *attr)
+static void serialize_attr_bgp_community(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	size_t i;
 	serialize_u64(buf, array_size(attr->cflags));
@@ -99,7 +99,7 @@ static void serialize_attr_bgp_community(struct nb_buf *buf, struct rte_attr *at
 }
 
 
-static void serialize_rte_attr(struct nb_buf *buf, struct rte_attr *attr)
+static void serialize_rte_attr(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	char *value;
 
@@ -137,7 +137,7 @@ static void serialize_rte_attr(struct nb_buf *buf, struct rte_attr *attr)
 }
 
 
-static void serialize_rte(struct nb_buf *buf, struct rte *rte)
+static void serialize_rte(struct nb_buffer *buf, struct rte *rte)
 {
 	size_t i;
 	serialize_u32(buf, rte->netmask);
@@ -163,7 +163,7 @@ static void serialize_rte(struct nb_buf *buf, struct rte *rte)
 }
 
 
-void serialize_binary(struct rt *rt, struct nb_buf *buf)
+void serialize_binary(struct rt *rt, struct nb_buffer *buf)
 {
 	size_t i;
 

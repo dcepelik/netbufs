@@ -2,7 +2,7 @@
  * TODO This should be linked with the die()-ing version of memory allocators.
  *      (we're not checking for NULL return values from _new() functions).
  */
-#include "buf.h"
+#include "buffer.h"
 #include "benchmark.h"
 #include "util.h"
 
@@ -16,8 +16,8 @@
 
 static struct {
 	char *name;
-	void (*serialize)(struct rt *rt, struct nb_buf *buf);
-	struct rt *(*deserialize)(struct nb_buf *buf);
+	void (*serialize)(struct rt *rt, struct nb_buffer *buf);
+	struct rt *(*deserialize)(struct nb_buffer *buf);
 } methods[] = {
 	{ .name = "binary", .serialize = serialize_binary, .deserialize = deserialize_binary },
 	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
@@ -37,9 +37,9 @@ int main(int argc, char *argv[])
 	char *fn_out;
 	struct rt *rt;
 	struct rt *rt2;
-	struct nb_buf *in;
-	struct nb_buf *out;
-	struct nb_buf *mry;
+	struct nb_buffer *in;
+	struct nb_buffer *out;
+	struct nb_buffer *mry;
 	const char *argv0;
 	bool found;
 	size_t i;
@@ -60,17 +60,17 @@ int main(int argc, char *argv[])
 	fn_in = argv[2];
 	fn_out = argv[3];
 
-	mry = nb_buf_new();
-	nb_buf_open_memory(mry);
+	mry = nb_buffer_new();
+	nb_buffer_open_memory(mry);
 
-	in = nb_buf_new();
-	out = nb_buf_new();
+	in = nb_buffer_new();
+	out = nb_buffer_new();
 
-	if (nb_buf_open_file(in, fn_in, O_RDONLY, 0) != NB_ERR_OK) {
+	if (nb_buffer_open_file(in, fn_in, O_RDONLY, 0) != NB_ERR_OK) {
 		fprintf(stderr, "%s: cannot open file '%s'\n", argv0, fn_in);
 		return EXIT_FAILURE;
 	}
-	if (nb_buf_open_file(out, fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666) != NB_ERR_OK) {
+	if (nb_buffer_open_file(out, fn_out, O_RDWR | O_CREAT | O_TRUNC, 0666) != NB_ERR_OK) {
 		fprintf(stderr, "%s: cannot open file '%s'\n", argv0, fn_out);
 		return EXIT_FAILURE;
 	}
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
 		end = clock();
 		time_serialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
-		nb_buf_flush(mry);
+		nb_buffer_flush(mry);
 
 		start = clock();
 		rt2 = methods[i].deserialize(mry);
@@ -102,17 +102,17 @@ int main(int argc, char *argv[])
 		time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
 		serialize_bird(rt2, out);
-		nb_buf_flush(out);
+		nb_buffer_flush(out);
 
 		printf("%lu %.3f %.3f\n", array_size(rt->entries), time_serialize, time_deserialize);
 	}
 	else {
 		methods[i].serialize(rt, out);
-		nb_buf_flush(out);
+		nb_buffer_flush(out);
 	}
 
-	nb_buf_delete(in);
-	nb_buf_delete(mry);
-	nb_buf_delete(out);
+	nb_buffer_delete(in);
+	nb_buffer_delete(mry);
+	nb_buffer_delete(out);
 	return EXIT_SUCCESS;
 }

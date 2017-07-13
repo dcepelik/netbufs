@@ -129,7 +129,7 @@ static void cbor_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 }
 
 
-void serialize_cbor(struct rt *rt, struct nb_buf *buf)
+void serialize_cbor(struct rt *rt, struct nb_buffer *buf)
 {
 	struct cbor_stream cs;
 	size_t i;

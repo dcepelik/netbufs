@@ -12,7 +12,7 @@ static void serialize_rte(xmlNodePtr rt_node, struct rte *rte)
 }
 
 
-void serialize_xml(struct rt *rt, struct nb_buf *buf)
+void serialize_xml(struct rt *rt, struct nb_buffer *buf)
 {
 	xmlDocPtr doc;
 	xmlNodePtr rt_node;

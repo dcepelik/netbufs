@@ -6,7 +6,7 @@
 #ifndef CBOR_H
 #define CBOR_H
 
-#include "buf.h"
+#include "buffer.h"
 #include "common.h"
 #include "diag.h"
 #include "error.h"
@@ -103,7 +103,7 @@ typedef void (cbor_error_handler_t)(struct cbor_stream *cs, nb_err_t err, void *
 struct cbor_stream
 {
 	mempool_t mempool;	/* memory pool for this CBOR stream */
-	struct nb_buf *buf;	/* the buffer being read or written */
+	struct nb_buffer *buf;	/* the buffer being read or written */
 	struct stack blocks;	/* block stack (open arrays and maps) */
 	struct diag *diag;	/* diagnostics buffer */
 
@@ -117,7 +117,7 @@ struct cbor_stream
 	void *error_handler_arg;
 };
 
-void cbor_stream_init(struct cbor_stream *cs, struct nb_buf *buf);
+void cbor_stream_init(struct cbor_stream *cs, struct nb_buffer *buf);
 void cbor_stream_free(struct cbor_stream *cs);
 
 void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag);

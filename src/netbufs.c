@@ -37,7 +37,7 @@ static void handle_cbor_error(struct cbor_stream *cs, nb_err_t err, void *arg)
 }
 
 
-void nb_init(struct nb *nb, struct nb_buf *buf)
+void nb_init(struct nb *nb, struct nb_buffer *buf)
 {
 	nb->mempool = mempool_new(NB_MEMPOOL_BLOCK_SIZE);
 

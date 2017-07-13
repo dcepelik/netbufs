@@ -42,7 +42,7 @@ const char *cbor_type_string(enum cbor_type type)
 }
 
 
-void cbor_stream_init(struct cbor_stream *cs, struct nb_buf *buf)
+void cbor_stream_init(struct cbor_stream *cs, struct nb_buffer *buf)
 {
 	cs->buf = buf;
 	cs->mempool = mempool_new(MEMPOOL_BLOCK_SIZE);

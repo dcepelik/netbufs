@@ -5,7 +5,7 @@
 
 /*
  * TODO The resulting string in the strbuf is copied into a memory stream;
- *	this is wasteful. Give nb_buf a printf()-like APIs.
+ *	this is wasteful. Give nb_buffer a printf()-like APIs.
  */
 
 
@@ -267,7 +267,7 @@ static void print_rte(struct strbuf *sb, struct rte *rte)
 }
 
 
-void serialize_bird(struct rt *rt, struct nb_buf *buf)
+void serialize_bird(struct rt *rt, struct nb_buffer *buf)
 {
 	struct rte rte;
 	struct strbuf sb;
@@ -279,5 +279,5 @@ void serialize_bird(struct rt *rt, struct nb_buf *buf)
 	for (i = 0; i < array_size(rt->entries); i++)
 		print_rte(&sb, &rt->entries[i]);
 
-	nb_buf_write(buf, (nb_byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
+	nb_buffer_write(buf, (nb_byte_t *)strbuf_get_string(&sb), strbuf_strlen(&sb));
 }

@@ -3,18 +3,18 @@
 #include "debug.h"
 
 
-static void deserialize_uint(struct nb_buf *buf, size_t nbytes, uint64_t *u64)
+static void deserialize_uint(struct nb_buffer *buf, size_t nbytes, uint64_t *u64)
 {
 	assert(nbytes >= 1 && nbytes <= 8);
 
 	uint64_t u64be = 0;
 	nb_byte_t *u64be_ptr = (nb_byte_t *)&u64be;
-	nb_buf_read(buf, u64be_ptr + (8 - nbytes), nbytes);
+	nb_buffer_read(buf, u64be_ptr + (8 - nbytes), nbytes);
 	*u64 = be64toh(u64be);
 }
 
 
-static void deserialize_u8(struct nb_buf *buf, uint8_t *u8)
+static void deserialize_u8(struct nb_buffer *buf, uint8_t *u8)
 {
 	uint64_t u64;
 	deserialize_uint(buf, 1, &u64);
@@ -23,7 +23,7 @@ static void deserialize_u8(struct nb_buf *buf, uint8_t *u8)
 }
 
 
-static void deserialize_u32(struct nb_buf *buf, uint32_t *u32)
+static void deserialize_u32(struct nb_buffer *buf, uint32_t *u32)
 {
 	uint64_t u64;
 	deserialize_uint(buf, 4, &u64);
@@ -32,13 +32,13 @@ static void deserialize_u32(struct nb_buf *buf, uint32_t *u32)
 }
 
 
-static void deserialize_u64(struct nb_buf *buf, uint64_t *u64)
+static void deserialize_u64(struct nb_buffer *buf, uint64_t *u64)
 {
 	deserialize_uint(buf, 8, u64);
 }
 
 
-static void deserialize_bool(struct nb_buf *buf, bool *b)
+static void deserialize_bool(struct nb_buffer *buf, bool *b)
 {
 	uint8_t u8;
 	deserialize_u8(buf, &u8);
@@ -47,7 +47,7 @@ static void deserialize_bool(struct nb_buf *buf, bool *b)
 }
 
 
-static void deserialize_i32(struct nb_buf *buf, int32_t *i32)
+static void deserialize_i32(struct nb_buffer *buf, int32_t *i32)
 {
 	bool negative;
 	uint32_t u32;
@@ -62,13 +62,13 @@ static void deserialize_i32(struct nb_buf *buf, int32_t *i32)
 }
 
 
-static void deserialize_ipv4(struct nb_buf *buf, ipv4_t *ip)
+static void deserialize_ipv4(struct nb_buffer *buf, ipv4_t *ip)
 {
 	deserialize_u32(buf, ip);
 }
 
 
-static void deserialize_time(struct nb_buf *buf, struct tm *tm)
+static void deserialize_time(struct nb_buffer *buf, struct tm *tm)
 {
 	deserialize_i32(buf, &tm->tm_hour);
 	deserialize_i32(buf, &tm->tm_min);
@@ -76,17 +76,17 @@ static void deserialize_time(struct nb_buf *buf, struct tm *tm)
 }
 
 
-static void deserialize_string(struct nb_buf *buf, char **str)
+static void deserialize_string(struct nb_buffer *buf, char **str)
 {
 	size_t len;
 	deserialize_u64(buf, &len);
 	*str = malloc(len + 1); /* TODO: * sizeof(char)? */
-	nb_buf_read(buf, (nb_byte_t *)*str, len);
+	nb_buffer_read(buf, (nb_byte_t *)*str, len);
 	(*str)[len] = '\0';
 }
 
 
-static void deserialize_attr_bgp_as_path(struct nb_buf *buf, struct rte_attr *attr)
+static void deserialize_attr_bgp_as_path(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	size_t nitems;
 	size_t i;
@@ -100,7 +100,7 @@ static void deserialize_attr_bgp_as_path(struct nb_buf *buf, struct rte_attr *at
 }
 
 
-static void deserialize_attr_bgp_community(struct nb_buf *buf, struct rte_attr *attr)
+static void deserialize_attr_bgp_community(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	size_t nitems;
 	size_t i;
@@ -115,7 +115,7 @@ static void deserialize_attr_bgp_community(struct nb_buf *buf, struct rte_attr *
 }
 
 
-static void deserialize_rte_attr(struct nb_buf *buf, struct rte_attr *attr)
+static void deserialize_rte_attr(struct nb_buffer *buf, struct rte_attr *attr)
 {
 	size_t foo;
 
@@ -150,7 +150,7 @@ static void deserialize_rte_attr(struct nb_buf *buf, struct rte_attr *attr)
 }
 
 
-static void deserialize_rte(struct nb_buf *buf, struct rte *rte)
+static void deserialize_rte(struct nb_buffer *buf, struct rte *rte)
 {
 	size_t i;
 	size_t nattrs;
@@ -181,7 +181,7 @@ static void deserialize_rte(struct nb_buf *buf, struct rte *rte)
 }
 
 
-struct rt *deserialize_binary(struct nb_buf *buf)
+struct rt *deserialize_binary(struct nb_buffer *buf)
 {
 	struct rt *rt;
 	size_t i;
@@ -190,7 +190,7 @@ struct rt *deserialize_binary(struct nb_buf *buf)
 	deserialize_string(buf, &rt->version_str);
 
 	rt->entries = array_new(256, sizeof(*rt->entries)); /* TODO 256 */
-	for (i = 0; !nb_buf_is_eof(buf); i++) {
+	for (i = 0; !nb_buffer_is_eof(buf); i++) {
 		rt->entries = array_push(rt->entries, 1);
 		deserialize_rte(buf, &rt->entries[i]);
 	}

@@ -131,7 +131,7 @@ static void send_rt(struct nb *nb, struct rt *rt)
 }
 
 
-void serialize_netbufs(struct rt *rt, struct nb_buf *buf)
+void serialize_netbufs(struct rt *rt, struct nb_buffer *buf)
 {
 	struct nb nb;
 	nb_init(&nb, buf);

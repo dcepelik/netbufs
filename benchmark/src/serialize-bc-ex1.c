@@ -50,7 +50,7 @@ static void serialize_string(struct cbor_stream *cs, char *str)
 }
 
 
-void serialize_bc_ex1(struct rt *rt, struct nb_buf *buf)
+void serialize_bc_ex1(struct rt *rt, struct nb_buffer *buf)
 {
 	assert(array_size(rt->entries) >= 1);
 

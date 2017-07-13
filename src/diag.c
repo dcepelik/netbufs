@@ -1,4 +1,4 @@
-#include "buf.h"
+#include "buffer.h"
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
@@ -285,7 +285,7 @@ nb_err_t diag_dump_cbor_stream(struct diag *diag, struct cbor_stream *cs)
 	nb_err_t err = NB_ERR_OK;
 	size_t i;
 
-	for (i = 0; !nb_buf_is_eof(cs->buf); i++) {
+	for (i = 0; !nb_buffer_is_eof(cs->buf); i++) {
 		if ((err = cbor_decode_item(cs, &item)) != NB_ERR_OK)
 			break;
 		diag_eol(diag, true);

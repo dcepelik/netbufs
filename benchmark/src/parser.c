@@ -19,7 +19,7 @@
 #define PARSER_BUF_SIZE		4096
 
 
-void parser_init(struct parser *p, struct nb_buf *buf)
+void parser_init(struct parser *p, struct nb_buffer *buf)
 {
 	p->buf = buf;
 	p->line_no = 1;
@@ -47,7 +47,7 @@ void parser_free(struct parser *p)
 
 static char parser_getc(struct parser *p)
 {
-	p->cur = nb_buf_getc(p->buf);
+	p->cur = nb_buffer_getc(p->buf);
 	if (p->cur == '\n') {
 		p->line_no++;
 		p->col_no = 0;
@@ -60,13 +60,13 @@ static char parser_getc(struct parser *p)
 
 static void parser_ungetc(struct parser *p, char c)
 {
-	nb_buf_ungetc(p->buf, c);
+	nb_buffer_ungetc(p->buf, c);
 }
 
 
 static char parser_peek(struct parser *p)
 {
-	return nb_buf_peek(p->buf);
+	return nb_buffer_peek(p->buf);
 }
 
 

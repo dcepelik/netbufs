@@ -7,7 +7,7 @@
  * TODO String and bytestream trimming, dynamic col widths.
  */
 
-#include "buf.h"
+#include "buffer.h"
 #include "cbor.h"
 #include "common.h"
 #include "debug.h"
@@ -33,8 +33,8 @@ static const char *optstring = "01234b:i:I:emo:t:Jh";
 
 static char *fname_in = "-";
 static char *fname_out = "-";
-static struct nb_buf *buf_in;
-static struct nb_buf *buf_out;
+static struct nb_buffer *buf_in;
+static struct nb_buffer *buf_out;
 static struct cbor_stream cbor_in;
 static struct cbor_stream cbor_out;
 
@@ -195,7 +195,7 @@ static void mirror_stream(void)
 	struct cbor_item item;
 	nb_err_t err;
 
-	while (!nb_buf_is_eof(buf_in)) {
+	while (!nb_buffer_is_eof(buf_in)) {
 		cbor_decode_item(&cbor_in, &item);
 		cbor_encode_item(&cbor_out, &item);
 	}
@@ -211,16 +211,16 @@ int main(int argc, char *argv[])
 	argv0 = basename(argv[0]);
 	parse_args(argc, argv);
 
-	buf_in = nb_buf_new();
+	buf_in = nb_buffer_new();
 	cbor_stream_init(&cbor_in, buf_in);
 
-	buf_out = nb_buf_new();
+	buf_out = nb_buffer_new();
 	cbor_stream_init(&cbor_out, buf_out);
 
 	if (fname_in && strcmp(fname_in, "-") != 0)
-		err = nb_buf_open_file(buf_in, fname_in, O_RDONLY, 0);
+		err = nb_buffer_open_file(buf_in, fname_in, O_RDONLY, 0);
 	else
-		err = nb_buf_open_stdin(buf_in);
+		err = nb_buffer_open_stdin(buf_in);
 
 	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: Cannot open input file '%s': %s\n", argv0, fname_in,
@@ -229,9 +229,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (fname_out && strcmp(fname_out, "-") != 0)
-		err = nb_buf_open_file(buf_out, fname_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
+		err = nb_buffer_open_file(buf_out, fname_out, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	else
-		err = nb_buf_open_stdout(buf_out);
+		err = nb_buffer_open_stdout(buf_out);
 	
 	if (err != NB_ERR_OK) {
 		fprintf(stderr, "%s: Cannot open output file '%s': %s\n", argv0, fname_out,
@@ -254,10 +254,10 @@ int main(int argc, char *argv[])
 		mirror_stream();
 	}
 
-	nb_buf_close(buf_in);
+	nb_buffer_close(buf_in);
 	cbor_stream_free(&cbor_in);
 
-	nb_buf_close(buf_out);
+	nb_buffer_close(buf_out);
 	cbor_stream_free(&cbor_out);
 
 	return EXIT_SUCCESS;

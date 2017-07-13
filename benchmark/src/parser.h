@@ -16,12 +16,12 @@ struct parser
 {
 	size_t line_no;		/* current line number */
 	size_t col_no;		/* current column number */
-	struct nb_buf *buf;	/* input buffer */
+	struct nb_buffer *buf;	/* input buffer */
 	char cur;		/* current character */
 };
 
 
-void parser_init(struct parser *p, struct nb_buf *buf);
+void parser_init(struct parser *p, struct nb_buffer *buf);
 void parser_parse_rt(struct parser *p, struct rt *rt);
 void parser_free(struct parser *p);
 

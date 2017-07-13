@@ -1,4 +1,4 @@
-#include "buf.h"
+#include "buffer.h"
 #include "common.h"
 #include "debug.h"
 #include "memory.h"
@@ -11,10 +11,10 @@
 #include <string.h>
 #include <unistd.h>
 
-static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes);
+static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 
 
-void nb_buf_init(struct nb_buf *buf)
+void nb_buffer_init(struct nb_buffer *buf)
 {
 	size_t size = 4096;
 
@@ -30,13 +30,13 @@ void nb_buf_init(struct nb_buf *buf)
 }
 
 
-void nb_buf_free(struct nb_buf *buf)
+void nb_buffer_free(struct nb_buffer *buf)
 {
 	xfree(buf->buf);
 }
 
 
-void nb_buf_flush(struct nb_buf *buf)
+void nb_buffer_flush(struct nb_buffer *buf)
 {
 	buf->flush(buf);
 	buf->pos = 0;
@@ -45,7 +45,7 @@ void nb_buf_flush(struct nb_buf *buf)
 }
 
 
-static bool nb_buf_fill(struct nb_buf *buf)
+static bool nb_buffer_fill(struct nb_buffer *buf)
 {
 	buf->fill(buf);
 	buf->pos = 0;
@@ -70,7 +70,7 @@ static void debug_write(unsigned char *bytes, size_t nbytes)
 
 
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
-static nb_err_t read_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
+static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
@@ -83,7 +83,7 @@ static nb_err_t read_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbyte
 		assert(avail >= 0);
 
 		if (!avail) {
-			nb_buf_fill(buf);
+			nb_buffer_fill(buf);
 			avail = buf->len;
 
 			if (avail == 0)
@@ -130,26 +130,26 @@ static inline char hexchar(nb_byte_t val)
 }
 
 
-nb_err_t nb_buf_read(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
+nb_err_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return read_internal(buf, bytes, nbytes);
 }
 
 
-size_t nb_buf_read_len(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
+size_t nb_buffer_read_len(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	read_internal(buf, bytes, nbytes);
-	return nb_buf_get_last_read_len(buf);
+	return nb_buffer_get_last_read_len(buf);
 }
 
 
-nb_err_t nb_buf_write(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
+nb_err_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return write_internal(buf, bytes, nbytes);
 }
 
 
-static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbytes)
+static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
@@ -159,7 +159,7 @@ static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbyt
 		assert(avail >= 0);
 
 		if (!avail) {
-			nb_buf_flush(buf);
+			nb_buffer_flush(buf);
 			avail = buf->bufsize;
 		}
 
@@ -178,7 +178,7 @@ static nb_err_t write_internal(struct nb_buf *buf, nb_byte_t *bytes, size_t nbyt
 }
 
 
-int nb_buf_getc(struct nb_buf *buf)
+int nb_buffer_getc(struct nb_buffer *buf)
 {
 	char c;
 
@@ -189,47 +189,47 @@ int nb_buf_getc(struct nb_buf *buf)
 	}
 
 	if (buf->pos >= buf->len)
-		if (!nb_buf_fill(buf))
+		if (!nb_buffer_fill(buf))
 			return BUF_EOF;
 
 	return buf->buf[buf->pos++];
 }
 
 
-void nb_buf_ungetc(struct nb_buf *buf, int c)
+void nb_buffer_ungetc(struct nb_buffer *buf, int c)
 {
 	assert(buf->ungetc == BUF_EOF); /* don't override ungetc */
 	buf->ungetc = c;
 }
 
 
-int nb_buf_peek(struct nb_buf *buf)
+int nb_buffer_peek(struct nb_buffer *buf)
 {
 	char c;
-	c = nb_buf_getc(buf);
-	nb_buf_ungetc(buf, c);
+	c = nb_buffer_getc(buf);
+	nb_buffer_ungetc(buf, c);
 	return c;
 }
 
 
-static void nb_buf_file_close(struct nb_buf *buf)
+static void nb_buffer_file_close(struct nb_buffer *buf)
 {
 	close(buf->fd);
 }
 
-static size_t nb_buf_file_tell(struct nb_buf *buf)
+static size_t nb_buffer_file_tell(struct nb_buffer *buf)
 {
 	return lseek(buf->fd, 0, SEEK_CUR);
 }
 
 
-static size_t nb_buf_memory_tell(struct nb_buf *buf)
+static size_t nb_buffer_memory_tell(struct nb_buffer *buf)
 {
 	return 0;
 }
 
 
-static void nb_buf_file_fill(struct nb_buf *buf)
+static void nb_buffer_file_fill(struct nb_buffer *buf)
 {
 	int retval;
 
@@ -243,7 +243,7 @@ static void nb_buf_file_fill(struct nb_buf *buf)
 }
 
 
-static void nb_buf_file_flush(struct nb_buf *buf)
+static void nb_buffer_file_flush(struct nb_buffer *buf)
 {
 	ssize_t written;
 	written = write(buf->fd, buf->buf, buf->len);
@@ -251,13 +251,13 @@ static void nb_buf_file_flush(struct nb_buf *buf)
 }
 
 
-static void nb_buf_memory_close(struct nb_buf *buf)
+static void nb_buffer_memory_close(struct nb_buffer *buf)
 {
 	xfree(buf->memory);
 }
 
 
-static void nb_buf_memory_fill(struct nb_buf *buf)
+static void nb_buffer_memory_fill(struct nb_buffer *buf)
 {
 	size_t avail;
 	size_t ncpy;
@@ -272,7 +272,7 @@ static void nb_buf_memory_fill(struct nb_buf *buf)
 }
 
 
-static void nb_buf_memory_flush(struct nb_buf *buf)
+static void nb_buffer_memory_flush(struct nb_buffer *buf)
 {
 	size_t new_mry_size;
 
@@ -287,26 +287,26 @@ static void nb_buf_memory_flush(struct nb_buf *buf)
 }
 
 
-struct nb_buf *nb_buf_new(void)
+struct nb_buffer *nb_buffer_new(void)
 {
-	struct nb_buf *buf;
+	struct nb_buffer *buf;
 	
 	buf = nb_malloc(sizeof(*buf));
 	if (buf)
-		nb_buf_init(buf);
+		nb_buffer_init(buf);
 
 	return buf;
 }
 
 
-void nb_buf_delete(struct nb_buf *buf)
+void nb_buffer_delete(struct nb_buffer *buf)
 {
-	nb_buf_free(buf);
+	nb_buffer_free(buf);
 	xfree(buf);
 }
 
 
-nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int flags, int mode)
+nb_err_t nb_buffer_open_file(struct nb_buffer *buf, char *filename, int flags, int mode)
 {
 	if ((buf->fd = open(filename, flags, mode)) == -1)
 		return NB_ERR_OPEN;
@@ -314,65 +314,65 @@ nb_err_t nb_buf_open_file(struct nb_buf *buf, char *filename, int flags, int mod
 	buf->filename = filename;
 	buf->mode = mode;
 
-	buf->close = nb_buf_file_close;
-	buf->fill = nb_buf_file_fill;
-	buf->flush = nb_buf_file_flush;
-	buf->tell = nb_buf_file_tell;
+	buf->close = nb_buffer_file_close;
+	buf->fill = nb_buffer_file_fill;
+	buf->flush = nb_buffer_file_flush;
+	buf->tell = nb_buffer_file_tell;
 
 	return NB_ERR_OK;
 }
 
 
-static nb_err_t open_fd(struct nb_buf *buf, int fd)
+static nb_err_t open_fd(struct nb_buffer *buf, int fd)
 {
 	buf->fd = fd;
 	buf->filename = NULL;
 	buf->mode = 0;
 
 	buf->close = NULL;
-	buf->fill = nb_buf_file_fill;
-	buf->flush = nb_buf_file_flush;
-	buf->tell = nb_buf_file_tell;
+	buf->fill = nb_buffer_file_fill;
+	buf->flush = nb_buffer_file_flush;
+	buf->tell = nb_buffer_file_tell;
 
 	return NB_ERR_OK;
 }
 
 
-nb_err_t nb_buf_open_fd(struct nb_buf *buf, int fd)
+nb_err_t nb_buffer_open_fd(struct nb_buffer *buf, int fd)
 {
 	return open_fd(buf, fd);
 }
 
 
-nb_err_t nb_buf_open_stdout(struct nb_buf *buf)
+nb_err_t nb_buffer_open_stdout(struct nb_buffer *buf)
 {
 	return open_fd(buf, STDOUT_FILENO);
 }
 
 
-nb_err_t nb_buf_open_stdin(struct nb_buf *buf)
+nb_err_t nb_buffer_open_stdin(struct nb_buffer *buf)
 {
 	return open_fd(buf, STDIN_FILENO);
 }
 
 
-nb_err_t nb_buf_open_memory(struct nb_buf *buf)
+nb_err_t nb_buffer_open_memory(struct nb_buffer *buf)
 {
 	buf->memory = NULL;
 	buf->memory_len = 0;
 	buf->memory_size = 0;
 	buf->memory_pos = 0;
 
-	buf->close = nb_buf_memory_close;
-	buf->fill = nb_buf_memory_fill;
-	buf->flush = nb_buf_memory_flush;
-	buf->tell = nb_buf_memory_tell;
+	buf->close = nb_buffer_memory_close;
+	buf->fill = nb_buffer_memory_fill;
+	buf->flush = nb_buffer_memory_flush;
+	buf->tell = nb_buffer_memory_tell;
 
 	return NB_ERR_OK;
 }
 
 
-void nb_buf_close(struct nb_buf *buf)
+void nb_buffer_close(struct nb_buffer *buf)
 {
 	if (buf->dirty)
 		buf->flush(buf);
@@ -382,7 +382,7 @@ void nb_buf_close(struct nb_buf *buf)
 }
 
 
-bool nb_buf_is_eof(struct nb_buf *buf)
+bool nb_buffer_is_eof(struct nb_buffer *buf)
 {
 	assert(!buf->dirty);
 
@@ -390,7 +390,7 @@ bool nb_buf_is_eof(struct nb_buf *buf)
 
 	avail = buf->len - buf->pos;
 	if (!avail) {
-		nb_buf_fill(buf);
+		nb_buffer_fill(buf);
 		return buf->len == 0;
 	}
 
@@ -398,7 +398,7 @@ bool nb_buf_is_eof(struct nb_buf *buf)
 }
 
 
-size_t nb_buf_tell(struct nb_buf *buf)
+size_t nb_buffer_tell(struct nb_buffer *buf)
 {
 	return buf->tell(buf);
 }

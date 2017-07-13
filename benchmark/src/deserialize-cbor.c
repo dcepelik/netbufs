@@ -138,7 +138,7 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 }
 
 
-struct rt *deserialize_cbor(struct nb_buf *buf)
+struct rt *deserialize_cbor(struct nb_buffer *buf)
 {
 	struct cbor_stream cs;
 	struct diag diag;
@@ -154,7 +154,7 @@ struct rt *deserialize_cbor(struct nb_buf *buf)
 	cbor_decode_text(&cs, &rt->version_str);
 
 	rt->entries = array_new(256, sizeof(*rt->entries));
-	for (i = 0; !nb_buf_is_eof(buf); i++) {
+	for (i = 0; !nb_buffer_is_eof(buf); i++) {
 		rt->entries = array_push(rt->entries, 1);
 		deserialize_rte(&cs, &rt->entries[i]);
 	}

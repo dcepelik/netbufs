@@ -1,7 +1,7 @@
 #ifndef NETBUFS_H
 #define NETBUFS_H
 
-#include "buf.h"
+#include "buffer.h"
 #include "cbor.h"
 #include "diag.h"
 #include "error.h"
@@ -67,7 +67,7 @@ char *nb_strerror(struct nb *nb);
 size_t nb_internal_recv_array_size(struct nb *nb);
 
 
-void nb_init(struct nb *nb, struct nb_buf *buf);
+void nb_init(struct nb *nb, struct nb_buffer *buf);
 void nb_free(struct nb *nb);
 
 void nb_bind(struct nb *nb, struct nb_group *group, nb_lid_t id, const char *name, bool reqd);

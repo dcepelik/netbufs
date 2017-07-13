@@ -2,7 +2,7 @@
 #include "parser.h"
 
 
-struct rt *deserialize_bird(struct nb_buf *buf)
+struct rt *deserialize_bird(struct nb_buffer *buf)
 {
 	struct rt *rt;
 	struct parser p;

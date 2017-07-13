@@ -8,7 +8,7 @@
  * TODO Decoding of tagged items
  */
 
-#include "buf.h"
+#include "buffer.h"
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
@@ -55,8 +55,8 @@ static inline nb_err_t read_stream(struct cbor_stream *cs, nb_byte_t *bytes, siz
 {
 	nb_err_t err;
 	
-	diag_log_offset(cs->diag, nb_buf_tell(cs->buf));
-	if ((err = nb_buf_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
+	diag_log_offset(cs->diag, nb_buffer_tell(cs->buf));
+	if ((err = nb_buffer_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
 		return error(cs, err,
 			err == NB_ERR_EOF ? "EOF was unexpected." : "(buffer error).");
 	diag_log_raw(cs->diag, bytes, MIN(nbytes, 4));

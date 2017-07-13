@@ -210,7 +210,7 @@ static nb_err_t recv_rt(struct nb *nb, struct rt *rt)
 }
 
 
-struct rt *deserialize_netbufs(struct nb_buf *buf)
+struct rt *deserialize_netbufs(struct nb_buffer *buf)
 {
 	struct nb nb;
 	struct rt *rt;
