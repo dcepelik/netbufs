@@ -70,9 +70,6 @@ static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 				return NB_ERR_EOF;
 		}
 
-		//DEBUG_EXPR("%lu", buf->pos);
-		//DEBUG_EXPR("%lu", buf->len);
-
 		ncpy = MIN(avail, nbytes);
 		memcpy(bytes, buf->buf + buf->pos, ncpy);
 		bytes += ncpy;
