@@ -46,7 +46,12 @@ void nb_init(struct nb *nb, struct nb_buffer *buf)
 
 	/* TODO clean-up */
 	diag_init(&nb->diag, stderr);
+	diag_enable_col(&nb->diag, DIAG_COL_RAW);
+	diag_enable_col(&nb->diag, DIAG_COL_ITEMS);
+	diag_enable_col(&nb->diag, DIAG_COL_CBOR);
+	diag_enable_col(&nb->diag, DIAG_COL_PROTO);
 	nb->diag.enabled = true;
+
 	nb->active_group = NULL;
 	cbor_stream_set_diag(&nb->cs, &nb->diag);
 

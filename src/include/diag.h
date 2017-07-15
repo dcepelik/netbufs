@@ -8,6 +8,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#define DIAG_ENABLE			0
+
 #define DIAG_NUM_COLS			5
 #define DIAG_DEFAULT_INDENT_CHAR	'.'
 #define DIAG_DEFAULT_INDENT_SIZE	4
@@ -27,35 +29,35 @@ enum diag_col
 
 #define diag_log_offset(diag, offset) \
 	do { \
-		if ((diag)->enabled) \
+		if (DIAG_ENABLE && (diag)->enabled) \
 			diag_log_offset_internal(diag, offset); \
 	} while (0)
 
 
 #define	diag_log_raw(diag, bytes, count) \
 	do { \
-		if ((diag)->enabled) \
+		if (DIAG_ENABLE && (diag)->enabled) \
 			diag_log_raw_internal(diag, bytes, count); \
 	} while (0)
 
 
 #define	diag_log_item(diag, ...) \
 	do { \
-		if ((diag)->enabled) \
+		if (DIAG_ENABLE && (diag)->enabled) \
 			diag_log_item_internal(diag, __VA_ARGS__); \
 	} while (0)
 
 
 #define diag_log_cbor(diag, ...) \
 	do { \
-		if ((diag)->enabled) \
+		if (DIAG_ENABLE && (diag)->enabled) \
 			diag_log_cbor_internal(diag, __VA_ARGS__); \
 	} while (0)
 
 
 #define diag_log_proto(diag, ...) \
 	do { \
-		if ((diag)->enabled) \
+		if (DIAG_ENABLE && (diag)->enabled) \
 			diag_log_proto_internal(diag, __VA_ARGS__); \
 	} while (0)
 

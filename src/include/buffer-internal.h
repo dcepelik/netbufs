@@ -15,17 +15,26 @@ struct nb_buffer_ops
 	size_t (*tell)(struct nb_buffer *buf);
 };
 
+enum buf_mode
+{
+	BUF_MODE_IDLE,		/* the buffer is idle (nothing to read nor write) */
+	BUF_MODE_READING,	/* the buffer contains data to be read */
+	BUF_MODE_WRITING,	/* the buffer contains data to be written */
+};
+
 struct nb_buffer
 {
-	const struct nb_buffer_ops *ops;
+	const struct nb_buffer_ops *ops;	/* buffer operations */
+
+	nb_byte_t mode;		/* buffer mode */
 	nb_byte_t *buf;		/* data buffer */
 	size_t bufsize;		/* size of the buffer */
 	size_t pos;		/* current read/write position within the buf */
 	size_t len;		/* number of valid bytes in the buffer (for reading) */
-	size_t last_read_len;
 	bool dirty;		/* do we have data to be written? */
 	bool eof;		/* did we hit EOF during last filling? */
 	int ungetc;		/* character to be returned by next getc()-call */
+	size_t last_read_len;
 };
 
 

@@ -23,10 +23,10 @@ void nb_buffer_init(struct nb_buffer *buf)
 	buf->buf = nb_malloc(size);
 	TEMP_ASSERT(buf->buf);
 
+	buf->mode = BUF_MODE_IDLE;
 	buf->bufsize = size;
 	buf->pos = 0;
 	buf->len = 0;
-	buf->dirty = false;
 	buf->eof = false;
 	buf->ungetc = -1;
 }
@@ -34,10 +34,12 @@ void nb_buffer_init(struct nb_buffer *buf)
 
 void nb_buffer_flush(struct nb_buffer *buf)
 {
-	buf->ops->flush(buf);
+	if (buf->mode == BUF_MODE_WRITING)
+		buf->ops->flush(buf);
+
 	buf->pos = 0;
 	buf->len = 0;
-	buf->dirty = false;
+	buf->mode = BUF_MODE_IDLE;
 }
 
 
@@ -55,7 +57,8 @@ static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 	size_t avail;
 	size_t ncpy;
 
-	assert(!buf->dirty);
+	assert(buf->mode != BUF_MODE_WRITING);
+	buf->mode = BUF_MODE_READING;
 	buf->last_read_len = 0;
 
 	while (nbytes > 0) {
@@ -124,6 +127,9 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 	size_t avail;
 	size_t ncpy;
 
+	assert(buf->mode != BUF_MODE_READING);
+	buf->mode = BUF_MODE_WRITING;
+
 	while (nbytes > 0) {
 		avail = buf->bufsize - buf->len;
 		assert(avail >= 0);
@@ -139,7 +145,6 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 		buf->pos += ncpy;
 		buf->len = buf->pos;
 		nbytes -= ncpy;
-		buf->dirty = true;
 	}
 
 	assert(nbytes == 0);
@@ -151,6 +156,8 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 int nb_buffer_getc(struct nb_buffer *buf)
 {
 	char c;
+
+	assert(buf->mode != BUF_MODE_WRITING);
 
 	if (buf->ungetc != BUF_EOF) {
 		c = buf->ungetc;
@@ -182,31 +189,9 @@ int nb_buffer_peek(struct nb_buffer *buf)
 }
 
 
-struct nb_buffer *nb_buffer_new(void)
-{
-	struct nb_buffer *buf;
-	
-	buf = nb_malloc(sizeof(*buf));
-	if (buf)
-		nb_buffer_init(buf);
-
-	return buf;
-}
-
-
-void nb_buffer_delete(struct nb_buffer *buf)
-{
-	if (buf->dirty)
-		buf->ops->flush(buf);
-
-	xfree(buf->buf);
-	buf->ops->delete(buf);
-}
-
-
 bool nb_buffer_is_eof(struct nb_buffer *buf)
 {
-	assert(!buf->dirty);
+	assert(buf->mode != BUF_MODE_WRITING);
 
 	size_t avail;
 
@@ -230,4 +215,14 @@ size_t nb_buffer_read_len(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes
 {
 	read_internal(buf, bytes, nbytes);
 	return buf->last_read_len;
+}
+
+
+void nb_buffer_delete(struct nb_buffer *buf)
+{
+	if (buf->mode == BUF_MODE_WRITING)
+		buf->ops->flush(buf);
+
+	xfree(buf->buf);
+	buf->ops->delete(buf);
 }

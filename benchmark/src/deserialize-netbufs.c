@@ -217,6 +217,7 @@ struct rt *deserialize_netbufs(struct nb_buffer *buf)
 
 	nb_init(&nb, buf);
 	setup_ids(&nb);
+	nb.diag.enabled = false;
 
 	rt = nb_malloc(sizeof(*rt));
 	recv_rt(&nb, rt);

@@ -166,6 +166,7 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 
 	if (minor == CBOR_MINOR_BREAK) {
 		diag_log_item(cs->diag, "break");
+		diag_eol(cs->diag, false);
 		return cs->err = NB_ERR_BREAK; /* TODO is this a hack? */
 	}
 

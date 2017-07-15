@@ -23,9 +23,9 @@ static struct {
 	{ .name = "binary", .serialize = serialize_binary, .deserialize = deserialize_binary },
 	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
 	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
-	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = NULL },
+	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
 	{ .name = "protobufs", .serialize = NULL, .deserialize = NULL },
-	{ .name = "xml", .serialize = NULL, .deserialize = NULL },
+	{ .name = "xml", .serialize = serialize_xml, .deserialize = deserialize_xml },
 
 	{ .name = "bc-ex1", .serialize = serialize_bc_ex1, .deserialize = NULL },
 };

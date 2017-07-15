@@ -5,7 +5,7 @@
 #include "netbufs.h"
 #include "string.h"
 
-#define NB_DEBUG_THIS	0
+#define NB_DEBUG_THIS	1
 
 
 static void send_pid(struct nb *nb, nb_pid_t pid)

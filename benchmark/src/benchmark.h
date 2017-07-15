@@ -51,6 +51,22 @@ enum rte_src
 	RTE_SRC_WHO_KNOWS,
 };
 
+static inline const char *rte_src_to_string(enum rte_src src)
+{
+	switch (src) {
+	case RTE_SRC_INTERNAL:
+		return "internal";
+	case RTE_SRC_EXTERNAL:
+		return "external";
+	case RTE_SRC_U:
+		return "u";
+	case RTE_SRC_WHO_KNOWS:
+		return "unknown";
+	default:
+		return NULL;
+	}
+}
+
 enum bgp_origin
 {
 	BGP_ORIGIN_IGP,
@@ -110,7 +126,7 @@ struct rte_attr
 	union {
 		enum bgp_origin bgp_origin;	/* BGP.origin */
 		ipv4_t bgp_next_hop;		/* BGP.next_hop */
-		int *bgp_as_path;			/* BGP.as_path */
+		int *bgp_as_path;		/* BGP.as_path */
 		uint32_t bgp_local_pref;	/* BGP.local_pref */
 		struct bgp_cflag *cflags;	/* BGP.community */
 		struct bgp_aggr aggr;		/* BGP.aggregator */
@@ -159,6 +175,29 @@ struct rt
 };
 
 
+static inline const char *get_attr_name(struct rte_attr *attr)
+{
+	switch (attr->type) {
+	case RTE_ATTR_TYPE_BGP_AS_PATH:
+		return "bgp_as_path";
+	case RTE_ATTR_TYPE_BGP_ORIGIN:
+		return "bgp_origin";
+	case RTE_ATTR_TYPE_BGP_NEXT_HOP:
+		return "bgp_next_hop";
+	case RTE_ATTR_TYPE_BGP_LOCAL_PREF:
+		return "bgp_local_pref";
+	case RTE_ATTR_TYPE_BGP_COMMUNITY:
+		return "bgp_community";
+	case RTE_ATTR_TYPE_BGP_AGGREGATOR:
+		return "bgp_aggregator";
+	case RTE_ATTR_TYPE_OTHER:
+		return "bgp_other";
+	default:
+		return NULL;
+	}
+}
+
+
 void serialize_bird(struct rt *rt, struct nb_buffer *buf);
 struct rt *deserialize_bird(struct nb_buffer *buf);
 
@@ -172,5 +211,8 @@ void serialize_binary(struct rt *rt, struct nb_buffer *buf);
 struct rt *deserialize_binary(struct nb_buffer *buf);
 
 void serialize_bc_ex1(struct rt *rt, struct nb_buffer *buf);
+
+void serialize_xml(struct rt *rt, struct nb_buffer *buf);
+struct rt *deserialize_xml(struct nb_buffer *buf);
 
 #endif

@@ -77,7 +77,6 @@ static void file_flush(struct nb_buffer *buf)
 {
 	struct nb_buffer_file *file_buf = (struct nb_buffer_file *)buf;
 	ssize_t written;
-
 	written = write(file_buf->fd, buf->buf, buf->len);
 	TEMP_ASSERT(written == buf->len);
 }
