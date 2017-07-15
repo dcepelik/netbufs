@@ -103,7 +103,7 @@ static void switch_lines(struct diag *diag)
 }
 
 
-static void diag_dump_line_internal(struct diag *diag)
+static void diag_dump_line_do(struct diag *diag)
 {
 	switch_lines(diag);
 	if (diag->line->empty)
@@ -127,18 +127,18 @@ static void diag_dump_line_internal(struct diag *diag)
 }
 
 
-void diag_log_offset_internal(struct diag *diag, size_t offset)
+void diag_log_offset_do(struct diag *diag, size_t offset)
 {
 	diag->line->offset = offset;
 }
 
 
-void diag_log_raw_internal(struct diag *diag, nb_byte_t *bytes, size_t count)
+void diag_log_raw_do(struct diag *diag, nb_byte_t *bytes, size_t count)
 {
 	size_t i;
 
 	if (diag->eol_on_next_raw)
-		diag_dump_line_internal(diag);
+		diag_dump_line_do(diag);
 
 	for (i = 0; i < count; i++)
 		strbuf_printf(&diag->line->raw, "%02X", bytes[i]);
@@ -146,7 +146,7 @@ void diag_log_raw_internal(struct diag *diag, nb_byte_t *bytes, size_t count)
 }
 
 
-void diag_log_item_internal(struct diag *diag, char *msg, ...)
+void diag_log_item_do(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
@@ -156,7 +156,7 @@ void diag_log_item_internal(struct diag *diag, char *msg, ...)
 }
 
 
-void diag_log_cbor_internal(struct diag *diag, char *msg, ...)
+void diag_log_cbor_do(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
@@ -166,7 +166,7 @@ void diag_log_cbor_internal(struct diag *diag, char *msg, ...)
 }
 
 
-void diag_log_proto_internal(struct diag *diag, char *msg, ...)
+void diag_log_proto_do(struct diag *diag, char *msg, ...)
 {
 	va_list args;
 	va_start(args, msg);
@@ -176,14 +176,14 @@ void diag_log_proto_internal(struct diag *diag, char *msg, ...)
 }
 
 
-void diag_eol(struct diag *diag, bool cbor_comma)
+void diag_eol_do(struct diag *diag, bool cbor_comma)
 {
 	diag->line->cbor_comma = cbor_comma;
 	diag->eol_on_next_raw = true;
 }
 
 
-void diag_comma(struct diag *diag)
+void diag_comma_do(struct diag *diag)
 {
 	if (diag->lines[1 - diag->line_idx].cbor_comma) {
 		strbuf_printf(&diag->lines[1 - diag->line_idx].cbor.sb, ",");
@@ -192,9 +192,9 @@ void diag_comma(struct diag *diag)
 }
 
 
-void diag_force_newline(struct diag *diag)
+void diag_force_newline_do(struct diag *diag)
 {
-	diag_dump_line_internal(diag);
+	diag_dump_line_do(diag);
 }
 
 
@@ -255,25 +255,25 @@ void diag_init(struct diag *diag, FILE *fout)
 }
 
 
-void diag_increase(struct diag *diag)
+void diag_indent_cbor_do(struct diag *diag)
 {
 	isbuf_indent(&diag->line->cbor);
 }
 
 
-void diag_decrease(struct diag *diag)
+void diag_dedent_cbor_do(struct diag *diag)
 {
 	isbuf_dedent(&diag->line->cbor);
 }
 
 
-void diag_indent_proto(struct diag *diag)
+void diag_indent_proto_do(struct diag *diag)
 {
 	isbuf_indent(&diag->line->proto);
 }
 
 
-void diag_dedent_proto(struct diag *diag)
+void diag_dedent_proto_do(struct diag *diag)
 {
 	isbuf_dedent(&diag->line->proto);
 }
@@ -343,8 +343,8 @@ void diag_enable_col(struct diag *diag, enum diag_col col)
 }
 
 
-void diag_flush(struct diag *diag)
+void diag_flush_do(struct diag *diag)
 {
-	diag_dump_line_internal(diag);
-	diag_dump_line_internal(diag);
+	diag_dump_line_do(diag);
+	diag_dump_line_do(diag);
 }

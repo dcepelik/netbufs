@@ -18,7 +18,7 @@ static void init_group(struct nb *nb, struct nb_group *group, const char *name)
 {
 	group->name = name; /* TODO strdup if no longer const */
 	group->attrs = array_new(NB_ATTRS_INIT_SIZE, sizeof(*group->attrs));
-	group->max_pid = 0;
+	group->max_pid = 1;
 	group->pid_to_lid = array_new(NB_GROUPS_INIT_SIZE, sizeof(*group->pid_to_lid));
 }
 
@@ -94,6 +94,7 @@ void nb_default_err_handler(struct nb *nb, nb_err_t err, void *arg)
 	(void) arg;
 	fprintf(stderr, "%s: NetBufs error: #%i: %s.\n", __func__, err,
 		nb_strerror(nb));
+	assert(false);
 	exit(EXIT_FAILURE);
 }
 

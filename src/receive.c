@@ -22,7 +22,8 @@ size_t nb_internal_recv_array_size(struct nb *nb)
 
 static void recv_pid(struct nb *nb, nb_pid_t *pid)
 {
-	cbor_decode_uint64(&nb->cs, pid);
+	if (cbor_decode_uint64(&nb->cs, pid) == NB_ERR_BREAK)
+		*pid = UINT64_MAX;
 }
 
 
@@ -34,8 +35,10 @@ static void recv_key(struct nb *nb, struct nb_group *group)
 	nb_lid_t lid;
 	nb_err_t err;
 
+	cbor_decode_map_begin_indef(&nb->cs);
 	cbor_decode_text(&nb->cs, &name);
 	recv_pid(nb, &pid);
+	cbor_decode_map_end(&nb->cs);
 
 	group->pid_to_lid = array_ensure_index(group->pid_to_lid, pid);
 
@@ -57,22 +60,19 @@ static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 	nb_pid_t pid;
 
 recv_another_key:
-	if ((err = cbor_peek(&nb->cs, &item)) != NB_ERR_OK) {
-		assert(err == NB_ERR_BREAK); /* other error would call error handler */
-		return false;
-	}
-
-	if (item.type == CBOR_TYPE_TEXT) { /* a key to be inserted follows */
-		recv_key(nb, group);
-		goto recv_another_key;
-	}
-
 	recv_pid(nb, &pid);
 
 	/* pID 0 is reserved and means "the type of this group", don't do any lookups */
 	if (pid == 0) {
 		*id = 0;
 		return true;
+	}
+	else if (pid == 1) {
+		recv_key(nb, group);
+		goto recv_another_key;
+	}
+	else if (pid == UINT64_MAX) {
+		return false;
 	}
 
 	/* TODO undef lids in pid_to_lid shall be LID_UNKNOWN! */

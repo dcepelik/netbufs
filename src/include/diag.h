@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-#define DIAG_ENABLE			0
+#define DIAG_ENABLE			1
 
 #define DIAG_NUM_COLS			5
 #define DIAG_DEFAULT_INDENT_CHAR	'.'
@@ -27,40 +27,29 @@ enum diag_col
 };
 
 
-#define diag_log_offset(diag, offset) \
+#define diag_if_on(diag, command) \
 	do { \
 		if (DIAG_ENABLE && (diag)->enabled) \
-			diag_log_offset_internal(diag, offset); \
+			command; \
 	} while (0)
 
+/*
+ * Conditionally compiled wrappers for diag utility functions
+ */
 
-#define	diag_log_raw(diag, bytes, count) \
-	do { \
-		if (DIAG_ENABLE && (diag)->enabled) \
-			diag_log_raw_internal(diag, bytes, count); \
-	} while (0)
-
-
-#define	diag_log_item(diag, ...) \
-	do { \
-		if (DIAG_ENABLE && (diag)->enabled) \
-			diag_log_item_internal(diag, __VA_ARGS__); \
-	} while (0)
-
-
-#define diag_log_cbor(diag, ...) \
-	do { \
-		if (DIAG_ENABLE && (diag)->enabled) \
-			diag_log_cbor_internal(diag, __VA_ARGS__); \
-	} while (0)
-
-
-#define diag_log_proto(diag, ...) \
-	do { \
-		if (DIAG_ENABLE && (diag)->enabled) \
-			diag_log_proto_internal(diag, __VA_ARGS__); \
-	} while (0)
-
+#define diag_comma(diag)		diag_if_on(diag, diag_comma_do(diag));
+#define diag_dedent_cbor(diag)		diag_if_on(diag, diag_dedent_cbor_do(diag));
+#define diag_dedent_proto(diag)		diag_if_on(diag, diag_dedent_proto_do(diag));
+#define diag_eol(diag, cbor_comma)	diag_if_on(diag, diag_eol_do(diag, cbor_comma));
+#define diag_flush(diag)		diag_if_on(diag, diag_flush_do(diag));
+#define diag_force_newline(diag)	diag_if_on(diag, diag_force_newline_do(diag));
+#define diag_indent_cbor(diag)		diag_if_on(diag, diag_indent_cbor_do(diag))
+#define diag_indent_proto(diag)		diag_if_on(diag, diag_indent_proto_do(diag));
+#define diag_log_cbor(diag, ...) 	diag_if_on(diag, diag_log_cbor_do(diag, __VA_ARGS__))
+#define diag_log_item(diag, ...) 	diag_if_on(diag, diag_log_item_do(diag, __VA_ARGS__))
+#define diag_log_offset(diag, offset) 	diag_if_on(diag, diag_log_offset_do(diag, offset))
+#define diag_log_proto(diag, ...)	diag_if_on(diag, diag_log_proto_do(diag, __VA_ARGS__))
+#define diag_log_raw(diag, bytes, n)	diag_if_on(diag, diag_log_raw_do(diag, bytes, n))
 
 /*
  * A string buffer with output indentation.
@@ -114,31 +103,27 @@ struct cbor_stream;
 void diag_init(struct diag *diag, FILE *fout);
 void diag_free(struct diag *diag);
 
+const char *diag_get_sval_name(struct diag *diag, enum cbor_sval sval);
+void diag_enable_col(struct diag *diag, enum diag_col col);
+
 nb_err_t diag_dump_cbor_stream(struct diag *diag, struct cbor_stream *cs);
 
-void diag_eol(struct diag *diag, bool cbor_comma);
-void diag_comma(struct diag *diag);
-void diag_force_newline(struct diag *diag);
-void diag_flush(struct diag *diag);
-
-void diag_log_offset_internal(struct diag *diag, size_t offset);
-void diag_log_raw_internal(struct diag *diag, unsigned char *bytes, size_t count);
-void diag_log_item_internal(struct diag *diag, char *msg, ...);
-
-/* TODO rename */
-void diag_increase(struct diag *diag);
-void diag_decrease(struct diag *diag);
-void diag_log_cbor_internal(struct diag *diag, char *msg, ...);
-
-void diag_indent_proto(struct diag *diag);
-void diag_dedent_proto(struct diag *diag);
-void diag_log_proto_internal(struct diag *diag, char *msg, ...);
-
-void diag_log_sval(struct diag *diag, uint64_t u64);
+void diag_eol_do(struct diag *diag, bool cbor_comma);
+void diag_force_newline_do(struct diag *diag);
+void diag_flush_do(struct diag *diag);
+void diag_comma_do(struct diag *diag);
 void diag_print_block_stack(struct diag *diag);
 
-const char *diag_get_sval_name(struct diag *diag, enum cbor_sval sval);
+void diag_log_offset_do(struct diag *diag, size_t offset);
+void diag_log_raw_do(struct diag *diag, unsigned char *bytes, size_t count);
+void diag_log_item_do(struct diag *diag, char *msg, ...);
+void diag_log_cbor_do(struct diag *diag, char *msg, ...);
+void diag_log_proto_do(struct diag *diag, char *msg, ...);
+void diag_log_sval(struct diag *diag, uint64_t u64);
 
-void diag_enable_col(struct diag *diag, enum diag_col col);
+void diag_indent_cbor_do(struct diag *diag);
+void diag_dedent_cbor_do(struct diag *diag);
+void diag_indent_proto_do(struct diag *diag);
+void diag_dedent_proto_do(struct diag *diag);
 
 #endif

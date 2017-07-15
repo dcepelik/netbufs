@@ -15,7 +15,7 @@ CBOR_RFC_TESTS_JSON=rfc-tests.json
 NBDIAG=../build/nbdiag
 
 IO_DIR=io
-IO_RAND_FILES="1 1k 8k 1M 16M"
+IO_RAND_FILES="1 5117 1k 8k 1M 16M"
 
 setup_test_files() {
 	if ! command -v jq >/dev/null; then

@@ -19,7 +19,9 @@ BENCH_DEPS = $(subst $(BENCH_SRC_DIR), deps/benchmark, $(patsubst %.c, %.deps, $
 
 MAINS = $(addprefix objs/netbufs/, nbdiag.o test-array.o test-stream.o test-adhoc.o)
 
-CFLAGS += -c -std=gnu11 -Wall -Werror --pedantic \
+CFLAGS += -c -std=gnu11 \
+	-Wall -Werror --pedantic \
+	-O3 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
 	-I /usr/include/libxml2 \

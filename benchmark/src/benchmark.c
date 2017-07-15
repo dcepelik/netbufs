@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 
 static struct {
@@ -92,6 +94,21 @@ int main(int argc, char *argv[])
 	}
 
 	if (methods[i].deserialize) {
+		pid_t pid;
+		pid_t child;
+		pid = getpid();
+		child = fork();
+		char pid_str[16];
+		snprintf(pid_str, sizeof(pid_str), "%i", pid);
+		if (child == 0) {
+			int dev_null = open("/dev/null", O_RDWR);
+			assert(dev_null != -1);
+			dup2(dev_null, STDOUT_FILENO);
+			dup2(dev_null, STDERR_FILENO);
+			exit(execl("/usr/bin/perf", "perf", "record", "-o", "perf.data",
+				"-p", pid_str, NULL));
+		}
+
 		start = clock();
 		methods[i].serialize(rt, mry);
 		end = clock();
@@ -104,6 +121,9 @@ int main(int argc, char *argv[])
 		end = clock();
 		time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
 
+		kill(child, SIGINT);
+		waitpid(child, NULL, 0);
+
 		serialize_bird(rt2, out);
 		nb_buffer_flush(out);
 
@@ -113,6 +133,9 @@ int main(int argc, char *argv[])
 		methods[i].serialize(rt, out);
 		nb_buffer_flush(out);
 	}
+
+	close(fd_out);
+
 
 	nb_buffer_delete(in);
 	nb_buffer_delete(mry);

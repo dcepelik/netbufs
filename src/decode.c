@@ -23,13 +23,14 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-
 #define CBOR_ARRAY_INIT_SIZE	8
 #define CBOR_BSTACK_INIT_SIZE	4
 #define INT64_MIN_ABS			(-(INT64_MIN + 1))
 
 #define	MAJOR_MASK	0xE0
 #define	LBITS_MASK	0x1F
+
+#define diag_finish_item(cs)	diag_if_on((cs)->diag, diag_finish_item_do(cs))
 
 
 static inline uint8_t lbits_to_nbytes(enum lbits lbits)
@@ -108,7 +109,7 @@ static inline nb_err_t u64_to_i64(struct cbor_stream *cs, uint64_t u64, int64_t 
 }
 
 
-static void diag_finish_item(struct cbor_stream *cs)
+static void diag_finish_item_do(struct cbor_stream *cs)
 {
 	switch (top_block(cs)->type) {
 	case CBOR_TYPE_ARRAY:
@@ -117,13 +118,13 @@ static void diag_finish_item(struct cbor_stream *cs)
 
 	case CBOR_TYPE_MAP: /* TODO */
 		if (top_block(cs)->num_items % 2 == 0) {
-			diag_decrease(cs->diag);
+			diag_dedent_cbor(cs->diag);
 			diag_eol(cs->diag, true);
 		}
 		else {
 			diag_log_cbor(cs->diag, ":");
 			diag_eol(cs->diag, false);
-			diag_increase(cs->diag);
+			diag_indent_cbor(cs->diag);
 		}
 		break;
 
@@ -152,7 +153,8 @@ static void print_sval_diag(struct cbor_stream *cs, enum cbor_sval sval)
 static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
 	enum minor minor)
 {
-	uint64_t u64;
+	uint64_t u64 = 0;
+	nb_err_t err;
 
 	assert(minor >= 0);
 
@@ -167,11 +169,12 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 	if (minor == CBOR_MINOR_BREAK) {
 		diag_log_item(cs->diag, "break");
 		diag_eol(cs->diag, false);
-		return cs->err = NB_ERR_BREAK; /* TODO is this a hack? */
+		return cs->err = NB_ERR_BREAK;
 	}
 
 	/* leverage decode_u64 to read the appropriate amount of data */
-	decode_u64(cs, (enum lbits)minor, &u64);
+	if ((err = decode_u64(cs, (enum lbits)minor, &u64)) != NB_ERR_OK)
+		return err;
 
 	switch (minor) {
 	case CBOR_MINOR_SVAL:
@@ -198,7 +201,7 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	nb_byte_t hdr;
 	enum major major;
 	nb_byte_t lbits;
-	uint64_t u64;
+	uint64_t u64 = 0;
 	nb_err_t err;
 
 	/* TODO hacky hacky */
@@ -219,31 +222,34 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	lbits = hdr & LBITS_MASK;
 	assert(major >= 0 && major <= 7);
 
-	if (major == CBOR_MAJOR_7)
-		return decode_item_major7(cs, item, lbits);
-
-	item->type = (enum cbor_type)major;
+	diag_comma(cs->diag); /* append a comma to previous line if needed */
 	item->flags = 0;
 
-	if (lbits == LBITS_INDEFINITE)
-		item->flags |= CBOR_FLAG_INDEFINITE;
+	if (major == CBOR_MAJOR_UINT && lbits <= 23) {
+		item->type = CBOR_TYPE_UINT;
+		u64 = lbits;
+	}
+	else {
+		if (major == CBOR_MAJOR_7)
+			return decode_item_major7(cs, item, lbits);
 
-	if (is_indefinite(item) && !major_allows_indefinite(major))
-		return error(cs, NB_ERR_INDEF, "Indefinite-length encoding is not allowed "
-			"for %s items.", cbor_type_string(major));
+		item->type = (enum cbor_type)major;
 
-	if (!is_indefinite(item) && (err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
-		return err;
+		if (lbits == LBITS_INDEFINITE)
+			item->flags |= CBOR_FLAG_INDEFINITE;
 
-	diag_comma(cs->diag); /* append a comma to previous line if needed */
-
-	if (is_indefinite(item))
-		diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
-	else
-		diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
-
-	if (is_indefinite(item)) {
-		return NB_ERR_OK;
+		if (!is_indefinite(item)) {
+			if ((err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
+				return err;
+			diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
+		}
+		else {
+			if (!major_allows_indefinite(major))
+				return error(cs, NB_ERR_INDEF, "Indefinite-length encoding "
+					"is not allowed for %s items.", cbor_type_string(major));
+			diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
+			return NB_ERR_OK;
+		}
 	}
 
 	item->u64 = u64; /* TODO remove */
@@ -476,8 +482,9 @@ static nb_err_t decode_break(struct cbor_stream *cs)
 	struct cbor_item item;
 	nb_err_t err;
 
-	if ((err = predecode(cs, &item)) == NB_ERR_BREAK)
-		return NB_ERR_OK;
+	if (cs->err == NB_ERR_BREAK || (err = predecode(cs, &item)) == NB_ERR_BREAK)
+		return cs->err = NB_ERR_OK;
+
 	return error(cs, NB_ERR_ITEM, "unexpected %s, break was expected",
 		cbor_type_string(item.type));
 }
@@ -546,7 +553,7 @@ nb_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
 
 	diag_log_cbor(cs->diag, "[");
 	diag_eol(cs->diag, false);
-	diag_increase(cs->diag);
+	diag_indent_cbor(cs->diag);
 
 	return NB_ERR_OK;
 }
@@ -562,7 +569,7 @@ nb_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
 
 	diag_log_cbor(cs->diag, cs->diag->print_json ? "[" : "[_");
 	diag_eol(cs->diag, false);
-	diag_increase(cs->diag);
+	diag_indent_cbor(cs->diag);
 
 	return NB_ERR_OK;
 }
@@ -580,7 +587,7 @@ nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
 	if (!indefinite)
 		diag_force_newline(cs->diag); /* TODO cleanup */
 
-	diag_decrease(cs->diag);
+	diag_dedent_cbor(cs->diag);
 	diag_log_cbor(cs->diag, "]");
 	diag_finish_item(cs);
 
@@ -597,7 +604,7 @@ nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
 
 	diag_log_cbor(cs->diag, "{");
 	diag_eol(cs->diag, false);
-	diag_increase(cs->diag);
+	diag_indent_cbor(cs->diag);
 
 	return NB_ERR_OK;
 }
@@ -613,7 +620,7 @@ nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs)
 
 	diag_log_cbor(cs->diag, cs->diag->print_json ? "{" : "{_");
 	diag_eol(cs->diag, false);
-	diag_increase(cs->diag);
+	diag_indent_cbor(cs->diag);
 
 	return NB_ERR_OK;
 }
@@ -631,7 +638,7 @@ nb_err_t cbor_decode_map_end(struct cbor_stream *cs)
 	if (!indefinite)
 		diag_force_newline(cs->diag); /* TODO cleanup */
 
-	diag_decrease(cs->diag);
+	diag_dedent_cbor(cs->diag);
 	diag_log_cbor(cs->diag, "}");
 	diag_finish_item(cs);
 

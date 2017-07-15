@@ -22,12 +22,13 @@ static struct nb_attr *group_get_attr(struct nb *nb, struct nb_group *group, nb_
 }
 
 
-/* TODO deduplicate code */
 static void send_ikg(struct nb *nb, char *name, nb_pid_t pid)
 {
-	//assert(nb->active_group != NULL);
+	send_pid(nb, 1);
+	cbor_encode_map_begin_indef(&nb->cs);
 	cbor_encode_text(&nb->cs, name);
 	send_pid(nb, pid);
+	cbor_encode_map_end(&nb->cs);
 }
 
 

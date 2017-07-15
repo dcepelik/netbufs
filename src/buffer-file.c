@@ -10,6 +10,8 @@
 #include "unistd.h"
 #include "util.h"
 
+#define NB_DEBUG_THIS	0
+
 
 static size_t file_tell(struct nb_buffer *buf);
 static void file_delete(struct nb_buffer *buf);
@@ -75,6 +77,7 @@ static void file_fill(struct nb_buffer *buf)
 
 static void file_flush(struct nb_buffer *buf)
 {
+	NB_DEBUG_TRACE;
 	struct nb_buffer_file *file_buf = (struct nb_buffer_file *)buf;
 	ssize_t written;
 	written = write(file_buf->fd, buf->buf, buf->len);

@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEBUG_THIS	0
+#define NB_DEBUG_THIS	0
 
 static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 
@@ -67,6 +67,7 @@ static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 
 		if (!avail) {
 			nb_buffer_fill(buf);
+			buf->mode = BUF_MODE_READING;
 			avail = buf->len;
 
 			if (avail == 0)
@@ -82,6 +83,7 @@ static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 	}
 
 	assert(nbytes == 0);
+
 	return NB_ERR_OK;
 }
 
@@ -136,6 +138,7 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 
 		if (!avail) {
 			nb_buffer_flush(buf);
+			buf->mode = BUF_MODE_WRITING;
 			avail = buf->bufsize;
 		}
 

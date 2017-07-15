@@ -38,16 +38,18 @@ int main(int argc, char *argv[])
 	fn_in = argv[1];
 	fn_out = argv[2];
 
-	assert((fd_in = open(fn_in, O_RDONLY, 0)) != -1);
-	assert((fd_out = open(fn_out, O_RDWR | O_CREAT | O_TRUNC, fd_out_mode)) != -1);
+	fd_in = open(fn_in, O_RDONLY, 0);
+	fd_out = open(fn_out, O_RDWR | O_CREAT | O_TRUNC, fd_out_mode);
+
+	assert(fd_in != -1);
+	assert(fd_out != -1);
 
 	buf = nb_malloc(BUFSIZE);
 	in = nb_buffer_new_file(fd_in);
 	out = nb_buffer_new_file(fd_out);
 
-	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0) {
+	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0)
 		nb_buffer_write(out, buf, len);
-	}
 
 	nb_buffer_delete(in);
 	nb_buffer_delete(out);
