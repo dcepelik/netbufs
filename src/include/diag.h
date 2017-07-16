@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-#define DIAG_ENABLE			1
+#define DIAG_ENABLE			0
 
 #define DIAG_NUM_COLS			5
 #define DIAG_DEFAULT_INDENT_CHAR	'.'
@@ -37,14 +37,14 @@ enum diag_col
  * Conditionally compiled wrappers for diag utility functions
  */
 
-#define diag_comma(diag)		diag_if_on(diag, diag_comma_do(diag));
-#define diag_dedent_cbor(diag)		diag_if_on(diag, diag_dedent_cbor_do(diag));
-#define diag_dedent_proto(diag)		diag_if_on(diag, diag_dedent_proto_do(diag));
-#define diag_eol(diag, cbor_comma)	diag_if_on(diag, diag_eol_do(diag, cbor_comma));
-#define diag_flush(diag)		diag_if_on(diag, diag_flush_do(diag));
-#define diag_force_newline(diag)	diag_if_on(diag, diag_force_newline_do(diag));
+#define diag_comma(diag)		diag_if_on(diag, diag_comma_do(diag))
+#define diag_dedent_cbor(diag)		diag_if_on(diag, diag_dedent_cbor_do(diag))
+#define diag_dedent_proto(diag)		diag_if_on(diag, diag_dedent_proto_do(diag))
+#define diag_eol(diag, cbor_comma)	diag_if_on(diag, diag_eol_do(diag, cbor_comma))
+#define diag_flush(diag)		diag_if_on(diag, diag_flush_do(diag))
+#define diag_force_newline(diag)	diag_if_on(diag, diag_force_newline_do(diag))
 #define diag_indent_cbor(diag)		diag_if_on(diag, diag_indent_cbor_do(diag))
-#define diag_indent_proto(diag)		diag_if_on(diag, diag_indent_proto_do(diag));
+#define diag_indent_proto(diag)		diag_if_on(diag, diag_indent_proto_do(diag))
 #define diag_log_cbor(diag, ...) 	diag_if_on(diag, diag_log_cbor_do(diag, __VA_ARGS__))
 #define diag_log_item(diag, ...) 	diag_if_on(diag, diag_log_item_do(diag, __VA_ARGS__))
 #define diag_log_offset(diag, offset) 	diag_if_on(diag, diag_log_offset_do(diag, offset))

@@ -147,11 +147,11 @@ void cbor_default_error_handler(struct cbor_stream *cs, nb_err_t err, void *arg)
 {
 	(void) arg;
 
-	diag_log_raw(cs->diag, NULL, 0); /* TODO hack */
+	diag_flush(cs->diag);
 	fprintf(stderr, "%s: encoding/decoding error #%i: %s.\n",
 		__func__, err, cbor_stream_strerror(cs));
-	//fprintf(stderr, "Block stack:\n");
-	//diag_print_block_stack(cs->diag);
+	fprintf(stderr, "\nBlock stack:\n");
+	diag_print_block_stack(cs->diag);
 	exit(EXIT_FAILURE);
 }
 

@@ -19,6 +19,20 @@
 #define PARSER_BUF_SIZE		4096
 
 
+static struct strbuf sb;
+
+
+static inline struct rte_attr *rte_add_attr(struct rte *rte, enum rte_attr_type type)
+{
+	struct rte_attr *attr;
+
+	rte->attrs = array_push(rte->attrs, 1);
+	attr = &rte->attrs[array_size(rte->attrs) - 1]; /* TODO */
+	attr->type = type;
+	return attr;
+}
+
+
 void parser_init(struct parser *p, struct nb_buffer *buf)
 {
 	p->buf = buf;
@@ -165,11 +179,10 @@ static void parse_u32(struct parser *p, uint32_t *n)
 
 static char *parser_try_accum(struct parser *p, int (*predicate)(int c))
 {
-	struct strbuf sb;
 	char *word;
 	char c;
 
-	strbuf_init(&sb, PARSER_STR_INIT_SIZE);
+	strbuf_reset(&sb);
 	eat_ws(p);
 
 	while ((c = parser_getc(p)) != BUF_EOF) {
@@ -186,7 +199,6 @@ static char *parser_try_accum(struct parser *p, int (*predicate)(int c))
 	else
 		word = strbuf_strcpy(&sb);
 
-	strbuf_free(&sb);
 	return word;
 }
 
@@ -604,12 +616,15 @@ static bool parse_rte(struct parser *p, struct rt *rt)
 
 void parser_parse_rt(struct parser *p, struct rt *rt)
 {
+	strbuf_init(&sb, PARSER_STR_INIT_SIZE);
+
 	match(p, "BIRD ");
 	rt->version_str = parse_version_str(p);
 	match(p, " ready.");
 	match_eol(p);
 
 	rt->entries = array_new(256, sizeof(*rt->entries));
-
 	while (parse_rte(p, rt)) ;
+
+	strbuf_free(&sb);
 }

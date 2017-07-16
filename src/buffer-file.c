@@ -19,7 +19,7 @@ static void file_fill(struct nb_buffer *buf);
 static void file_flush(struct nb_buffer *buf);
 
 const struct nb_buffer_ops file_ops = {
-	.delete = file_delete,
+	.free = file_delete,
 	.fill = file_fill,
 	.flush = file_flush,
 	.tell = file_tell,

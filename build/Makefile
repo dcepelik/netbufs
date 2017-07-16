@@ -15,6 +15,7 @@ BINS = benchmark nbdiag test-array test-stream
 
 BENCH_SRCS = $(wildcard $(BENCH_SRC_DIR)/*.c)
 BENCH_OBJS = $(subst $(BENCH_SRC_DIR), objs/benchmark, $(patsubst %.c, %.o, $(BENCH_SRCS)))
+BENCH_OBJS += $(addprefix objs/benchmark/, pb.o serialize-pb.o deserialize-pb.o)
 BENCH_DEPS = $(subst $(BENCH_SRC_DIR), deps/benchmark, $(patsubst %.c, %.deps, $(BENCH_SRCS)))
 
 MAINS = $(addprefix objs/netbufs/, nbdiag.o test-array.o test-stream.o test-adhoc.o)
@@ -25,8 +26,9 @@ CFLAGS += -c -std=gnu11 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
 	-I /usr/include/libxml2 \
-	-ggdb3 -DNB_DEBUG
+	-ggdb3 -DNB_DEBUG -DNDEBUG
 
+CXXFLAGS += -c -O3 -I $(SRC_DIR)/include
 LDFLAGS += -Wall -lxml2
 
 all: $(BINS)
@@ -34,8 +36,8 @@ all: $(BINS)
 nbdiag: $(filter-out $(MAINS), $(OBJS)) objs/netbufs/nbdiag.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
-benchmark: $(BENCH_OBJS) $(filter-out $(MAINS), $(OBJS))
-	$(CC) $(LDFLAGS) -o $@ $^
+benchmark: $(BENCH_OBJS) $(filter-out $(MAINS),$(OBJS))
+	$(CXX) $(LDFLAGS) -o $@ $^ -lprotobuf -pthread
 
 test-stream: $(addprefix objs/netbufs/, test-stream.o buffer.o buffer-file.o memory.o util.o)
 	$(CC) $(LDFLAGS) -o $@ $^
@@ -45,6 +47,18 @@ test-array: $(addprefix objs/netbufs/, test-array.o array.o memory.o util.o)
 
 objs/netbufs/%.o: $(SRC_DIR)/%.c deps/netbufs/%.deps
 	$(CC) $(CFLAGS) -o $@ $<
+
+objs/benchmark/serialize-pb.o: $(BENCH_SRC_DIR)/serialize-pb.cc
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+objs/benchmark/deserialize-pb.o: $(BENCH_SRC_DIR)/deserialize-pb.cc
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+objs/benchmark/pb.o: $(BENCH_SRC_DIR)/gen/rt.pb.cc $(BENCH_SRC_DIR)/gen/rt.pb.h gen
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+gen: $(BENCH_SRC_DIR)/rt.proto
+	 protoc -I$(BENCH_SRC_DIR) --cpp_out=$(BENCH_SRC_DIR)/gen $<
 
 deps/netbufs/%.deps: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -MM -MT objs/$*.o -o $@ $<; sed 's%:% $@:%' $@ > $@.tmp; mv $@.tmp $@

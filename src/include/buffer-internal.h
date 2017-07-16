@@ -9,7 +9,7 @@ struct nb_buffer;
 
 struct nb_buffer_ops
 {
-	void (*delete)(struct nb_buffer *buf);
+	void (*free)(struct nb_buffer *buf);
 	void (*fill)(struct nb_buffer *buf);
 	void (*flush)(struct nb_buffer *buf);
 	size_t (*tell)(struct nb_buffer *buf);

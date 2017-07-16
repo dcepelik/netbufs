@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	out = nb_buffer_new_file(fd_out);
 
 	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0)
-		nb_buffer_write(out, buf, len);
+		nb_buffer_write_slow(out, buf, len);
 
 	nb_buffer_delete(in);
 	nb_buffer_delete(out);

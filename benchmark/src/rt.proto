@@ -1,0 +1,86 @@
+syntax = "proto2";
+
+package protobuf_bird_bench;
+
+enum rte_src {
+	INTERNAL = 0;
+	EXTERNAL = 1;
+	U = 2;
+	WHO_KNOWS = 3;
+}
+
+enum rta_type {
+	BGP_AS_PATH = 1;
+	BGP_ORIGIN = 2;
+	BGP_NEXT_HOP = 3;
+	BGP_LOCAL_PREF = 4;
+	BGP_COMMUNITY = 5;
+	BGP_AGGREGATOR = 6;
+	OTHER = 7;
+}
+
+message cflag {
+	required uint64 as_no = 1;
+	required uint64 flag = 2;
+}
+
+message bgp_community {
+	repeated cflag cflags = 1;
+}
+
+message bgp_aggr {
+	required uint64 as_no = 1;
+	required uint32 ip = 2;
+}
+
+message bgp_as_path {
+	repeated uint64 as_no = 1;
+}
+
+message rta_other {
+	required string key = 1;
+	optional string value = 2;
+}
+
+enum bgp_origin {
+	IGP = 1;
+	EGP = 2;
+	INCOMPLETE = 3;
+}
+
+message time {
+	required int32 hour = 1;
+	required int32 min = 2;
+	required int32 sec = 3;
+};
+
+message rta {
+	required rta_type type = 1;
+	required bool tflag = 9;
+	optional bgp_as_path as_path = 2;
+	optional bgp_origin origin = 3;
+	optional uint32 next_hop = 4;
+	optional int32 local_pref = 5;
+	optional bgp_community community = 6;
+	optional bgp_aggr aggregator = 7;
+	optional rta_other other = 8;
+}
+
+message rte {
+  required uint32 netaddr = 1;
+  required uint32 prefix = 2;
+  required uint32 gwaddr = 3;
+  optional uint64 as_no = 4;
+  optional string ifname = 7;
+  required time uplink = 8;
+  optional uint32 uplink_from = 9;
+  required uint32 type = 10;
+  optional rte_src src = 5;
+  repeated rta attrs = 6;
+}
+
+
+message rt {
+  required string version = 1;
+  repeated rte entries = 2;
+}

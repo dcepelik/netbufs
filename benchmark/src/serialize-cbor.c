@@ -6,9 +6,7 @@
 
 void serialize_ipv4(struct cbor_stream *cs, ipv4_t *ip)
 {
-	size_t i;
-	for (i = 0; i < 4; i++)
-		cbor_encode_uint32(cs, ipv4_get_byte(ip, i));
+	cbor_encode_uint32(cs, *ip);
 }
 
 

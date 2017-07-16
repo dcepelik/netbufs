@@ -18,7 +18,7 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 
 void nb_buffer_init(struct nb_buffer *buf)
 {
-	size_t size = 4096;
+	size_t size = 4 * 4096;
 
 	buf->buf = nb_malloc(size);
 	TEMP_ASSERT(buf->buf);
@@ -118,7 +118,7 @@ nb_err_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 }
 
 
-nb_err_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+nb_err_t nb_buffer_write_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return write_internal(buf, bytes, nbytes);
 }
@@ -136,7 +136,7 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 		avail = buf->bufsize - buf->len;
 		assert(avail >= 0);
 
-		if (!avail) {
+		if (__builtin_expect(!avail, 0)) {
 			nb_buffer_flush(buf);
 			buf->mode = BUF_MODE_WRITING;
 			avail = buf->bufsize;
@@ -227,5 +227,5 @@ void nb_buffer_delete(struct nb_buffer *buf)
 		buf->ops->flush(buf);
 
 	xfree(buf->buf);
-	buf->ops->delete(buf);
+	buf->ops->free(buf);
 }

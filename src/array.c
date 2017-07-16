@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <string.h>
 
-
 struct array_header
 {
 	size_t item_size;

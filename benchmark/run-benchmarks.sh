@@ -5,9 +5,9 @@
 #
 
 BUILD_DIR=../build
-METHODS="binary bird cbor netbufs"
+METHODS="binary bird cbor netbufs xml"
 BENCHMARK_TOOL=$BUILD_DIR/benchmark
-INPUT_TEST=data/rt4
+INPUT_TEST=data/rt4.bigger
 
 make --directory=$BUILD_DIR
 

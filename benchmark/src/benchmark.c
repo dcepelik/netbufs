@@ -24,9 +24,9 @@ static struct {
 } methods[] = {
 	{ .name = "binary", .serialize = serialize_binary, .deserialize = deserialize_binary },
 	{ .name = "bird", .serialize = serialize_bird, .deserialize = deserialize_bird },
-	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = deserialize_cbor },
-	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = deserialize_netbufs },
-	{ .name = "protobufs", .serialize = NULL, .deserialize = NULL },
+	{ .name = "cbor", .serialize = serialize_cbor, .deserialize = NULL }, //deserialize_cbor },
+	{ .name = "netbufs", .serialize = serialize_netbufs, .deserialize = NULL }, //deserialize_netbufs },
+	{ .name = "protobuf", .serialize = serialize_pb, .deserialize = NULL },
 	{ .name = "xml", .serialize = serialize_xml, .deserialize = deserialize_xml },
 
 	{ .name = "bc-ex1", .serialize = serialize_bc_ex1, .deserialize = NULL },
@@ -49,8 +49,8 @@ int main(int argc, char *argv[])
 	bool found;
 	size_t i;
 
-    	clock_t start;
-	clock_t end;
+    	clock_t start_s;
+	clock_t end_s;
 	double time_serialize;
 	double time_deserialize = 0;
 
@@ -93,49 +93,54 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (methods[i].deserialize) {
-		pid_t pid;
-		pid_t child;
-		pid = getpid();
-		child = fork();
-		char pid_str[16];
-		snprintf(pid_str, sizeof(pid_str), "%i", pid);
-		if (child == 0) {
-			int dev_null = open("/dev/null", O_RDWR);
-			assert(dev_null != -1);
-			dup2(dev_null, STDOUT_FILENO);
-			dup2(dev_null, STDERR_FILENO);
-			exit(execl("/usr/bin/perf", "perf", "record", "-o", "perf.data",
-				"-p", pid_str, NULL));
-		}
+	pid_t pid;
+	pid_t child;
+	pid = getpid();
+	child = fork();
+	char pid_str[16];
+	snprintf(pid_str, sizeof(pid_str), "%i", pid);
+	if (child == 0) {
+		int dev_null = open("/dev/null", O_RDWR);
+		assert(dev_null != -1);
+		dup2(dev_null, STDOUT_FILENO);
+		dup2(dev_null, STDERR_FILENO);
+		exit(execl("/usr/bin/perf", "perf", "record", "-o", "perf.data",
+			"-p", pid_str, NULL));
+	}
 
-		start = clock();
+	if (methods[i].deserialize) {
+		start_s = clock();
 		methods[i].serialize(rt, mry);
-		end = clock();
-		time_serialize = ((double) (end - start)) / CLOCKS_PER_SEC;
+		end_s = clock();
+		time_serialize = ((double) (end_s - start_s)) / CLOCKS_PER_SEC;
 
 		nb_buffer_flush(mry);
 
-		start = clock();
+		start_s = clock();
 		rt2 = methods[i].deserialize(mry);
-		end = clock();
-		time_deserialize = ((double) (end - start)) / CLOCKS_PER_SEC;
-
-		kill(child, SIGINT);
-		waitpid(child, NULL, 0);
-
-		serialize_bird(rt2, out);
-		nb_buffer_flush(out);
+		end_s = clock();
+		time_deserialize = ((double) (end_s - start_s)) / CLOCKS_PER_SEC;
 
 		printf("%lu %.3f %.3f\n", array_size(rt->entries), time_serialize, time_deserialize);
 	}
 	else {
+		start_s = clock();
 		methods[i].serialize(rt, out);
+		nb_buffer_flush(out);
+		end_s = clock();
+		time_serialize = ((double) (end_s - start_s)) / CLOCKS_PER_SEC;
+		printf("%lu %.3f\n", array_size(rt->entries), time_serialize);
+	}
+
+	kill(child, SIGINT);
+	waitpid(child, NULL, 0);
+
+	if (methods[i].deserialize) {
+		serialize_bird(rt2, out);
 		nb_buffer_flush(out);
 	}
 
 	close(fd_out);
-
 
 	nb_buffer_delete(in);
 	nb_buffer_delete(mry);

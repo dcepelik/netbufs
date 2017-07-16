@@ -158,16 +158,6 @@ struct rte
 	enum rte_src src;
 };
 
-static inline struct rte_attr *rte_add_attr(struct rte *rte, enum rte_attr_type type)
-{
-	struct rte_attr *attr;
-
-	rte->attrs = array_push(rte->attrs, 1);
-	attr = &rte->attrs[array_size(rte->attrs) - 1]; /* TODO */
-	attr->type = type;
-	return attr;
-}
-
 struct rt
 {
 	char *version_str;		/* Bird dump version string */
@@ -214,5 +204,8 @@ void serialize_bc_ex1(struct rt *rt, struct nb_buffer *buf);
 
 void serialize_xml(struct rt *rt, struct nb_buffer *buf);
 struct rt *deserialize_xml(struct nb_buffer *buf);
+
+void serialize_pb(struct rt *rt, struct nb_buffer *buf);
+struct rt *deserialize_pb(struct nb_buffer *buf);
 
 #endif

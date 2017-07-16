@@ -6,13 +6,7 @@
 
 void deserialize_ipv4(struct cbor_stream *cs, ipv4_t *ip)
 {
-	size_t i;
-	uint8_t b;
-
-	for (i = 0; i < 4; i++) {
-		cbor_decode_uint8(cs, &b);
-		ipv4_set_byte(ip, i, b);
-	}
+	cbor_decode_uint32(cs, ip);
 }
 
 
@@ -112,6 +106,7 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 {
 	size_t i;
 	struct cbor_item item;
+	nb_err_t err;
 
 	deserialize_ipv4_net(cs, &rte->netaddr, &rte->netmask);
 	deserialize_ipv4(cs, &rte->gwaddr);
@@ -130,10 +125,11 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 	cbor_decode_int32(cs, (int32_t *)&rte->type);
 	cbor_decode_array_begin_indef(cs);
 	rte->attrs = array_new(2, sizeof(*rte->attrs));
-	for (i = 0; cbor_peek(cs, &item) == NB_ERR_OK; i++) {
+	for (i = 0; (err = cbor_peek(cs, &item)) == NB_ERR_OK; i++) {
 		rte->attrs = array_push(rte->attrs, 1);
 		deserialize_rte_attr(cs, &rte->attrs[i]);
 	}
+	assert(err == NB_ERR_BREAK);
 	cbor_decode_array_end(cs);
 }
 
@@ -148,6 +144,9 @@ struct rt *deserialize_cbor(struct nb_buffer *buf)
 	cbor_stream_init(&cs, buf);
 	diag_init(&diag, stderr);
 	diag.enabled = true;
+	diag_enable_col(&diag, DIAG_COL_RAW);
+	diag_enable_col(&diag, DIAG_COL_ITEMS);
+	diag_enable_col(&diag, DIAG_COL_CBOR);
 	cbor_stream_set_diag(&cs, &diag);
 	rt = nb_malloc(sizeof(*rt));
 

@@ -129,7 +129,8 @@ static void diag_finish_item_do(struct cbor_stream *cs)
 		break;
 
 	default:
-		break;
+		if (cbor_block_stack_empty(cs))
+			diag_eol(cs->diag, true);
 	}
 }
 
@@ -241,7 +242,6 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 		if (!is_indefinite(item)) {
 			if ((err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
 				return err;
-			diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
 		}
 		else {
 			if (!major_allows_indefinite(major))
@@ -251,6 +251,8 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 			return NB_ERR_OK;
 		}
 	}
+
+	diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
 
 	item->u64 = u64; /* TODO remove */
 	switch (item->type)
@@ -482,7 +484,8 @@ static nb_err_t decode_break(struct cbor_stream *cs)
 	struct cbor_item item;
 	nb_err_t err;
 
-	if (cs->err == NB_ERR_BREAK || (err = predecode(cs, &item)) == NB_ERR_BREAK)
+	if ((cs->err == NB_ERR_BREAK && !cs->peeking)
+		|| (err = predecode(cs, &item)) == NB_ERR_BREAK)
 		return cs->err = NB_ERR_OK;
 
 	return error(cs, NB_ERR_ITEM, "unexpected %s, break was expected",

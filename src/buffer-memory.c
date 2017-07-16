@@ -16,7 +16,7 @@ static void mem_fill(struct nb_buffer *buf);
 static void mem_flush(struct nb_buffer *buf);
 
 const struct nb_buffer_ops mem_ops = {
-	.delete = mem_delete,
+	.free = mem_delete,
 	.fill = mem_fill,
 	.flush = mem_flush,
 	.tell = mem_tell,
