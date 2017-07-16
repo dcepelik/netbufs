@@ -22,8 +22,6 @@
 static nb_err_t write_hdr(struct cbor_stream *cs, enum major major, nb_byte_t lbits)
 {
 	nb_byte_t hdr;
-	struct block *block;
-
 	hdr = (major << 5) + lbits;
 	return nb_buffer_write(cs->buf, &hdr, 1);
 }
@@ -116,13 +114,13 @@ nb_err_t cbor_encode_uint16(struct cbor_stream *cs, uint16_t val)
 }
 
 
-nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val)
+nb_err_t cbor_encode_uint32_slow(struct cbor_stream *cs, uint32_t val)
 {
 	return write_hdr_u64(cs, CBOR_MAJOR_UINT, val);
 }
 
 
-nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
+nb_err_t cbor_encode_uint64_slow(struct cbor_stream *cs, uint64_t val)
 {
 	return write_hdr_u64(cs, CBOR_MAJOR_UINT, val);
 }

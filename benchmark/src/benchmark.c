@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 		assert(dev_null != -1);
 		dup2(dev_null, STDOUT_FILENO);
 		dup2(dev_null, STDERR_FILENO);
-		exit(execl("/usr/bin/perf", "perf", "record", "-o", "perf.data",
+		exit(execl("/usr/bin/perf", "perf", "record", "--freq", "8000", "-o", "perf.data",
 			"-p", pid_str, NULL));
 	}
 

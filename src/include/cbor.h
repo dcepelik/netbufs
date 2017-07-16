@@ -151,10 +151,42 @@ nb_err_t cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
 nb_err_t cbor_encode_uint16(struct cbor_stream *cs, uint16_t val);
 nb_err_t cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val);
 
-nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val);
+nb_err_t cbor_encode_uint32_slow(struct cbor_stream *cs, uint32_t val);
+static inline nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val)
+{
+	nb_byte_t hdr;
+	struct block *top_block;
+	
+	if (val <= 23) {
+		top_block = stack_top(&cs->blocks);
+		top_block->num_items++;
+		hdr = (CBOR_TYPE_UINT << 5) + val;
+		return nb_buffer_write(cs->buf, &hdr, 1);
+	}
+	else {
+		return cbor_encode_uint32_slow(cs, val);
+	}
+}
+
 nb_err_t cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val);
 
-nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val);
+nb_err_t cbor_encode_uint64_slow(struct cbor_stream *cs, uint64_t val);
+static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
+{
+	nb_byte_t hdr;
+	struct block *top_block;
+	
+	if (val <= 23) {
+		top_block = stack_top(&cs->blocks);
+		top_block->num_items++;
+		hdr = (CBOR_TYPE_UINT << 5) + val;
+		return nb_buffer_write(cs->buf, &hdr, 1);
+	}
+	else {
+		return cbor_encode_uint32_slow(cs, val);
+	}
+}
+
 nb_err_t cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val);
 
 nb_err_t cbor_encode_int8(struct cbor_stream *cs, int8_t val);

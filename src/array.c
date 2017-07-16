@@ -7,19 +7,8 @@
 #include <assert.h>
 #include <string.h>
 
-struct array_header
-{
-	size_t item_size;
-	size_t num_items;
-	size_t capacity;
-};
-
-
-static inline struct array_header *array_get_header(void *arr)
-{
-	return (struct array_header *)((unsigned char *)arr - sizeof(struct array_header));
-}
-
+struct array_header *array_get_header(void *arr);
+extern size_t array_size(void *arr);
 
 /*
  * TODO Alignment 8-multiples
@@ -93,12 +82,6 @@ void *array_ensure_index(void *arr, size_t index)
 	if (hdr->capacity >= nitems_after)
 		return arr;
 	return resize(arr, MAX(2 * hdr->capacity, nitems_after), hdr->item_size);
-}
-
-
-size_t array_size(void *arr)
-{
-	return array_get_header(arr)->num_items;
 }
 
 
