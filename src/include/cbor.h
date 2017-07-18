@@ -161,7 +161,7 @@ static inline nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val)
 		top_block = stack_top(&cs->blocks);
 		top_block->num_items++;
 		hdr = (CBOR_TYPE_UINT << 5) + val;
-		return nb_buffer_write(cs->buf, &hdr, 1);
+		return nb_buffer_write(cs->buf, &hdr, 1) == 1 ? NB_ERR_OK : NB_ERR_WRITE;
 	}
 	else {
 		return cbor_encode_uint32_slow(cs, val);
@@ -180,7 +180,7 @@ static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
 		top_block = stack_top(&cs->blocks);
 		top_block->num_items++;
 		hdr = (CBOR_TYPE_UINT << 5) + val;
-		return nb_buffer_write(cs->buf, &hdr, 1);
+		return nb_buffer_write(cs->buf, &hdr, 1) == 1 ? NB_ERR_OK : NB_ERR_WRITE;
 	}
 	else {
 		return cbor_encode_uint32_slow(cs, val);

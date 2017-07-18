@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
 	struct nb_buffer *out;
 	unsigned char *buf;
 	size_t len;
+	size_t written_total = 0;
 	int fd_out_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 	assert(argc == 3);
@@ -48,8 +49,12 @@ int main(int argc, char *argv[])
 	in = nb_buffer_new_file(fd_in);
 	out = nb_buffer_new_file(fd_out);
 
-	while ((len = nb_buffer_read_len(in, buf, BUFSIZE)) > 0)
+	while ((len = nb_buffer_read(in, buf, BUFSIZE)) > 0) {
 		nb_buffer_write_slow(out, buf, len);
+		written_total += len;
+	}
+
+	assert(written_total == nb_buffer_get_written_total(out));
 
 	nb_buffer_delete(in);
 	nb_buffer_delete(out);

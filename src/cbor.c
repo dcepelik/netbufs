@@ -6,6 +6,8 @@
 #include "strbuf.h"
 #include "util.h"
 
+extern struct block *top_block(struct cbor_stream *cs);
+
 #include <assert.h>
 
 #define MEMPOOL_BLOCK_SIZE	(32 * sizeof(struct cbor_item))
@@ -133,13 +135,6 @@ nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite
 	block->group = active_group;
 
 	return NB_ERR_OK;
-}
-
-
-struct block *top_block(struct cbor_stream *cs)
-{
-	assert(!stack_is_empty(&cs->blocks));
-	return stack_top(&cs->blocks);
 }
 
 

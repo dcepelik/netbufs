@@ -1,11 +1,10 @@
 #include "benchmark.h"
-#include "debug.h"
-
+#include "debug.h" 
 #include <ctype.h>
 #include <libxml/tree.h>
 #include <string.h>
 
-#define NB_DEBUG_THIS	1
+#define NB_DEBUG_THIS	0
 
 
 static xmlDoc *doc;
@@ -216,18 +215,41 @@ static void deserialize_rte(xmlNode *rte_node, struct rte *rte)
 }
 
 
+static int xml_fill_buffer(void *ctx, char *dst, int len)
+{
+	NB_DEBUG_EXPR("%i", len);
+	ssize_t result;
+	struct nb_buffer *buf = (struct nb_buffer *)ctx;
+	result = nb_buffer_read(buf, (nb_byte_t *)dst, len);
+	char *dst_copy = strndup(dst, result);
+	dst_copy[result] = 0;
+	NB_DEBUG_EXPR("%li", result);
+	return result;
+}
+
+
+static int xml_close_buffer(void *ctx)
+{
+	(void) ctx;
+	return 0;
+}
+
+
 struct rt *deserialize_xml(struct nb_buffer *buf)
 {
 	xmlNode *rt_node;
 	xmlNode *rte_node;
+	char *bytes;
+	size_t len;
 	struct rt *rt;
 	size_t i;
 
-	doc = xmlReadFile("/tmp/out.xml", NULL, 0);
+	len = nb_buffer_get_written_total(buf);
+	doc = xmlReadIO(xml_fill_buffer, xml_close_buffer, buf, "memory", "UTF-8", 0);
 	assert(doc != NULL);
 
 	rt_node = xmlDocGetRootElement(doc);
-	assert(rt_node);
+	assert(rt_node != NULL);
 
 	rt = malloc(sizeof(*rt));
 	rt->version_str = get_attr(rt_node, "version");

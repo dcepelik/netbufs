@@ -26,10 +26,15 @@ CFLAGS += -c -std=gnu11 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
 	-I /usr/include/libxml2 \
-	-ggdb3 -DNB_DEBUG -DNDEBUG
+	-ggdb3 -DNB_DEBUG -DNEDBUG
 
-CXXFLAGS += -c -O3 -I $(SRC_DIR)/include
-LDFLAGS += -Wall -lxml2
+CXXFLAGS += -c \
+	-Wall -Werror --pedantic \
+	-O3 \
+	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
+	-I $(SRC_DIR)/include \
+	-ggdb3 -DNEDBUG
+LDFLAGS += -Wall -lxml2 -flto
 
 all: $(BINS)
 
@@ -54,7 +59,7 @@ objs/benchmark/serialize-pb.o: $(BENCH_SRC_DIR)/serialize-pb.cc
 objs/benchmark/deserialize-pb.o: $(BENCH_SRC_DIR)/deserialize-pb.cc
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
-objs/benchmark/pb.o: $(BENCH_SRC_DIR)/gen/rt.pb.cc $(BENCH_SRC_DIR)/gen/rt.pb.h gen
+objs/benchmark/pb.o: $(BENCH_SRC_DIR)/gen/rt.pb.cc $(BENCH_SRC_DIR)/gen/rt.pb.h
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 gen: $(BENCH_SRC_DIR)/rt.proto

@@ -13,7 +13,9 @@
 
 #define NB_DEBUG_THIS	0
 
-static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
+static ssize_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
+extern ssize_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
+extern ssize_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 
 
 void nb_buffer_init(struct nb_buffer *buf)
@@ -29,13 +31,16 @@ void nb_buffer_init(struct nb_buffer *buf)
 	buf->len = 0;
 	buf->eof = false;
 	buf->ungetc = -1;
+	buf->written_total = 0;
 }
 
 
 void nb_buffer_flush(struct nb_buffer *buf)
 {
-	if (buf->mode == BUF_MODE_WRITING)
+	if (buf->mode == BUF_MODE_WRITING) {
+		NB_DEBUG_TRACE;
 		buf->ops->flush(buf);
+	}
 
 	buf->pos = 0;
 	buf->len = 0;
@@ -52,10 +57,11 @@ static bool nb_buffer_fill(struct nb_buffer *buf)
 
 
 /* TODO Check that: once EOF is returned for the first time, all successive calls return EOF as well */
-static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+static ssize_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
+	size_t read = 0;
 
 	assert(buf->mode != BUF_MODE_WRITING);
 	buf->mode = BUF_MODE_READING;
@@ -70,21 +76,22 @@ static nb_err_t read_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 			buf->mode = BUF_MODE_READING;
 			avail = buf->len;
 
+			NB_DEBUG_TRACE;
+
 			if (avail == 0)
-				return NB_ERR_EOF;
+				break;
 		}
 
 		ncpy = MIN(avail, nbytes);
 		memcpy(bytes, buf->buf + buf->pos, ncpy);
 		bytes += ncpy;
 		buf->pos += ncpy;
+		read += ncpy;
 		nbytes -= ncpy;
 		buf->last_read_len += ncpy;
 	}
 
-	assert(nbytes == 0);
-
-	return NB_ERR_OK;
+	return read;
 }
 
 
@@ -112,22 +119,23 @@ static inline char hexchar(nb_byte_t val)
 }
 
 
-nb_err_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+ssize_t nb_buffer_read_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return read_internal(buf, bytes, nbytes);
 }
 
 
-nb_err_t nb_buffer_write_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+ssize_t nb_buffer_write_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	return write_internal(buf, bytes, nbytes);
 }
 
 
-static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
+static ssize_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes)
 {
 	size_t avail;
 	size_t ncpy;
+	size_t written = 0;
 
 	assert(buf->mode != BUF_MODE_READING);
 	buf->mode = BUF_MODE_WRITING;
@@ -146,13 +154,15 @@ static nb_err_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t n
 		memcpy(buf->buf + buf->pos, bytes, ncpy);
 		bytes += ncpy;
 		buf->pos += ncpy;
+		buf->written_total += ncpy;
 		buf->len = buf->pos;
+		written += ncpy;
 		nbytes -= ncpy;
 	}
 
 	assert(nbytes == 0);
 
-	return NB_ERR_OK;
+	return written;
 }
 
 
@@ -228,4 +238,10 @@ void nb_buffer_delete(struct nb_buffer *buf)
 
 	xfree(buf->buf);
 	buf->ops->free(buf);
+}
+
+
+size_t nb_buffer_get_written_total(struct nb_buffer *buf)
+{
+	return buf->written_total;
 }

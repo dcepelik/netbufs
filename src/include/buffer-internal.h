@@ -35,6 +35,7 @@ struct nb_buffer
 	bool eof;		/* did we hit EOF during last filling? */
 	int ungetc;		/* character to be returned by next getc()-call */
 	size_t last_read_len;
+	size_t written_total;	/* total number of bytes written into this buffer */
 };
 
 

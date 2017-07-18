@@ -17,6 +17,11 @@
 
 typedef uint32_t ipv4_t;
 
+static inline double time_diff(clock_t start, clock_t end)
+{
+	return ((double)(end - start)) / CLOCKS_PER_SEC;
+}
+
 static inline void ipv4_init(ipv4_t *ip)
 {
 	*ip = 0;
@@ -142,20 +147,23 @@ enum rte_type
 	RTE_TYPE_STATIC = 8,
 };
 
+/*
+ * Routing Table Entry
+ */
 struct rte
 {
-	ipv4_t netaddr;
-	uint32_t netmask;
-	ipv4_t gwaddr;
-	char *ifname;
-	struct tm uplink;
-	bool uplink_from_valid;
-	ipv4_t uplink_from;
-	struct rte_attr *attrs;
-	enum rte_type type;
-	bool as_no_valid;
-	uint32_t as_no;
-	enum rte_src src;
+        ipv4_t netaddr;         /* target network address (IPv4) */
+        uint32_t netmask;       /* target network prefix */
+        ipv4_t gwaddr;          /* target gateway address (IPv4) */
+        char *ifname;           /* interface where the gateway is reachable */
+        struct tm uplink;       /* route uplink: how long the route is known  */
+        bool uplink_from_valid; /* is uplink_from field valid? */
+        ipv4_t uplink_from;     /* IPv4 address of the provider */
+        struct rte_attr *attrs; /* route attributes */
+        enum rte_type type;     /* route type */
+        bool as_no_valid;       /* is as_no field valid? */
+        uint32_t as_no;         /* number of the AS which provided the route */
+        enum rte_src src;       /* route source */
 };
 
 struct rt

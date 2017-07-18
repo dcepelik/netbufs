@@ -6,6 +6,7 @@
 #include "buffer-internal.h"
 #include <string.h>
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -20,29 +21,59 @@ struct nb_buffer *nb_buffer_new_memory(void);
 
 void nb_buffer_delete(struct nb_buffer *buf);
 
-nb_err_t nb_buffer_write_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t count);
-static inline nb_err_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t count)
+ssize_t nb_buffer_write_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t count);
+static inline ssize_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t count)
 {
 	size_t avail;
 
+	assert(buf->mode != BUF_MODE_READING);
+
 	avail = buf->bufsize - buf->len;
+	assert(avail >= 0);
+
 	if (__builtin_expect(count <= avail, 1)) {
 		memcpy(buf->buf + buf->pos, bytes, count);
 		buf->pos += count;
 		buf->len = buf->pos;
-		return NB_ERR_OK;
+		buf->written_total += count;
+		buf->mode = BUF_MODE_WRITING;
+		return count;
 	}
 	else {
 		return nb_buffer_write_slow(buf, bytes, count);
 	}
 }
 
-nb_err_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t count);
+ssize_t nb_buffer_read_slow(struct nb_buffer *buf, nb_byte_t *bytes, size_t count);
+static inline ssize_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t count)
+{
+	size_t avail;
+	assert(buf->mode != BUF_MODE_WRITING);
+
+	avail = buf->len - buf->pos;
+	assert(avail >= 0);
+
+	if (__builtin_expect(count <= avail, 1)) {
+		memcpy(bytes, buf->buf + buf->pos, count);
+		buf->pos += count;
+		buf->last_read_len += count;
+		buf->mode = BUF_MODE_READING;
+		return count;
+	}
+	else {
+		return nb_buffer_read_slow(buf, bytes, count);
+	}
+
+	return NB_ERR_OK;
+}
+
 size_t nb_buffer_tell(struct nb_buffer *buf);
 void nb_buffer_flush(struct nb_buffer *buf);
 
 int nb_buffer_getc(struct nb_buffer *buf);
 void nb_buffer_ungetc(struct nb_buffer *buf, int c);
 int nb_buffer_peek(struct nb_buffer *buf);
+
+size_t nb_buffer_get_written_total(struct nb_buffer *buf);
 
 #endif

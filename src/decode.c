@@ -54,12 +54,9 @@ static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 
 static inline nb_err_t read_stream(struct cbor_stream *cs, nb_byte_t *bytes, size_t nbytes)
 {
-	nb_err_t err;
-	
 	diag_log_offset(cs->diag, nb_buffer_tell(cs->buf));
-	if ((err = nb_buffer_read(cs->buf, bytes, nbytes)) != NB_ERR_OK)
-		return error(cs, err,
-			err == NB_ERR_EOF ? "EOF was unexpected." : "(buffer error).");
+	if (nb_buffer_read(cs->buf, bytes, nbytes) != nbytes)
+		return error(cs, NB_ERR_EOF, "EOF was unexpected.");
 	diag_log_raw(cs->diag, bytes, MIN(nbytes, 4));
 	return NB_ERR_OK;
 }
@@ -205,8 +202,7 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	uint64_t u64 = 0;
 	nb_err_t err;
 
-	/* TODO hacky hacky */
-	if (cs->peeking) {
+	if (__builtin_expect(cs->peeking, 0)) {
 		*item = cs->peek; /* TODO avoid the copy */
 		cs->peeking = false;
 		err = cs->err;

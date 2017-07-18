@@ -1,14 +1,17 @@
-#include "gen/rt.pb.h"
-#include <iostream>
-#include <fstream>
-#include <ctime>
-
 extern "C" {
 #include "benchmark.h"
 }
 
-namespace pb = protobuf_bird_bench;
+#include "gen/rt.pb.h"
+
+#include <cassert>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+
 using namespace std;
+namespace pb = protobuf_bird_bench;
 
 void serialize_pb(struct rt *rt, struct nb_buffer *buf)
 {
@@ -104,12 +107,11 @@ void serialize_pb(struct rt *rt, struct nb_buffer *buf)
 		}
 	}
 
-	clock_t start = clock();
-	fstream output("/tmp/out.pb", ios::out | ios::trunc | ios::binary);
-	if (!pb_rt.SerializeToOstream(&output)) {
-		cerr << "Failed to serialize RT using protobufs" << endl;
-	}
-	output.flush();
-	clock_t end = clock();
-	cout << "time c++ " << ((double) (end - start)) / CLOCKS_PER_SEC;
+	clock_t start_i = clock();
+	string output;
+	pb_rt.SerializeToString(&output);
+	clock_t end_i = clock();
+
+	nb_buffer_write(buf, (nb_byte_t *)output.c_str(), output.length());
+	cout << "\tinner serialize " << setprecision(3) << time_diff(start_i, end_i) << endl;
 }

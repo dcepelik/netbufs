@@ -1,6 +1,8 @@
 #include "memory.h"
 #include "stack.h"
-#include <assert.h>
+
+
+extern void *stack_top(struct stack *stack);
 
 
 static bool stack_resize(struct stack *stack, size_t new_size)
@@ -44,13 +46,6 @@ void *stack_pop(struct stack *stack)
 {
 	assert(stack->num_items > 0);
 	return stack->items + ((--stack->num_items) * stack->item_size);
-}
-
-
-void *stack_top(struct stack *stack)
-{
-	assert(stack->num_items > 0);
-	return stack->items + ((stack->num_items - 1) * stack->item_size);
 }
 
 

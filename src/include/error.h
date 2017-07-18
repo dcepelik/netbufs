@@ -16,6 +16,7 @@ enum nb_err
 	NB_ERR_NOFILE,		/* file not found */
 	NB_ERR_INDEF,		/* (in)definite-length item was unexpected */
 	NB_ERR_READ,		/* read()-related error */
+	NB_ERR_WRITE,		/* write()-related error */
 	NB_ERR_UNSUP,		/* operation not supported */
 	NB_ERR_NOMORE,		/* no more items */
 	NB_ERR_BREAK,		/* break was hit */

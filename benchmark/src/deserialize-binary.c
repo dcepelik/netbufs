@@ -5,11 +5,13 @@
 
 static void deserialize_uint(struct nb_buffer *buf, size_t nbytes, uint64_t *u64)
 {
+	ssize_t read;
 	assert(nbytes >= 1 && nbytes <= 8);
 
 	uint64_t u64be = 0;
 	nb_byte_t *u64be_ptr = (nb_byte_t *)&u64be;
-	nb_buffer_read(buf, u64be_ptr + (8 - nbytes), nbytes);
+	read = nb_buffer_read(buf, u64be_ptr + (8 - nbytes), nbytes);
+	assert(read >= 0 && (size_t)read == nbytes);
 	*u64 = be64toh(u64be);
 }
 
@@ -79,9 +81,11 @@ static void deserialize_time(struct nb_buffer *buf, struct tm *tm)
 static void deserialize_string(struct nb_buffer *buf, char **str)
 {
 	size_t len;
+	ssize_t read;
 	deserialize_u64(buf, &len);
 	*str = malloc(len + 1); /* TODO: * sizeof(char)? */
-	nb_buffer_read(buf, (nb_byte_t *)*str, len);
+	read = nb_buffer_read(buf, (nb_byte_t *)*str, len);
+	assert(read >= 0 && (size_t)read == len);
 	(*str)[len] = '\0';
 }
 

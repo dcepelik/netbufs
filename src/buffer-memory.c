@@ -5,9 +5,12 @@
 
 #include "buffer-internal.h"
 #include "buffer.h"
+#include "debug.h"
 #include "memory.h"
 #include "string.h"
 #include "util.h"
+
+#define NB_DEBUG_THIS	1
 
 
 static size_t mem_tell(struct nb_buffer *buf);
