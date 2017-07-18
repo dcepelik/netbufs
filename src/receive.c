@@ -26,7 +26,7 @@ static void recv_pid(struct nb *nb, nb_pid_t *pid)
 }
 
 
-static void recv_key(struct nb *nb, struct nb_group *group)
+static void recv_keys(struct nb *nb, struct nb_group *group)
 {
 	char *name;
 	nb_pid_t pid;
@@ -52,36 +52,26 @@ static void recv_key(struct nb *nb, struct nb_group *group)
 }
 
 
-static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
+/* TODO undef lids in pid_to_lid shall be LID_UNKNOWN! */
+static void recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 {
 	nb_err_t err;
 	struct cbor_item item;
 	nb_pid_t pid;
 
-recv_another_key:
-	if (cbor_is_break(&nb->cs))
-		return false;
-
+retry:
 	recv_pid(nb, &pid);
 
-	/* pID 0 is reserved and means "the type of this group", don't do any lookups */
-	if (pid == 0) {
-		*id = 0;
-		return true;
+	if (pid != 1) {
+		if (unlikely(array_size(group->pid_to_lid) < pid || group->pid_to_lid[pid] == LID_UNKNOWN))
+			nb_error(nb, NB_ERR_UNDEF_ID, "pID %lu is undefined", pid);
+
+		*id = group->pid_to_lid[pid];
 	}
-	else if (pid == 1) {
-		recv_key(nb, group);
-		goto recv_another_key;
+	else { /* pID 1 is reserved and means "insert keys" */
+		recv_keys(nb, group);
+		goto retry;
 	}
-
-	/* TODO undef lids in pid_to_lid shall be LID_UNKNOWN! */
-
-	assert(pid != 0);
-	if (array_size(group->pid_to_lid) < pid || group->pid_to_lid[pid] == LID_UNKNOWN)
-		nb_error(nb, NB_ERR_UNDEF_ID, "pID %lu is undefined", pid);
-
-	*id = group->pid_to_lid[pid];
-	return true;
 }
 
 
@@ -89,24 +79,20 @@ bool nb_recv_attr(struct nb *nb, nb_lid_t *id)
 {
 	struct nb_attr *attr;
 
-	//if (top_block(&nb->cs)->num_items > 2)
-		//diag_dedent_proto(&nb->diag);
-	
-	if (nb->active_group == NULL)
-		nb_error(nb, NB_ERR_OPER, "Cannot receive attributes outside of a group");
-
-	if (!recv_id(nb, nb->active_group, id))
+	if (cbor_is_break(&nb->cs))
 		return false;
 
+	if (unlikely(nb->active_group == NULL))
+		nb_error(nb, NB_ERR_OPER, "Cannot receive attributes outside of a group, "
+			"please call nb_recv_group first");
+
+	recv_id(nb, nb->active_group, id);
 	assert(array_size(nb->active_group->attrs) >= *id); /* if not, recv_id would fail */
 
 	attr = nb->active_group->attrs[*id];
 	assert(attr != NULL); /* if not, recv_id would fail */
-
 	diag_log_proto(&nb->diag, "%s =", attr->name);
 	nb->cur_attr = attr;
-	//diag_indent_proto(&nb->diag);
-
 	return true;
 }
 

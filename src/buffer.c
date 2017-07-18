@@ -16,6 +16,9 @@
 static ssize_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 extern ssize_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
 extern ssize_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, size_t nbytes);
+extern int nb_buffer_getc(struct nb_buffer *buf);
+extern void nb_buffer_ungetc(struct nb_buffer *buf, int c);
+extern int nb_buffer_peek(struct nb_buffer *buf);
 
 
 void nb_buffer_init(struct nb_buffer *buf)
@@ -48,7 +51,7 @@ void nb_buffer_flush(struct nb_buffer *buf)
 }
 
 
-static bool nb_buffer_fill(struct nb_buffer *buf)
+bool nb_buffer_fill(struct nb_buffer *buf)
 {
 	buf->ops->fill(buf);
 	buf->pos = 0;
@@ -163,42 +166,6 @@ static ssize_t write_internal(struct nb_buffer *buf, nb_byte_t *bytes, size_t nb
 	assert(nbytes == 0);
 
 	return written;
-}
-
-
-int nb_buffer_getc(struct nb_buffer *buf)
-{
-	char c;
-
-	assert(buf->mode != BUF_MODE_WRITING);
-
-	if (buf->ungetc != BUF_EOF) {
-		c = buf->ungetc;
-		buf->ungetc = BUF_EOF;
-		return c;
-	}
-
-	if (buf->pos >= buf->len)
-		if (!nb_buffer_fill(buf))
-			return BUF_EOF;
-
-	return buf->buf[buf->pos++];
-}
-
-
-void nb_buffer_ungetc(struct nb_buffer *buf, int c)
-{
-	assert(buf->ungetc == BUF_EOF); /* don't override ungetc */
-	buf->ungetc = c;
-}
-
-
-int nb_buffer_peek(struct nb_buffer *buf)
-{
-	char c;
-	c = nb_buffer_getc(buf);
-	nb_buffer_ungetc(buf, c);
-	return c;
 }
 
 

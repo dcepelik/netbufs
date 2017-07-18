@@ -15,6 +15,7 @@
 struct nb_buffer;
 
 bool nb_buffer_is_eof(struct nb_buffer *buf);
+bool nb_buffer_fill(struct nb_buffer *buf);
 
 struct nb_buffer *nb_buffer_new_file(int fd_in);
 struct nb_buffer *nb_buffer_new_memory(void);
@@ -65,6 +66,28 @@ static inline ssize_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, si
 	}
 
 	return NB_ERR_OK;
+}
+
+static inline int nb_buffer_getc(struct nb_buffer *buf)
+{
+	if (unlikely(buf->pos >= buf->len))
+		if (!nb_buffer_fill(buf))
+			return BUF_EOF;
+	return buf->buf[buf->pos++];
+}
+
+static inline void nb_buffer_ungetc(struct nb_buffer *buf, int c)
+{
+	assert(buf->pos > 0);
+	buf->buf[--buf->pos] = c;
+}
+
+static inline int nb_buffer_peek(struct nb_buffer *buf)
+{
+	int c = nb_buffer_getc(buf);
+	if (c != BUF_EOF)
+		nb_buffer_ungetc(buf, c);
+	return c;
 }
 
 size_t nb_buffer_tell(struct nb_buffer *buf);

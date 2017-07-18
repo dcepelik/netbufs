@@ -32,6 +32,10 @@
 
 #define diag_finish_item(cs)	diag_if_on((cs)->diag, diag_finish_item_do(cs))
 
+extern void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val);
+extern bool cbor_is_break(struct cbor_stream *cs);
+extern void cbor_peek(struct cbor_stream *cs, struct cbor_item *item);
+
 
 static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 {
@@ -74,16 +78,12 @@ static uint64_t decode_u64(struct cbor_stream *cs, enum lbits lbits)
 	if (lbits <= 23)
 		return lbits;
 
-	if (lbits > LBITS_8B)
+	if (unlikely(lbits > LBITS_8B))
 		error(cs, NB_ERR_PARSE,
 			"Invalid value of Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
-	read_stream(cs, bytes, nbytes);
-
-	for (i = 0; i < nbytes; i++)
-		u64be_ptr[(8 - nbytes) + i] = bytes[i]; /* TODO optimize as in encoder */
-
+	read_stream(cs, &u64be_ptr[8 - nbytes], nbytes);
 	return be64toh(u64be);
 }
 
@@ -181,18 +181,12 @@ static void decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
 }
 
 
-static void predecode(struct cbor_stream *cs, struct cbor_item *item)
+void predecode(struct cbor_stream *cs, struct cbor_item *item)
 {
 	nb_byte_t hdr;
 	enum major major;
 	nb_byte_t lbits;
 	uint64_t u64 = 0;
-
-	if (__builtin_expect(cs->peeking, 0)) {
-		*item = cs->peek;
-		cs->peeking = false;
-		return;
-	}
 
 	read_stream(cs, &hdr, 1);
 	if (hdr == CBOR_BREAK) {
@@ -202,12 +196,10 @@ static void predecode(struct cbor_stream *cs, struct cbor_item *item)
 
 	major = (hdr & MAJOR_MASK) >> 5;
 	lbits = hdr & LBITS_MASK;
-	assert(major >= 0 && major <= 7);
+	item->flags = 0;
+	top_block(cs)->num_items++;
 
 	diag_comma(cs->diag); /* append a comma to previous line if needed */
-	item->flags = 0;
-
-	top_block(cs)->num_items++;
 
 	if (major == CBOR_MAJOR_UINT && lbits <= 23) {
 		item->type = CBOR_TYPE_UINT;
@@ -271,23 +263,6 @@ static void predecode(struct cbor_stream *cs, struct cbor_item *item)
 }
 
 
-void cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
-{
-	if (!cs->peeking)
-		predecode(cs, &cs->peek);
-	cs->peeking = true;
-	*item = cs->peek; /* TODO avoid the copy */
-}
-
-
-bool cbor_is_break(struct cbor_stream *cs)
-{
-	struct cbor_item item;
-	cbor_peek(cs, &item);
-	return item.type == CBOR_TYPE_BREAK;
-}
-
-
 static void decode_break(struct cbor_stream *cs)
 {
 	struct cbor_item item;
@@ -307,12 +282,12 @@ static inline void predecode_check(struct cbor_stream *cs, struct cbor_item *ite
 }
 
 
-static uint64_t decode_uint(struct cbor_stream *cs, uint64_t max)
+uint64_t decode_uint(struct cbor_stream *cs, uint64_t max)
 {
 	struct cbor_item item;
 
 	predecode(cs, &item);
-	if (item.u64 > max)
+	if (unlikely(item.u64 > max))
 		error(cs, NB_ERR_RANGE, "Expected unsigned integer less than or equal "
 			"to %lu, %lu was decoded", max, item.u64);
 	return item.u64;
@@ -369,12 +344,6 @@ void cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val)
 void cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val)
 {
 	*val = (uint32_t)decode_uint(cs, UINT32_MAX);
-}
-
-
-void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
-{
-	*val = (uint64_t)decode_uint(cs, UINT64_MAX);
 }
 
 

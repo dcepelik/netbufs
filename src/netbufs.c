@@ -20,6 +20,7 @@ static void init_group(struct nb *nb, struct nb_group *group, const char *name)
 	group->attrs = array_new(NB_ATTRS_INIT_SIZE, sizeof(*group->attrs));
 	group->max_pid = 1;
 	group->pid_to_lid = array_new(NB_GROUPS_INIT_SIZE, sizeof(*group->pid_to_lid));
+	group->pid_to_lid[0] = 0;
 }
 
 

@@ -144,11 +144,38 @@ struct cbor_pair
 	struct cbor_item value;
 };
 
+void predecode(struct cbor_stream *cs, struct cbor_item *item);
+
+
+/* TODO valid fields in item when using peek_item -> manual */
+static inline void cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
+{
+	nb_byte_t major;
+	nb_byte_t lbits;
+	nb_byte_t hdr = nb_buffer_peek(cs->buf);
+	if (hdr == CBOR_BREAK) {
+		item->type = CBOR_TYPE_BREAK;
+		return;
+	}
+
+	major = (hdr & 0xE0) >> 5;
+	lbits = hdr & 0x1F;
+	item->type = (enum cbor_type)major;
+	item->flags = 0;
+	if (lbits == 31)
+		item->flags |= CBOR_FLAG_INDEFINITE;
+}
+
+
+static inline bool cbor_is_break(struct cbor_stream *cs)
+{
+	return nb_buffer_peek(cs->buf) == CBOR_BREAK;
+}
+
 /*
  * Stream encoding and decoding of items.
  */
 
-bool cbor_is_break(struct cbor_stream *cs);
 
 nb_err_t cbor_encode_uint8(struct cbor_stream *cs, uint8_t val);
 void cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
@@ -192,7 +219,23 @@ static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
 	}
 }
 
-void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val);
+uint64_t decode_uint(struct cbor_stream *cs, uint64_t max);
+
+static inline void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
+{
+	nb_byte_t hdr = (nb_byte_t)nb_buffer_peek(cs->buf);
+	struct block *b;
+	if (hdr <= 23) {
+		b = stack_top(&cs->blocks);
+		b->num_items++;
+		*val = hdr;
+		nb_buffer_getc(cs->buf);
+	}
+	else {
+		*val = decode_uint(cs, UINT64_MAX);
+	}
+}
+
 
 nb_err_t cbor_encode_int8(struct cbor_stream *cs, int8_t val);
 void cbor_decode_int8(struct cbor_stream *cs, int8_t *val);
@@ -239,9 +282,6 @@ nb_err_t cbor_encode_text(struct cbor_stream *cs, char *str);
 nb_err_t cbor_encode_text_begin_indef(struct cbor_stream *cs);
 nb_err_t cbor_encode_text_end(struct cbor_stream *cs);
 void cbor_decode_text(struct cbor_stream *cs, char **str);
-
-/* TODO valid fields in item when using peek_item -> manual */
-void cbor_peek(struct cbor_stream *cs, struct cbor_item *item);
 
 /*
  * DOM-oriented encoding and decoding of (generic) items.
