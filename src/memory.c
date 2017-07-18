@@ -23,7 +23,7 @@ void *nb_realloc(void *ptr, size_t size)
 	ptr = realloc(ptr, size);
 	if (!ptr) {
 		assert(false);
-		nb_die("Cannot allocate %zu bytes of memory.", size);
+		nb_die("Cannot allocate %zu bytes of memory.\n", size);
 	}
 
 	return ptr;

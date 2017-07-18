@@ -67,7 +67,7 @@ static nb_err_t send_rte_attr(struct nb *nb, struct rte_attr *attr)
 	case RTE_ATTR_TYPE_BGP_AS_PATH:
 		nb_send_array(nb, BIRD_ORG_RTA_BGP_AS_PATH, array_size(attr->bgp_as_path));
 		for (i = 0; i < array_size(attr->bgp_as_path); i++)
-			nb_send_u32(nb, -1, attr->bgp_as_path[i]); /* TODO give a name to -1 */
+			nb_send_u32(nb, -1, attr->bgp_as_path[i] + 3); /* TODO give a name to -1 */
 		nb_send_array_end(nb);
 		break;
 	case RTE_ATTR_TYPE_BGP_AGGREGATOR:

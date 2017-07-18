@@ -52,57 +52,51 @@ static inline uint8_t lbits_to_nbytes(enum lbits lbits)
 }
 
 
-static inline nb_err_t read_stream(struct cbor_stream *cs, nb_byte_t *bytes, size_t nbytes)
+static inline void read_stream(struct cbor_stream *cs, nb_byte_t *bytes, size_t nbytes)
 {
 	diag_log_offset(cs->diag, nb_buffer_tell(cs->buf));
 	if (nb_buffer_read(cs->buf, bytes, nbytes) != nbytes)
-		return error(cs, NB_ERR_EOF, "EOF was unexpected.");
+		error(cs, NB_ERR_EOF, "EOF was unexpected.");
 	diag_log_raw(cs->diag, bytes, MIN(nbytes, 4));
-	return NB_ERR_OK;
 }
 
 
-static inline nb_err_t decode_u64(struct cbor_stream *cs, enum lbits lbits, uint64_t *u64)
+static uint64_t decode_u64(struct cbor_stream *cs, enum lbits lbits)
 {
+	assert(lbits != LBITS_INDEFINITE);
+
 	nb_byte_t bytes[8];
 	uint8_t nbytes;
 	uint64_t u64be = 0;
 	nb_byte_t *u64be_ptr = (nb_byte_t *)&u64be;
 	size_t i;
-	nb_err_t err;
 
-	if (lbits <= 23) {
-		*u64 = lbits;
-		return NB_ERR_OK;
-	}
+	if (lbits <= 23)
+		return lbits;
 
-	assert(lbits != LBITS_INDEFINITE);
 	if (lbits > LBITS_8B)
-		return error(cs, NB_ERR_PARSE,
+		error(cs, NB_ERR_PARSE,
 			"Invalid value of Additional Information: 0x%02X.", lbits);
 
 	nbytes = lbits_to_nbytes(lbits);
-	if ((err = read_stream(cs, bytes, nbytes)) != NB_ERR_OK)
-		return error(cs, err, "Error occured while reading the stream.");
+	read_stream(cs, bytes, nbytes);
 
 	for (i = 0; i < nbytes; i++)
-		u64be_ptr[(8 - nbytes) + i] = bytes[i];
+		u64be_ptr[(8 - nbytes) + i] = bytes[i]; /* TODO optimize as in encoder */
 
-	*u64 = be64toh(u64be);
-	return NB_ERR_OK;
+	return be64toh(u64be);
 }
 
 
 /* TODO have a look at the range checks and make sure nothing overflows */
-static inline nb_err_t u64_to_i64(struct cbor_stream *cs, uint64_t u64, int64_t *i64)
+static inline int64_t u64_to_i64(struct cbor_stream *cs, uint64_t u64)
 {
-	if (u64 <= INT64_MIN_ABS) {
-		*i64 = -u64 - 1;
-		return NB_ERR_OK;
-	}
+	if (u64 <= INT64_MIN_ABS)
+		return -u64 - 1;
 
-	return error(cs, NB_ERR_RANGE,
-		"Negative integer -%lu less than -%lu cannot be decoded.", u64, INT64_MIN_ABS);
+	error(cs, NB_ERR_RANGE, "Negative integer -%lu less than -%lu cannot be decoded.",
+		u64, INT64_MIN_ABS);
+	return 0; /* TODO */
 }
 
 
@@ -148,31 +142,24 @@ static void print_sval_diag(struct cbor_stream *cs, enum cbor_sval sval)
 }
 
 
-static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
+static void decode_item_major7(struct cbor_stream *cs, struct cbor_item *item,
 	enum minor minor)
 {
 	uint64_t u64 = 0;
-	nb_err_t err;
 
 	assert(minor >= 0);
+	assert(minor != CBOR_MINOR_BREAK);
 
 	if (minor <= 23) {
 		item->type = CBOR_TYPE_SVAL;
 		item->sval = minor;
 		item->u64 = item->sval;
 		print_sval_diag(cs, item->sval);
-		return NB_ERR_OK;
-	}
-
-	if (minor == CBOR_MINOR_BREAK) {
-		diag_log_item(cs->diag, "break");
-		diag_eol(cs->diag, false);
-		return cs->err = NB_ERR_BREAK;
+		return;
 	}
 
 	/* leverage decode_u64 to read the appropriate amount of data */
-	if ((err = decode_u64(cs, (enum lbits)minor, &u64)) != NB_ERR_OK)
-		return err;
+	u64 = decode_u64(cs, (enum lbits)minor);
 
 	switch (minor) {
 	case CBOR_MINOR_SVAL:
@@ -180,40 +167,38 @@ static nb_err_t decode_item_major7(struct cbor_stream *cs, struct cbor_item *ite
 		item->sval = u64;
 		item->u64 = item->sval; /* TODO */
 		print_sval_diag(cs, item->sval);
-		return NB_ERR_OK;
+		return;
 	case CBOR_MINOR_FLOAT16:
 	case CBOR_MINOR_FLOAT32:
 	case CBOR_MINOR_FLOAT64:
-		return error(cs, NB_ERR_UNSUP, "Float decoding not supported.");
+		error(cs, NB_ERR_UNSUP, "Float decoding not supported.");
 	default:
 		break;
 	}
 
-	return error(cs, NB_ERR_PARSE, "Invalid Additional Information "
+	error(cs, NB_ERR_PARSE, "Invalid Additional Information "
 		"value for Major Type 7: 0x%02X.", minor);
 }
 
 
-static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
+static void predecode(struct cbor_stream *cs, struct cbor_item *item)
 {
 	nb_byte_t hdr;
 	enum major major;
 	nb_byte_t lbits;
 	uint64_t u64 = 0;
-	nb_err_t err;
 
 	if (__builtin_expect(cs->peeking, 0)) {
-		*item = cs->peek; /* TODO avoid the copy */
+		*item = cs->peek;
 		cs->peeking = false;
-		err = cs->err;
-		cs->err = NB_ERR_OK;
-		return err;
+		return;
 	}
 
-	top_block(cs)->num_items++;
-
-	if ((err = read_stream(cs, &hdr, 1)) != NB_ERR_OK)
-		return err;
+	read_stream(cs, &hdr, 1);
+	if (hdr == CBOR_BREAK) {
+		item->type = CBOR_TYPE_BREAK;
+		return;
+	}
 
 	major = (hdr & MAJOR_MASK) >> 5;
 	lbits = hdr & LBITS_MASK;
@@ -222,13 +207,17 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 	diag_comma(cs->diag); /* append a comma to previous line if needed */
 	item->flags = 0;
 
+	top_block(cs)->num_items++;
+
 	if (major == CBOR_MAJOR_UINT && lbits <= 23) {
 		item->type = CBOR_TYPE_UINT;
 		u64 = lbits;
 	}
 	else {
-		if (major == CBOR_MAJOR_7)
-			return decode_item_major7(cs, item, lbits);
+		if (major == CBOR_MAJOR_7) {
+			decode_item_major7(cs, item, lbits);
+			return;
+		}
 
 		item->type = (enum cbor_type)major;
 
@@ -236,15 +225,14 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 			item->flags |= CBOR_FLAG_INDEFINITE;
 
 		if (!is_indefinite(item)) {
-			if ((err = decode_u64(cs, lbits, &u64)) != NB_ERR_OK)
-				return err;
+			u64 = decode_u64(cs, lbits);
 		}
 		else {
 			if (!major_allows_indefinite(major))
-				return error(cs, NB_ERR_INDEF, "Indefinite-length encoding "
+				error(cs, NB_ERR_INDEF, "Indefinite-length encoding "
 					"is not allowed for %s items.", cbor_type_string(major));
 			diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
-			return NB_ERR_OK;
+			return;
 		}
 	}
 
@@ -260,8 +248,7 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 		break;
 
 	case CBOR_TYPE_INT:
-		if ((err = u64_to_i64(cs, u64, &item->i64)) != NB_ERR_OK)
-			return err;
+		item->i64 = u64_to_i64(cs, u64);
 		diag_log_cbor(cs->diag, "%li", item->i64);
 		diag_finish_item(cs);
 		break;
@@ -279,309 +266,247 @@ static nb_err_t predecode(struct cbor_stream *cs, struct cbor_item *item)
 		break;
 
 	default:
-		return error(cs, NB_ERR_PARSE, "Invalid major type.");
+		error(cs, NB_ERR_PARSE, "Invalid major type: 0x%02X.", major);
 	}
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
+void cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
 {
-	nb_err_t err;
-
-	err = predecode(cs, &cs->peek);
-	*item = cs->peek; /* TODO avoid the copy */
+	if (!cs->peeking)
+		predecode(cs, &cs->peek);
 	cs->peeking = true;
-	return err;
+	*item = cs->peek; /* TODO avoid the copy */
 }
 
 
-static inline nb_err_t predecode_check(struct cbor_stream *cs, struct cbor_item *item,
+bool cbor_is_break(struct cbor_stream *cs)
+{
+	struct cbor_item item;
+	cbor_peek(cs, &item);
+	return item.type == CBOR_TYPE_BREAK;
+}
+
+
+static void decode_break(struct cbor_stream *cs)
+{
+	struct cbor_item item;
+	predecode(cs, &item);
+	if (item.type != CBOR_TYPE_BREAK)
+		error(cs, NB_ERR_BREAK, "Break was expected");
+}
+
+
+static inline void predecode_check(struct cbor_stream *cs, struct cbor_item *item,
 	enum cbor_type type)
 {
-	nb_err_t err;
-
-	if ((err = predecode(cs, item)) != NB_ERR_OK)
-		return err;
-
+	predecode(cs, item);
 	if (item->type != type)
-		/* TODO msg */
-		return error(cs, NB_ERR_ITEM, "%s was unexpected, %s was expected.",
+		error(cs, NB_ERR_ITEM, "%s was unexpected, %s was expected.",
 			cbor_type_string(item->type), cbor_type_string(type));
-
-	return NB_ERR_OK;
 }
 
 
-static uint64_t decode_uint(struct cbor_stream *cs, nb_err_t *err, uint64_t max)
+static uint64_t decode_uint(struct cbor_stream *cs, uint64_t max)
 {
 	struct cbor_item item;
 
-	if ((*err = predecode(cs, &item)) != NB_ERR_OK)
-		return 0;
-
-	if (item.u64 > max) {
-		*err = NB_ERR_RANGE;
-		return 0;
-	}
-
-	*err = NB_ERR_OK;
+	predecode(cs, &item);
+	if (item.u64 > max)
+		error(cs, NB_ERR_RANGE, "Expected unsigned integer less than or equal "
+			"to %lu, %lu was decoded", max, item.u64);
 	return item.u64;
 }
 
 
 /* TODO have a look at the range checks and make sure nothing overflows */
-static int64_t decode_int(struct cbor_stream *cs, nb_err_t *err, int64_t min, int64_t max)
+static int64_t decode_int(struct cbor_stream *cs, int64_t min, int64_t max)
 {
 	struct cbor_item item;
 	int64_t i64;
 
-	if ((*err = predecode(cs, &item)) != NB_ERR_OK)
-		return 0;
+	predecode(cs, &item);
 
 	if (item.type == CBOR_TYPE_INT) {
 		i64 = item.i64;
 	}
 	else if (item.type == CBOR_TYPE_UINT) {
 		if (item.u64 > INT64_MAX) {
-			*err = NB_ERR_RANGE;
+			error(cs, NB_ERR_RANGE, "Expected unsigned or negative integer "
+				"less than or equal to %lu, %lu was decoded",
+				INT64_MAX, item.u64);
 			return 0;
 		}
-
 		i64 = (int64_t)item.u64;
 	}
 	else {
-		*err = error(cs, NB_ERR_ITEM, "%s was unexpected, (unsigned) integer was expected",
-			cbor_type_string(item.type));
+		error(cs, NB_ERR_ITEM, "%s was unexpected, unsigned or negative "
+			"integer was expected", cbor_type_string(item.type));
 		return 0;
 	}
 
 	if (i64 >= min && i64 <= max)
 		return i64;
 
-	*err = NB_ERR_RANGE;
+	error(cs, NB_ERR_RANGE, "Expected unsigned or negative integer in the range "
+		"from %li to %lu, %lu was decoded", min, max, i64);
 	return 0;
 }
 
 
-nb_err_t cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val)
+void cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val)
 {
-	nb_err_t err;
-	*val = (uint8_t)decode_uint(cs, &err, UINT8_MAX);
-	return err;
+	*val = (uint8_t)decode_uint(cs, UINT8_MAX);
 }
 
 
-nb_err_t cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val)
+void cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val)
 {
-	nb_err_t err;
-	*val = (uint16_t)decode_uint(cs, &err, UINT16_MAX);
-	return err;
+	*val = (uint16_t)decode_uint(cs, UINT16_MAX);
 }
 
 
-nb_err_t cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val)
+void cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val)
 {
-	nb_err_t err;
-	*val = (uint32_t)decode_uint(cs, &err, UINT32_MAX);
-	return err;
+	*val = (uint32_t)decode_uint(cs, UINT32_MAX);
 }
 
 
-nb_err_t cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
+void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
 {
-	nb_err_t err;
-	*val = (uint64_t)decode_uint(cs, &err, UINT64_MAX);
-	return err;
+	*val = (uint64_t)decode_uint(cs, UINT64_MAX);
 }
 
 
-nb_err_t cbor_decode_int8(struct cbor_stream *cs, int8_t *val)
+void cbor_decode_int8(struct cbor_stream *cs, int8_t *val)
 {
-	nb_err_t err;
-	*val = (int8_t)decode_int(cs, &err, INT8_MIN, INT8_MAX);
-	return err;
+	*val = (int8_t)decode_int(cs, INT8_MIN, INT8_MAX);
 }
 
 
-nb_err_t cbor_decode_int16(struct cbor_stream *cs, int16_t *val)
+void cbor_decode_int16(struct cbor_stream *cs, int16_t *val)
 {
-	nb_err_t err;
-	*val = (int16_t)decode_int(cs, &err, INT16_MIN, INT16_MAX);
-	return err;
+	*val = (int16_t)decode_int(cs, INT16_MIN, INT16_MAX);
 }
 
 
-nb_err_t cbor_decode_int32(struct cbor_stream *cs, int32_t *val)
+void cbor_decode_int32(struct cbor_stream *cs, int32_t *val)
 {
-	nb_err_t err;
-	*val = (int32_t)decode_int(cs, &err, INT32_MIN, INT32_MAX);
-	return err;
+	*val = (int32_t)decode_int(cs, INT32_MIN, INT32_MAX);
 }
 
 
-nb_err_t cbor_decode_int64(struct cbor_stream *cs, int64_t *val)
+void cbor_decode_int64(struct cbor_stream *cs, int64_t *val)
 {
-	nb_err_t err;
-	*val = (int64_t)decode_int(cs, &err, INT64_MIN, INT64_MAX);
-	return err;
+	*val = (int64_t)decode_int(cs, INT64_MIN, INT64_MAX);
 }
 
 
-nb_err_t cbor_decode_tag(struct cbor_stream *cs, uint32_t *tag)
+void cbor_decode_tag(struct cbor_stream *cs, uint32_t *tag)
 {
 	struct cbor_item item;
-	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_TAG)) != NB_ERR_OK)
-		return err;
-
+	predecode_check(cs, &item, CBOR_TYPE_TAG);
 	if (item.u64 > UINT32_MAX)
-		return error(cs, NB_ERR_RANGE,
+		error(cs, NB_ERR_RANGE,
 			"This implementation only supports uint32 tags in the range "
-			"0, ..., %lu; %lu was given", UINT32_MAX, item.u64);
+			"0...%lu; %lu was decoded", UINT32_MAX, item.u64);
 
 	*tag = (uint32_t)item.u64;
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *sval)
+void cbor_decode_sval(struct cbor_stream *cs, enum cbor_sval *sval)
 {
 	struct cbor_item item;
-	nb_err_t err;
-
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_SVAL)) == NB_ERR_OK)
-		*sval = item.u64;
-	return err;
+	predecode_check(cs, &item, CBOR_TYPE_SVAL);
+	*sval = item.u64;
 }
 
 
-nb_err_t cbor_decode_bool(struct cbor_stream *cs, bool *b)
+void cbor_decode_bool(struct cbor_stream *cs, bool *b)
 {
 	enum cbor_sval sval;
-	nb_err_t err;
-
-	if ((err = cbor_decode_sval(cs, &sval)) != NB_ERR_OK)
-		return err;
-
+	cbor_decode_sval(cs, &sval);
 	if (sval != CBOR_SVAL_TRUE && sval != CBOR_SVAL_FALSE)
-		return error(cs, NB_ERR_RANGE, "expected bool, but the decoded simple "
+		error(cs, NB_ERR_RANGE, "expected bool, but the decoded simple "
 			"value was neither true nor false");
-
 	*b = (sval == CBOR_SVAL_TRUE);
-	return NB_ERR_OK;
 }
 
 
-static nb_err_t decode_break(struct cbor_stream *cs)
-{
-	struct cbor_item item;
-	nb_err_t err;
-
-	if ((cs->err == NB_ERR_BREAK && !cs->peeking)
-		|| (err = predecode(cs, &item)) == NB_ERR_BREAK)
-		return cs->err = NB_ERR_OK;
-
-	return error(cs, NB_ERR_ITEM, "unexpected %s, break was expected",
-		cbor_type_string(item.type));
-}
-
-
-static nb_err_t decode_block_start(struct cbor_stream *cs, enum cbor_type type,
+static void decode_block_start(struct cbor_stream *cs, enum cbor_type type,
 	bool indef, uint64_t *len)
 {
 	struct cbor_item item;
 	size_t block_len = 0;
-	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, type)) != NB_ERR_OK)
-		return err;
-
+	predecode_check(cs, &item, type);
 	if (is_indefinite(&item) != indef)
-		return error(cs, NB_ERR_INDEF, NULL);
+		error(cs, NB_ERR_INDEF, NULL);
 
-	if (!is_indefinite(&item)) {
-		*len = item.u64;
-		block_len = item.u64;
-		if (type == CBOR_TYPE_MAP)
-			block_len *= 2;
-	}
+	*len = item.u64;
+	block_len = item.u64;
+	if (type == CBOR_TYPE_MAP)
+		block_len *= 2;
 
-	return push_block(cs, item.type, is_indefinite(&item), block_len);
+	push_block(cs, item.type, is_indefinite(&item), block_len);
 }
 
 
-/*
- * TODO Make the checks work.
- */
-static nb_err_t decode_block_end(struct cbor_stream *cs, enum cbor_type type)
+static void decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 {
 	struct block *block;
-	size_t err;
 
 	if (cbor_block_stack_empty(cs))
-		return error(cs, NB_ERR_OPER, "Cannot end block, there's no block open.");
+		error(cs, NB_ERR_OPER, "Cannot end block, there's no block open.");
 
 	block = stack_top(&cs->blocks);
 	if (block->type != type)
-		return error(cs, NB_ERR_OPER, NULL);
+		error(cs, NB_ERR_OPER, "Cannot end block of type %s when block of %s "
+			"is open", cbor_type_string(block->type), cbor_type_string(type));
 
-	if (block->indefinite) {
-		if ((err = decode_break(cs)) != NB_ERR_OK)
-			return err;
-	}
+	if (block->indefinite)
+		decode_break(cs);
+
 	else if (block->num_items != block->len) {
-		return error(cs, NB_ERR_OPER,
+		error(cs, NB_ERR_OPER,
 			"Cannot end %s: designated size is %lu, but %lu items were decoded",
 			cbor_type_string(block->type), block->len, block->num_items);
 	}
 
 	(void) stack_pop(&cs->blocks);
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
+void cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
 {
-	nb_err_t err;
-
-	if ((err = decode_block_start(cs, CBOR_TYPE_ARRAY, false, len)) != NB_ERR_OK)
-		return err;
+	decode_block_start(cs, CBOR_TYPE_ARRAY, false, len);
 
 	diag_log_cbor(cs->diag, "[");
 	diag_eol(cs->diag, false);
 	diag_indent_cbor(cs->diag);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_array_begin_indef(struct cbor_stream *cs)
+void cbor_decode_array_begin_indef(struct cbor_stream *cs)
 {
-	nb_err_t err;
 	uint64_t foo;
 
-	if ((err = decode_block_start(cs, CBOR_TYPE_ARRAY, true, &foo)) != NB_ERR_OK)
-		return err;
+	decode_block_start(cs, CBOR_TYPE_ARRAY, true, &foo);
 
 	diag_log_cbor(cs->diag, cs->diag->print_json ? "[" : "[_");
 	diag_eol(cs->diag, false);
 	diag_indent_cbor(cs->diag);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
+void cbor_decode_array_end(struct cbor_stream *cs)
 {
-	nb_err_t err;
 	bool indefinite;
 
 	indefinite = top_block(cs)->indefinite;
-	if ((err = decode_block_end(cs, CBOR_TYPE_ARRAY)) != NB_ERR_OK)
-		return err;
+	decode_block_end(cs, CBOR_TYPE_ARRAY);
 
 	if (!indefinite)
 		diag_force_newline(cs->diag); /* TODO cleanup */
@@ -589,50 +514,37 @@ nb_err_t cbor_decode_array_end(struct cbor_stream *cs)
 	diag_dedent_cbor(cs->diag);
 	diag_log_cbor(cs->diag, "]");
 	diag_finish_item(cs);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
+void cbor_decode_map_begin(struct cbor_stream *cs, uint64_t *len)
 {
-	nb_err_t err;
-
-	if ((err = decode_block_start(cs, CBOR_TYPE_MAP, false, len)) != NB_ERR_OK)
-		return err;
+	decode_block_start(cs, CBOR_TYPE_MAP, false, len);
 
 	diag_log_cbor(cs->diag, "{");
 	diag_eol(cs->diag, false);
 	diag_indent_cbor(cs->diag);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_map_begin_indef(struct cbor_stream *cs)
+void cbor_decode_map_begin_indef(struct cbor_stream *cs)
 {
-	nb_err_t err;
 	uint64_t foo;
 
-	if ((err = decode_block_start(cs, CBOR_TYPE_MAP, true, &foo)) != NB_ERR_OK)
-		return err;
+	decode_block_start(cs, CBOR_TYPE_MAP, true, &foo);
 
 	diag_log_cbor(cs->diag, cs->diag->print_json ? "{" : "{_");
 	diag_eol(cs->diag, false);
 	diag_indent_cbor(cs->diag);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_map_end(struct cbor_stream *cs)
+void cbor_decode_map_end(struct cbor_stream *cs)
 {
-	nb_err_t err;
 	bool indefinite;
 
 	indefinite = top_block(cs)->indefinite;
-	if ((err = decode_block_end(cs, CBOR_TYPE_MAP)) != NB_ERR_OK)
-		return err;
+	decode_block_end(cs, CBOR_TYPE_MAP);
 
 	if (!indefinite)
 		diag_force_newline(cs->diag); /* TODO cleanup */
@@ -640,162 +552,122 @@ nb_err_t cbor_decode_map_end(struct cbor_stream *cs)
 	diag_dedent_cbor(cs->diag);
 	diag_log_cbor(cs->diag, "}");
 	diag_finish_item(cs);
-
-	return NB_ERR_OK;
 }
 
 
-static nb_err_t read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stream,
+static void read_stream_chunk(struct cbor_stream *cs, struct cbor_item *stream,
 	struct cbor_item *chunk, nb_byte_t **bytes, size_t *len)
 {
-	nb_err_t err;
-
 	if (chunk->u64 > SIZE_MAX)
-		return error(cs, NB_ERR_RANGE,
+		error(cs, NB_ERR_RANGE,
 			"Chunk is too large to be decoded by this implementation.");
 
 	*bytes = nb_realloc(*bytes, 1 + *len + chunk->u64);
-	if (!*bytes)
-		return error(cs, NB_ERR_NOMEM, "No memory to decode another buf chunk.");
 
-	if ((err = read_stream(cs, *bytes + *len, chunk->u64)) != NB_ERR_OK) {
-		free(*bytes);
-		return err;
-	}
+	read_stream(cs, *bytes + *len, chunk->u64);
+	/* TODO free(*bytes); */
 
 	(*bytes)[*len + chunk->u64] = 0;
 	*len += chunk->u64;
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
+void cbor_decode_stream(struct cbor_stream *cs, struct cbor_item *stream,
 	nb_byte_t **bytes, size_t *len)
 {
 	struct cbor_item chunk;
-	nb_err_t err;
 
 	*len = 0;
 	*bytes = NULL;
 
-	if (!is_indefinite(stream))
-		return read_stream_chunk(cs, stream, stream, bytes, len);
-
-	while ((err = predecode_check(cs, &chunk, stream->type)) == NB_ERR_OK) {
-		/* check indef */
-		if (is_indefinite(&chunk)) {
-			err = NB_ERR_INDEF;
-			break;
-		}
-
-		if ((err = read_stream_chunk(cs, stream, &chunk, bytes, len) != NB_ERR_OK))
-			break;
+	if (!is_indefinite(stream)) {
+		read_stream_chunk(cs, stream, stream, bytes, len);
+		return;
 	}
 
-	if (err == NB_ERR_BREAK)
-		return NB_ERR_OK;
-
-	free(*bytes);
-	return err;
+	while (!cbor_is_break(cs)) {
+		predecode_check(cs, &chunk, stream->type);
+		if (!is_indefinite(&chunk))
+			read_stream_chunk(cs, stream, &chunk, bytes, len);
+		else
+			error(cs, NB_ERR_INDEF, "Indefinite-length streams cannot "
+				"contain indefinite-length chunks");
+	}
 }
 
 
-nb_err_t cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
+void cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
 	nb_byte_t **bytes, size_t *len)
 {
-	nb_err_t err;
-	if ((err = cbor_decode_stream(cs, stream, bytes, len)) == NB_ERR_OK)
-		(*bytes)[*len] = 0;
-	return err;
+	cbor_decode_stream(cs, stream, bytes, len);
+	(*bytes)[*len] = 0;
 }
 
 
-nb_err_t cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
+void cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 {
 	struct cbor_item item;
-	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_BYTES)) != NB_ERR_OK)
-		return err;
-
-	if ((err = cbor_decode_stream(cs, &item, str, len)) != NB_ERR_OK)
-		return err;
+	predecode_check(cs, &item, CBOR_TYPE_BYTES);
+	cbor_decode_stream(cs, &item, str, len);
 
 	diag_log_cbor(cs->diag, "\"%s\"", *str);
 	diag_finish_item(cs);
-	return NB_ERR_OK;
 }
 
 
-static nb_err_t decode_text(struct cbor_stream *cs, char **str, size_t *len)
+static void decode_text(struct cbor_stream *cs, char **str, size_t *len)
 {
 	struct cbor_item item;
-	nb_err_t err;
 
-	if ((err = predecode_check(cs, &item, CBOR_TYPE_TEXT)) != NB_ERR_OK)
-		return err;
-
-	if ((err = cbor_decode_stream0(cs, &item, (nb_byte_t **)str, len)) != NB_ERR_OK)
-		return err;
+	predecode_check(cs, &item, CBOR_TYPE_TEXT);
+	cbor_decode_stream0(cs, &item, (nb_byte_t **)str, len);
 
 	diag_log_cbor(cs->diag, "\"%s\"", *str);
 	diag_finish_item(cs);
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_text(struct cbor_stream *cs, char **str)
+void cbor_decode_text(struct cbor_stream *cs, char **str)
 {
 	size_t unused;
-	return decode_text(cs, str, &unused);
+	decode_text(cs, str, &unused);
+	(void) unused;
 }
 
 
-static nb_err_t decode_array_items(struct cbor_stream *cs, struct cbor_item *arr,
-	struct cbor_item **items, uint64_t *nitems, bool map_diag)
+static void decode_array_items(struct cbor_stream *cs, struct cbor_item *arr,
+	struct cbor_item **items, uint64_t *nitems)
 {
 	struct cbor_item *item;
 	size_t size;
-	nb_err_t err = NB_ERR_OK;
 	size_t i;
 
-	size = CBOR_ARRAY_INIT_SIZE;
-	if (!is_indefinite(arr))
-		size = arr->u64;
-
 	*items = NULL;
-	i = 0;
+	size = is_indefinite(arr) ? CBOR_ARRAY_INIT_SIZE : arr->u64;
 
+	i = 0;
 	do {
 		*items = nb_realloc(*items, size * sizeof(**items));
-		if (!*items)
-			return error(cs, NB_ERR_NOMEM, "No memory to decode array items.");
 
 		while (i < size) {
 			item = *items + i;
-			if ((err = cbor_decode_item(cs, item)) != NB_ERR_OK)
-				break;
+			if (cbor_is_break(cs))
+				goto out;
+			cbor_decode_item(cs, item);
 			i++;
 		}
 
 		size *= 2;
-	} while (is_indefinite(arr) && err != NB_ERR_BREAK && err != NB_ERR_EOF);
-
+	} while (is_indefinite(arr));
+out:
 	*nitems = i;
-
-	if (err == NB_ERR_BREAK)
-		return NB_ERR_OK;
-
-	if (err != NB_ERR_OK)
-		xfree(*items);
-	return err;
 }
 
 
-static nb_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
+static void decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 	struct cbor_pair **pairs, uint64_t *npairs)
 {
-	nb_err_t err;
 	struct cbor_item arr;
 	struct cbor_item *items;
 	uint64_t nitems;
@@ -807,78 +679,62 @@ static nb_err_t decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 		.u64 = 2 * map->u64,
 	};
 
-	if ((err = decode_array_items(cs, &arr, &items, &nitems, true)) != NB_ERR_OK)
-		return err;
+	decode_array_items(cs, &arr, &items, &nitems);
 
 	if (nitems % 2 != 0)
-		return error(cs, NB_ERR_NITEMS, "Odd number of items in a map.");
+		error(cs, NB_ERR_NITEMS, "Odd number of items in a map.");
 	*npairs = nitems / 2;
-
 	*pairs = ((struct cbor_pair *)items);
-
-	return NB_ERR_OK;
 }
 
 
-nb_err_t cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
+void cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 {
-	nb_err_t err;
-
-	if ((err = cbor_peek(cs, item)) != NB_ERR_OK)
-		return err;
+	cbor_peek(cs, item);
 
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
-		return cbor_decode_uint64(cs, &item->u64);
+		cbor_decode_uint64(cs, &item->u64);
+		break;
 	case CBOR_TYPE_SVAL:
-		return cbor_decode_sval(cs, &item->sval);
+		cbor_decode_sval(cs, &item->sval);
+		break;
 	case CBOR_TYPE_INT:
-		return cbor_decode_int64(cs, &item->i64);
-	case CBOR_TYPE_FLOAT16:
-	case CBOR_TYPE_FLOAT32:
-	case CBOR_TYPE_FLOAT64:
-		return error(cs, NB_ERR_UNSUP, "Float decoding not supported."); /* TODO redundant error()? */
-
+		cbor_decode_int64(cs, &item->i64);
+		break;
 	case CBOR_TYPE_BYTES:
-		return cbor_decode_bytes(cs, &item->bytes, &item->len);
+		cbor_decode_bytes(cs, &item->bytes, &item->len);
+		break;
 	case CBOR_TYPE_TEXT:
-		return decode_text(cs, &item->str, &item->len);
+		decode_text(cs, &item->str, &item->len);
+		break;
 	case CBOR_TYPE_ARRAY:
 		if (!is_indefinite(item))
-			err = cbor_decode_array_begin(cs, &item->len);
+			cbor_decode_array_begin(cs, &item->len);
 		else
-			err = cbor_decode_array_begin_indef(cs);
-
-		if (err != NB_ERR_OK)
-			return err;
-
-		if ((err = decode_array_items(cs, item, &item->items, &item->len, false)))
-			return err;
-
-		return cbor_decode_array_end(cs);
+			cbor_decode_array_begin_indef(cs);
+		decode_array_items(cs, item, &item->items, &item->len);
+		cbor_decode_array_end(cs);
+		break;
 
 	case CBOR_TYPE_MAP:
 		if (!is_indefinite(item))
-			err = cbor_decode_map_begin(cs, &item->len);
+			cbor_decode_map_begin(cs, &item->len);
 		else
-			err = cbor_decode_map_begin_indef(cs);
+			cbor_decode_map_begin_indef(cs);
 
-		if (err != NB_ERR_OK)
-			return err;
-
-		if ((err = decode_map_items(cs, item, &item->pairs, &item->len)))
-			return err;
-
-		return cbor_decode_map_end(cs);
+		decode_map_items(cs, item, &item->pairs, &item->len);
+		cbor_decode_map_end(cs);
+		break;
 
 	case CBOR_TYPE_TAG:
 		cbor_decode_tag(cs, &item->tag);
 		item->tagged_item = nb_malloc(sizeof(*item->tagged_item));
-		if (!item->tagged_item)
-			return NB_ERR_NOMEM;
-		return cbor_decode_item(cs, item->tagged_item);
+		cbor_decode_item(cs, item->tagged_item);
+		break;
 
 	default:
-		return error(cs, NB_ERR_UNSUP, NULL);
+		error(cs, NB_ERR_UNSUP, "Decoding of %s data type is not supported",
+			cbor_type_string(item->type));
 	}
 }

@@ -230,7 +230,7 @@ num_ok=0
 make --directory=../build all
 
 setup_test_files
-//run_cbor_positive_tests
-//run_cbor_negative_tests
+run_cbor_positive_tests
+run_cbor_negative_tests
 run_io_buf_echo_tests
 print_results

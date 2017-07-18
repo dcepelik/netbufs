@@ -11,5 +11,6 @@ void nb_die(char *fmt, ...)
 	va_start(args, fmt);
 	vfprintf(stderr, fmt, args);
 	va_end(args);
+	abort();
 	exit(EXIT_FAILURE);
 }

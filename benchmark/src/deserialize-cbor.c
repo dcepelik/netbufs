@@ -125,11 +125,10 @@ void deserialize_rte(struct cbor_stream *cs, struct rte *rte)
 	cbor_decode_int32(cs, (int32_t *)&rte->type);
 	cbor_decode_array_begin_indef(cs);
 	rte->attrs = array_new(2, sizeof(*rte->attrs));
-	for (i = 0; (err = cbor_peek(cs, &item)) == NB_ERR_OK; i++) {
+	for (i = 0; !cbor_is_break(cs); i++) {
 		rte->attrs = array_push(rte->attrs, 1);
 		deserialize_rte_attr(cs, &rte->attrs[i]);
 	}
-	assert(err == NB_ERR_BREAK);
 	cbor_decode_array_end(cs);
 }
 

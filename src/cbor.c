@@ -38,6 +38,8 @@ const char *cbor_type_string(enum cbor_type type)
 		return "32-bit float";
 	case CBOR_TYPE_FLOAT64:
 		return "64-bit float";
+	case CBOR_TYPE_BREAK:
+		return "break";
 	}
 
 	return NULL;
@@ -100,6 +102,7 @@ void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag)
 nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *msg, ...)
 {
 	assert(err != NB_ERR_OK);
+	assert(err == NB_ERR_OK);
 
 	va_list args;
 

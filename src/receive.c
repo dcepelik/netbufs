@@ -22,8 +22,7 @@ size_t nb_internal_recv_array_size(struct nb *nb)
 
 static void recv_pid(struct nb *nb, nb_pid_t *pid)
 {
-	if (cbor_decode_uint64(&nb->cs, pid) == NB_ERR_BREAK)
-		*pid = UINT64_MAX;
+	cbor_decode_uint64(&nb->cs, pid);
 }
 
 
@@ -60,6 +59,9 @@ static bool recv_id(struct nb *nb, struct nb_group *group, nb_lid_t *id)
 	nb_pid_t pid;
 
 recv_another_key:
+	if (cbor_is_break(&nb->cs))
+		return false;
+
 	recv_pid(nb, &pid);
 
 	/* pID 0 is reserved and means "the type of this group", don't do any lookups */
@@ -70,9 +72,6 @@ recv_another_key:
 	else if (pid == 1) {
 		recv_key(nb, group);
 		goto recv_another_key;
-	}
-	else if (pid == UINT64_MAX) {
-		return false;
 	}
 
 	/* TODO undef lids in pid_to_lid shall be LID_UNKNOWN! */
