@@ -8,6 +8,7 @@
 #include <string.h>
 
 #define	LID_UNKNOWN	(-1)
+#define NB_DEBUG_THIS	1
 
 
 /* TODO remove this if possible */
@@ -134,9 +135,6 @@ nb_err_t nb_recv_group_end(struct nb *nb)
 	ended_group = top_block(&nb->cs)->group; /* in Czech: `skončivší', ha ha */
 	assert(ended_group != NULL); /* TODO check this */
 
-	//if (top_block(&nb->cs)->num_items > 0)
-		//diag_dedent_proto(&nb->diag);
-	
 	cbor_decode_map_end(&nb->cs);
 
 	nb->active_group = top_block(&nb->cs)->group;

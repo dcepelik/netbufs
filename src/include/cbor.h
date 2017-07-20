@@ -13,6 +13,7 @@
 #include "memory.h"
 #include "stack.h"
 #include "sval.h"
+#include "diag.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -20,6 +21,9 @@
 #include <inttypes.h>
 
 #define CBOR_BREAK	0xFF
+
+#define diag_finish_item(cs)	diag_if_on((cs)->diag, diag_finish_item_do(cs))
+
 
 /*
  * Type of a CBOR Data Item as percieved by the user.
@@ -146,6 +150,12 @@ struct cbor_pair
 
 void predecode(struct cbor_stream *cs, struct cbor_item *item);
 
+static inline struct block *top_block(struct cbor_stream *cs)
+{
+	assert(!stack_is_empty(&cs->blocks));
+	return stack_top(&cs->blocks);
+}
+
 
 /* TODO valid fields in item when using peek_item -> manual */
 static inline void cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
@@ -221,15 +231,45 @@ static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
 
 uint64_t decode_uint(struct cbor_stream *cs, uint64_t max);
 
+
+static inline void diag_finish_item_do(struct cbor_stream *cs)
+{
+	switch (top_block(cs)->type) {
+	case CBOR_TYPE_ARRAY:
+		diag_eol(cs->diag, true);
+		break;
+
+	case CBOR_TYPE_MAP: /* TODO */
+		if (top_block(cs)->num_items % 2 == 0) {
+			diag_dedent_cbor(cs->diag);
+			diag_eol(cs->diag, true);
+		}
+		else {
+			diag_log_cbor(cs->diag, ":");
+			diag_eol(cs->diag, false);
+			diag_indent_cbor(cs->diag);
+		}
+		break;
+
+	default:
+		if (cbor_block_stack_empty(cs))
+			diag_eol(cs->diag, true);
+	}
+}
+
+
 static inline void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
 {
 	nb_byte_t hdr = (nb_byte_t)nb_buffer_peek(cs->buf);
-	struct block *b;
 	if (hdr <= 23) {
-		b = stack_top(&cs->blocks);
-		b->num_items++;
-		*val = hdr;
 		nb_buffer_getc(cs->buf);
+		top_block(cs)->num_items++;
+		*val = hdr;
+		diag_log_raw(cs->diag, (nb_byte_t *)val, 1);
+		diag_comma(cs->diag); /* append a comma to previous line if needed */
+		diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(CBOR_TYPE_UINT), *val);
+		diag_log_cbor(cs->diag, "%lu", *val);
+		diag_finish_item(cs);
 	}
 	else {
 		*val = decode_uint(cs, UINT64_MAX);

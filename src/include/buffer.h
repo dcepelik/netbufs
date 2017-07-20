@@ -32,7 +32,7 @@ static inline ssize_t nb_buffer_write(struct nb_buffer *buf, nb_byte_t *bytes, s
 	avail = buf->bufsize - buf->len;
 	assert(avail >= 0);
 
-	if (__builtin_expect(count <= avail, 1)) {
+	if (likely(count <= avail)) {
 		memcpy(buf->buf + buf->pos, bytes, count);
 		buf->pos += count;
 		buf->len = buf->pos;
@@ -54,7 +54,7 @@ static inline ssize_t nb_buffer_read(struct nb_buffer *buf, nb_byte_t *bytes, si
 	avail = buf->len - buf->pos;
 	assert(avail >= 0);
 
-	if (__builtin_expect(count <= avail, 1)) {
+	if (likely(count <= avail)) {
 		memcpy(bytes, buf->buf + buf->pos, count);
 		buf->pos += count;
 		buf->last_read_len += count;

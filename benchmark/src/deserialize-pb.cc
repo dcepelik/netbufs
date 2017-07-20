@@ -25,7 +25,7 @@ struct rt *deserialize_pb(struct nb_buffer *buf)
 	clock_t start_i = clock();
 	assert(pb_rt.ParseFromString(input));
 	clock_t end_i = clock();
-	cout << "\tinner deserialize " << setprecision(3) << time_diff(start_i, end_i) << endl;
+	cout << time_diff(start_i, end_i) << " " << 0 << endl << "protobufall";
 
 	struct rt *rt = (struct rt *)nb_malloc(sizeof(rt));
 	rt->version_str = (char *)pb_rt.version().c_str();

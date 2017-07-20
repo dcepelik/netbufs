@@ -64,12 +64,6 @@ static inline bool major_allows_indefinite(enum major major)
 	}
 }
 
-static inline struct block *top_block(struct cbor_stream *cs)
-{
-	assert(!stack_is_empty(&cs->blocks));
-	return stack_top(&cs->blocks);
-}
-
 nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *str, ...);
 nb_err_t push_block(struct cbor_stream *cs, enum cbor_type type, bool indefinite, uint64_t len);
 struct block *top_block(struct cbor_stream *cs);

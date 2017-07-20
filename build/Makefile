@@ -26,7 +26,7 @@ CFLAGS += -c -std=gnu11 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
 	-I /usr/include/libxml2 \
-	-ggdb3 -DNB_DEBUG -DNDEBUG
+	-ggdb3 -DNB_DEBUG
 
 CXXFLAGS += -c \
 	-Wall -Werror --pedantic \

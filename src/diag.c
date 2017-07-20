@@ -13,6 +13,7 @@
 #include <string.h>
 
 #define BYTES_DUMP_MAXLEN_DEFAULT	64
+#define NB_DEBUG_THIS			1
 
 
 static void isbuf_init(struct isbuf *is, size_t init_size)

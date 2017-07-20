@@ -5,7 +5,7 @@
 #
 
 BUILD_DIR=../build
-METHODS="binary bird cbor netbufs xml protobuf"
+METHODS="binary cbor netbufs protobuf"
 BENCHMARK_TOOL=$BUILD_DIR/benchmark
 INPUT_TEST=data/rt4
 

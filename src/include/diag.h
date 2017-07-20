@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-#define DIAG_ENABLE			0
+#define DIAG_ENABLE			1
 
 #define DIAG_NUM_COLS			5
 #define DIAG_DEFAULT_INDENT_CHAR	'.'

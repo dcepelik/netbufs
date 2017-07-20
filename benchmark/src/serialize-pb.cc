@@ -113,5 +113,5 @@ void serialize_pb(struct rt *rt, struct nb_buffer *buf)
 	clock_t end_i = clock();
 
 	nb_buffer_write(buf, (nb_byte_t *)output.c_str(), output.length());
-	cout << "\tinner serialize " << setprecision(3) << time_diff(start_i, end_i) << endl;
+	cout << "\t" << setprecision(3) << time_diff(start_i, end_i) << " ";
 }

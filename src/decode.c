@@ -3,7 +3,6 @@
  * CBOR Decoder
  *
  * TODO Get rid of all recursion, or limit allowed nesting of maps and arrays.
- * TODO Open a nesting block when using cbor_decode_item and we run into an array, too.
  * TODO Enforce memory limits (globally or per item).
  * TODO Decoding of tagged items
  */
@@ -12,7 +11,6 @@
 #include "cbor-internal.h"
 #include "cbor.h"
 #include "debug.h"
-#include "diag.h"
 #include "memory.h"
 #include "util.h"
 
@@ -30,11 +28,10 @@
 #define	MAJOR_MASK	0xE0
 #define	LBITS_MASK	0x1F
 
-#define diag_finish_item(cs)	diag_if_on((cs)->diag, diag_finish_item_do(cs))
-
 extern void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val);
 extern bool cbor_is_break(struct cbor_stream *cs);
 extern void cbor_peek(struct cbor_stream *cs, struct cbor_item *item);
+extern void diag_finish_item_do(struct cbor_stream *cs);
 
 
 static inline uint8_t lbits_to_nbytes(enum lbits lbits)
@@ -97,32 +94,6 @@ static inline int64_t u64_to_i64(struct cbor_stream *cs, uint64_t u64)
 	error(cs, NB_ERR_RANGE, "Negative integer -%lu less than -%lu cannot be decoded.",
 		u64, INT64_MIN_ABS);
 	return 0; /* TODO */
-}
-
-
-static void diag_finish_item_do(struct cbor_stream *cs)
-{
-	switch (top_block(cs)->type) {
-	case CBOR_TYPE_ARRAY:
-		diag_eol(cs->diag, true);
-		break;
-
-	case CBOR_TYPE_MAP: /* TODO */
-		if (top_block(cs)->num_items % 2 == 0) {
-			diag_dedent_cbor(cs->diag);
-			diag_eol(cs->diag, true);
-		}
-		else {
-			diag_log_cbor(cs->diag, ":");
-			diag_eol(cs->diag, false);
-			diag_indent_cbor(cs->diag);
-		}
-		break;
-
-	default:
-		if (cbor_block_stack_empty(cs))
-			diag_eol(cs->diag, true);
-	}
 }
 
 
