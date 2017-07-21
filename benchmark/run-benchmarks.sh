@@ -11,6 +11,10 @@ INPUT_TEST=data/rt4
 
 make --directory=$BUILD_DIR
 
+#
+# TODO: diff the outputs
+#
+
 for method in $METHODS; do
 	result=$($BENCHMARK_TOOL $method $INPUT_TEST /tmp/out)
 	send=$(echo $result | cut -d' ' -f1)
@@ -18,5 +22,5 @@ for method in $METHODS; do
 	size=$(echo $result | cut -d' ' -f3)
 	hsize=$(numfmt --to=iec-i --suffix=B --format="%.3f" $size)
 
-	echo "\tt $method & $send s & $recv s & $hsize\crl"
+	echo "$method... encode: $send s decode: $recv s size: $hsize\crl"
 done

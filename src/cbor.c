@@ -13,7 +13,7 @@ extern struct block *top_block(struct cbor_stream *cs);
 #define MEMPOOL_BLOCK_SIZE	(32 * sizeof(struct cbor_item))
 
 
-const char *cbor_type_string(enum cbor_type type)
+const char *cbor_type_to_string(enum cbor_type type)
 {
 	switch (type) {
 	case CBOR_TYPE_UINT:
@@ -102,7 +102,6 @@ void cbor_stream_set_diag(struct cbor_stream *cs, struct diag *diag)
 nb_err_t error(struct cbor_stream *cs, nb_err_t err, char *msg, ...)
 {
 	assert(err != NB_ERR_OK);
-	assert(err == NB_ERR_OK);
 
 	va_list args;
 

@@ -195,8 +195,8 @@ static nb_err_t end_block(struct cbor_stream *cs, enum cbor_type type)
 	block = stack_pop(&cs->blocks);
 	if (block->type != type)
 		return error(cs, NB_ERR_OPER, "Attempting to close %s "
-			"block when %s is open.", cbor_type_string(type),
-			cbor_type_string(block->type));
+			"block when %s is open.", cbor_type_to_string(type),
+			cbor_type_to_string(block->type));
 
 	if (block->indefinite)
 		return write_break(cs);

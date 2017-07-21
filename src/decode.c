@@ -193,13 +193,13 @@ void predecode(struct cbor_stream *cs, struct cbor_item *item)
 		else {
 			if (!major_allows_indefinite(major))
 				error(cs, NB_ERR_INDEF, "Indefinite-length encoding "
-					"is not allowed for %s items.", cbor_type_string(major));
-			diag_log_item(cs->diag, "%s(_)", cbor_type_string(item->type));
+					"is not allowed for %s items.", cbor_type_to_string(major));
+			diag_log_item(cs->diag, "%s(_)", cbor_type_to_string(item->type));
 			return;
 		}
 	}
 
-	diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(item->type), u64);
+	diag_log_item(cs->diag, "%s(%lu)", cbor_type_to_string(item->type), u64);
 
 	item->u64 = u64; /* TODO remove */
 	switch (item->type)
@@ -249,7 +249,7 @@ static inline void predecode_check(struct cbor_stream *cs, struct cbor_item *ite
 	predecode(cs, item);
 	if (item->type != type)
 		error(cs, NB_ERR_ITEM, "%s was unexpected, %s was expected.",
-			cbor_type_string(item->type), cbor_type_string(type));
+			cbor_type_to_string(item->type), cbor_type_to_string(type));
 }
 
 
@@ -287,7 +287,7 @@ static int64_t decode_int(struct cbor_stream *cs, int64_t min, int64_t max)
 	}
 	else {
 		error(cs, NB_ERR_ITEM, "%s was unexpected, unsigned or negative "
-			"integer was expected", cbor_type_string(item.type));
+			"integer was expected", cbor_type_to_string(item.type));
 		return 0;
 	}
 
@@ -404,7 +404,7 @@ static void decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 	block = stack_top(&cs->blocks);
 	if (block->type != type)
 		error(cs, NB_ERR_OPER, "Cannot end block of type %s when block of %s "
-			"is open", cbor_type_string(block->type), cbor_type_string(type));
+			"is open", cbor_type_to_string(block->type), cbor_type_to_string(type));
 
 	if (block->indefinite)
 		decode_break(cs);
@@ -412,7 +412,7 @@ static void decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 	else if (block->num_items != block->len) {
 		error(cs, NB_ERR_OPER,
 			"Cannot end %s: designated size is %lu, but %lu items were decoded",
-			cbor_type_string(block->type), block->len, block->num_items);
+			cbor_type_to_string(block->type), block->len, block->num_items);
 	}
 
 	(void) stack_pop(&cs->blocks);
@@ -422,6 +422,7 @@ static void decode_block_end(struct cbor_stream *cs, enum cbor_type type)
 void cbor_decode_array_begin(struct cbor_stream *cs, uint64_t *len)
 {
 	decode_block_start(cs, CBOR_TYPE_ARRAY, false, len);
+
 
 	diag_log_cbor(cs->diag, "[");
 	diag_eol(cs->diag, false);
@@ -547,11 +548,25 @@ void cbor_decode_stream0(struct cbor_stream *cs, struct cbor_item *stream,
 void cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 {
 	struct cbor_item item;
+	size_t i;
+	size_t dump_len;
 
 	predecode_check(cs, &item, CBOR_TYPE_BYTES);
 	cbor_decode_stream(cs, &item, str, len);
 
-	diag_log_cbor(cs->diag, "\"%s\"", *str);
+	struct strbuf bytes_dump;
+	strbuf_init(&bytes_dump, 64);
+	dump_len = MIN(*len, cs->diag->bytes_dump_maxlen);
+
+	strbuf_printf(&bytes_dump, item.type == CBOR_TYPE_TEXT ? "\"" : "h'");
+	for (i = 0; i < dump_len; i++)
+		strbuf_printf(&bytes_dump, "%02X", (*str)[i]);
+	if (i < *len)
+		strbuf_printf(&bytes_dump, "...");
+	strbuf_printf(&bytes_dump, "\'");
+
+	diag_log_cbor(cs->diag, "%s", strbuf_get_string(&bytes_dump));
+	strbuf_free(&bytes_dump);
 	diag_finish_item(cs);
 }
 
@@ -559,11 +574,25 @@ void cbor_decode_bytes(struct cbor_stream *cs, nb_byte_t **str, size_t *len)
 static void decode_text(struct cbor_stream *cs, char **str, size_t *len)
 {
 	struct cbor_item item;
+	size_t i;
+	size_t dump_len;
 
 	predecode_check(cs, &item, CBOR_TYPE_TEXT);
 	cbor_decode_stream0(cs, &item, (nb_byte_t **)str, len);
 
-	diag_log_cbor(cs->diag, "\"%s\"", *str);
+	struct strbuf str_dump;
+	strbuf_init(&str_dump, 64);
+	dump_len = MIN(*len, cs->diag->str_dump_maxlen);
+
+	strbuf_printf(&str_dump, item.type == CBOR_TYPE_TEXT ? "\"" : "h\"");
+	for (i = 0; i < dump_len; i++)
+		strbuf_printf(&str_dump, "%c", (*str)[i]);
+	if (i < *len)
+		strbuf_printf(&str_dump, "...");
+	strbuf_printf(&str_dump, "\"");
+
+	diag_log_cbor(cs->diag, "%s", strbuf_get_string(&str_dump));
+
 	diag_finish_item(cs);
 }
 
@@ -588,7 +617,10 @@ static void decode_array_items(struct cbor_stream *cs, struct cbor_item *arr,
 
 	i = 0;
 	do {
-		*items = nb_realloc(*items, size * sizeof(**items));
+		if (size > 0)
+			*items = nb_realloc(*items, size * sizeof(**items));
+		else
+			*items = NULL;
 
 		while (i < size) {
 			item = *items + i;
@@ -631,6 +663,7 @@ static void decode_map_items(struct cbor_stream *cs, struct cbor_item *map,
 void cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 {
 	cbor_peek(cs, item);
+	size_t tmp;
 
 	switch (item->type) {
 	case CBOR_TYPE_UINT:
@@ -649,17 +682,26 @@ void cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 		decode_text(cs, &item->str, &item->len);
 		break;
 	case CBOR_TYPE_ARRAY:
-		if (!is_indefinite(item))
-			cbor_decode_array_begin(cs, &item->len);
-		else
+		if (!is_indefinite(item)) {
+			/* tmp: optimization by GCC causes a bug */
+			cbor_decode_array_begin(cs, &tmp);
+			item->u64 = tmp;
+			item->len = tmp;
+		}
+		else {
 			cbor_decode_array_begin_indef(cs);
+		}
 		decode_array_items(cs, item, &item->items, &item->len);
 		cbor_decode_array_end(cs);
 		break;
 
 	case CBOR_TYPE_MAP:
-		if (!is_indefinite(item))
-			cbor_decode_map_begin(cs, &item->len);
+		if (!is_indefinite(item)) {
+			/* tmp: optimization by GCC causes a bug */
+			cbor_decode_map_begin(cs, &tmp);
+			item->u64 = tmp;
+			item->len = tmp;
+		}
 		else
 			cbor_decode_map_begin_indef(cs);
 
@@ -675,6 +717,6 @@ void cbor_decode_item(struct cbor_stream *cs, struct cbor_item *item)
 
 	default:
 		error(cs, NB_ERR_UNSUP, "Decoding of %s data type is not supported",
-			cbor_type_string(item->type));
+			cbor_type_to_string(item->type));
 	}
 }

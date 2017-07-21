@@ -11,7 +11,7 @@ BENCH_SRC_DIR = $(ROOT_DIR)/benchmark/src
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(subst $(SRC_DIR)/, objs/netbufs/, $(patsubst %.c, %.o, $(SRCS)))
 DEPS = $(subst $(SRC_DIR)/, deps/netbufs/, $(patsubst %.c, %.deps, $(SRCS)))
-BINS = benchmark nbdiag test-array test-stream
+BINS = benchmark test-array test-stream
 
 BENCH_SRCS = $(wildcard $(BENCH_SRC_DIR)/*.c)
 BENCH_OBJS = $(subst $(BENCH_SRC_DIR), objs/benchmark, $(patsubst %.c, %.o, $(BENCH_SRCS)))
@@ -22,7 +22,7 @@ MAINS = $(addprefix objs/netbufs/, nbdiag.o test-array.o test-stream.o test-adho
 
 CFLAGS += -c -std=gnu11 \
 	-Wall -Werror --pedantic \
-	-O3 \
+	-O2 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
 	-I /usr/include/libxml2 \
@@ -30,16 +30,17 @@ CFLAGS += -c -std=gnu11 \
 
 CXXFLAGS += -c \
 	-Wall -Werror --pedantic \
-	-O3 \
+	-O2 \
 	-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
 	-I $(SRC_DIR)/include \
-	-ggdb3 -DNEDBUG
+	-ggdb3
 LDFLAGS += -Wall -lxml2 -flto
 
-all: $(BINS)
+all: $(BINS) nbdiag
 
-nbdiag: $(filter-out $(MAINS), $(OBJS)) objs/netbufs/nbdiag.o
-	$(CC) $(LDFLAGS) -o $@ $^
+nbdiag: $(filter-out $(addprefix ../src/, test-array.c test-stream.c test-adhoc.c benchmark.c), $(SRCS))
+	$(CC) -Wall -Werror --pedantic -Wno-unused-function -Wno-unused-variable \
+		-Wno-unused-but-set-variable -I$(SRC_DIR)/include -ggdb3 -DNB_DEBUG -DDIAG_ENABLE -o $@ $^
 
 benchmark: $(BENCH_OBJS) $(filter-out $(MAINS),$(OBJS))
 	$(CXX) $(LDFLAGS) -o $@ $^ -lprotobuf -pthread

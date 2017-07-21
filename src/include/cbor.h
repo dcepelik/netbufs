@@ -45,7 +45,7 @@ enum cbor_type
 	CBOR_TYPE_BREAK,
 };
 
-const char *cbor_type_string(enum cbor_type type);
+const char *cbor_type_to_string(enum cbor_type type);
 
 struct cbor_pair;
 
@@ -70,7 +70,7 @@ struct cbor_item
 	nb_byte_t rfu[2];	/* reserved for future use */
 	uint32_t tag;		/* CBOR_TYPE_TAG */
 
-	/* refactoring aid */
+	/* TODO refactoring aids, remove when done - only use the union */
 	uint64_t len;				/* go away! */
 	uint64_t u64;				/* CBOR_TYPE_UINT */
 
@@ -165,6 +165,8 @@ static inline void cbor_peek(struct cbor_stream *cs, struct cbor_item *item)
 	nb_byte_t hdr = nb_buffer_peek(cs->buf);
 	if (hdr == CBOR_BREAK) {
 		item->type = CBOR_TYPE_BREAK;
+		item->flags = 0;
+		item->u64 = 0;
 		return;
 	}
 
@@ -186,14 +188,11 @@ static inline bool cbor_is_break(struct cbor_stream *cs)
  * Stream encoding and decoding of items.
  */
 
-
 nb_err_t cbor_encode_uint8(struct cbor_stream *cs, uint8_t val);
-void cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
-
 nb_err_t cbor_encode_uint16(struct cbor_stream *cs, uint16_t val);
-void cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val);
-
 nb_err_t cbor_encode_uint32_slow(struct cbor_stream *cs, uint32_t val);
+
+
 static inline nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val)
 {
 	nb_byte_t hdr;
@@ -210,9 +209,14 @@ static inline nb_err_t cbor_encode_uint32(struct cbor_stream *cs, uint32_t val)
 	}
 }
 
-void cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val);
 
+uint64_t decode_uint(struct cbor_stream *cs, uint64_t max);
+void cbor_decode_uint8(struct cbor_stream *cs, uint8_t *val);
+void cbor_decode_uint16(struct cbor_stream *cs, uint16_t *val);
+void cbor_decode_uint32(struct cbor_stream *cs, uint32_t *val);
 nb_err_t cbor_encode_uint64_slow(struct cbor_stream *cs, uint64_t val);
+
+
 static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
 {
 	nb_byte_t hdr;
@@ -228,8 +232,6 @@ static inline nb_err_t cbor_encode_uint64(struct cbor_stream *cs, uint64_t val)
 		return cbor_encode_uint32_slow(cs, val);
 	}
 }
-
-uint64_t decode_uint(struct cbor_stream *cs, uint64_t max);
 
 
 static inline void diag_finish_item_do(struct cbor_stream *cs)
@@ -267,7 +269,7 @@ static inline void cbor_decode_uint64(struct cbor_stream *cs, uint64_t *val)
 		*val = hdr;
 		diag_log_raw(cs->diag, (nb_byte_t *)val, 1);
 		diag_comma(cs->diag); /* append a comma to previous line if needed */
-		diag_log_item(cs->diag, "%s(%lu)", cbor_type_string(CBOR_TYPE_UINT), *val);
+		diag_log_item(cs->diag, "%s(%lu)", cbor_type_to_string(CBOR_TYPE_UINT), *val);
 		diag_log_cbor(cs->diag, "%lu", *val);
 		diag_finish_item(cs);
 	}

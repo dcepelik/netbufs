@@ -311,7 +311,7 @@ void diag_print_block_stack(struct diag *diag)
 
 	//stack_foreach(&diag->cs->blocks, block) {
 	//	fprintf(stderr, "Block #%lu, type=%s, active_group=%s\n",
-	//		i, cbor_type_string(block->type),
+	//		i, cbor_type_to_string(block->type),
 	//		block->group ? block->group->name : "<none>");
 	//	i++;
 	//}
